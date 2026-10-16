@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.4.2
+
+- Suppress DWM's system-accent caption fill on full-client Acrylic windows, including after system theme changes, while retaining resizing and background material.
+- Enlarge dictionary definitions, examples, translations, search input and supporting text; give multiline results more line spacing.
+- Reduce the dark overlay on Acrylic and result cards, with brighter secondary text and the existing opaque fallback.
+- Check native caption/resize flags and the Acrylic-or-opaque invariant using an HWND that is never displayed or activated.
+
 ## 0.4.1
 
 - Replace private-use icon-font glyphs and disclosure arrows with vector geometry so global text styles cannot turn controls into missing-glyph boxes.

@@ -145,7 +145,7 @@ public partial class MainWindow : Window
         SetQuery(raw.Trim());
         Welcome.Visibility = Visibility.Collapsed; EntryPanel.Visibility = Visibility.Visible;
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
-        Headword.Text = raw.Trim(); Headword.FontSize = 28; Phonetic.Text = "";
+        Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = "";
         LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear();
         ResultsScroll.ScrollToTop(); LookupStatus.Text = "查询本地词库…";
         var notes = new List<string>();
@@ -235,15 +235,21 @@ public partial class MainWindow : Window
     private static string Status(List<string> notes, string fallback) => notes.Count == 0 ? fallback : string.Join(" · ", notes);
     private async Task TryCacheAsync<T>(string kind, string query, T value)
     { try { await cache.WriteAsync(kind, query, value); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* Cache failure never discards a valid result. */ } }
-    private TextBlock Hint(string text, Brush? brush = null) => new() { Text = text, Foreground = brush ?? muted, FontSize = 11, Margin = new(0,4,0,12), TextWrapping = TextWrapping.Wrap };
-    private TextBox Selectable(string text, double size = 14) => new() { Text = text, Style = (Style)FindResource("Selectable"), FontSize = size, Margin = new(0,3,0,6) };
+    private TextBlock Hint(string text, Brush? brush = null) => new() { Text = text, Foreground = brush ?? muted, FontSize = 14, Margin = new(0,4,0,12), TextWrapping = TextWrapping.Wrap };
+    private TextBox Selectable(string text, double size = 18)
+    {
+        var block = new TextBox { Text = text, Style = (Style)FindResource("Selectable"), FontSize = size, Margin = new(0,4,0,8) };
+        TextBlock.SetLineHeight(block, size * 1.55);
+        TextBlock.SetLineStackingStrategy(block, LineStackingStrategy.BlockLineHeight);
+        return block;
+    }
     private StackPanel Card(Panel parent, string title, string source, bool accent = false)
     {
         var content = new StackPanel();
         var header = new Grid { Margin = new(0,0,0,10) };
         header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        header.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 12, Foreground = accent ? green : Foreground, Margin = new(0,0,10,0) });
-        var tag = new TextBlock { Text = source, FontSize = 10, Foreground = muted, VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(tag,1); header.Children.Add(tag);
+        header.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 15, Foreground = accent ? green : Foreground, Margin = new(0,0,10,0) });
+        var tag = new TextBlock { Text = source, FontSize = 13, Foreground = muted, VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(tag,1); header.Children.Add(tag);
         content.Children.Add(header);
         parent.Children.Add(new Border { Background = accent ? Theme.Brush("PanelSurface") : Brushes.Transparent, CornerRadius = new(accent ? 8 : 0), BorderBrush = Theme.Brush("Stroke"), BorderThickness = accent ? new(1) : new(0,0,0,1), Padding = accent ? new(16,14,16,12) : new(0,12,0,14), Margin = new(0,0,0,12), Child = content });
         return content;
@@ -261,8 +267,8 @@ public partial class MainWindow : Window
             if (Queries.Normalize(entry.Word) != query) card.Children.Add(Hint("词条：" + entry.Word));
             if (!string.IsNullOrWhiteSpace(entry.Chinese)) card.Children.Add(Selectable(entry.Chinese));
             if (!string.IsNullOrWhiteSpace(entry.English)) card.Children.Add(Selectable(entry.English));
-            if (!string.IsNullOrWhiteSpace(entry.Original)) card.Children.Add(new Expander { Header = "完整原始条目", Content = Selectable(entry.Original, 12), Margin = new(0,10,0,4) });
-            var source = new Button { Content = "词典来源 ↗", FontSize = 11, Foreground = muted, HorizontalAlignment = HorizontalAlignment.Left, Padding = new(0,5,0,0) };
+            if (!string.IsNullOrWhiteSpace(entry.Original)) card.Children.Add(new Expander { Header = "完整原始条目", Content = Selectable(entry.Original, 16), Margin = new(0,10,0,4) });
+            var source = new Button { Content = "词典来源 ↗", FontSize = 14, Foreground = muted, HorizontalAlignment = HorizontalAlignment.Left, Padding = new(0,5,0,0) };
             source.Click += (_, _) => OpenSource(hit.Dictionary.SourceUrl); card.Children.Add(source);
             card.Children.Add(Hint(hit.Dictionary.Attribution + " · " + hit.Dictionary.License));
         }
@@ -273,9 +279,9 @@ public partial class MainWindow : Window
         var stack = new StackPanel { Margin = new(0,10,0,0) };
         for (int i = 0; i < entry.Senses.Length; i++)
         {
-            stack.Children.Add(new TextBlock { Text = $"[{i+1}]  {entry.Senses[i].PartOfSpeech.ToLowerInvariant()}", Foreground = green, FontSize = 12, Margin = new(0,7,0,3) });
+            stack.Children.Add(new TextBlock { Text = $"[{i+1}]  {entry.Senses[i].PartOfSpeech.ToLowerInvariant()}", Foreground = green, FontSize = 15, Margin = new(0,7,0,3) });
             stack.Children.Add(Selectable(entry.Senses[i].Definition));
-            foreach (var example in entry.Senses[i].Examples) { var text = Selectable(example,13); text.Foreground = muted; stack.Children.Add(text); }
+            foreach (var example in entry.Senses[i].Examples) { var text = Selectable(example,16); text.Foreground = muted; stack.Children.Add(text); }
         }
         var source = new Button { Content = "查看 Wiktionary 来源 ↗", HorizontalAlignment = HorizontalAlignment.Left, Foreground = green, Padding = new(0,8,0,8) };
         source.Click += (_, _) => OpenSource(entry.Url);
@@ -292,13 +298,13 @@ public partial class MainWindow : Window
         foreach (var (sense, i) in entry.Senses.Select((s,i)=>(s,i)))
         {
             var label = $"{i+1:00}  {sense.PartOfSpeech}" + (string.IsNullOrWhiteSpace(sense.Register) ? "" : "  ·  " + sense.Register);
-            card.Children.Add(new TextBlock { Text = label, Foreground = muted, FontSize = 11, Margin = new(0,i == 0 ? 0 : 16,0,5) });
-            card.Children.Add(Selectable(sense.Chinese,16));
+            card.Children.Add(new TextBlock { Text = label, Foreground = muted, FontSize = 14, Margin = new(0,i == 0 ? 0 : 16,0,5) });
+            card.Children.Add(Selectable(sense.Chinese,20));
             card.Children.Add(Selectable(sense.English));
             if (!string.IsNullOrWhiteSpace(sense.Example))
             {
-                var example = new StackPanel(); var en = Selectable(sense.Example,13); en.Foreground = muted; example.Children.Add(en);
-                if (!string.IsNullOrWhiteSpace(sense.ExampleChinese)) { var zh = Selectable(sense.ExampleChinese,12); zh.Foreground = muted; example.Children.Add(zh); }
+                var example = new StackPanel(); var en = Selectable(sense.Example,16); en.Foreground = muted; example.Children.Add(en);
+                if (!string.IsNullOrWhiteSpace(sense.ExampleChinese)) { var zh = Selectable(sense.ExampleChinese,16); zh.Foreground = muted; example.Children.Add(zh); }
                 card.Children.Add(new Border { Child = example, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(2,0,0,0), Padding = new(10,0,0,0), Margin = new(0,8,0,4) });
             }
             if (sense.Evidence.Length > 0 && online != null)
@@ -306,7 +312,7 @@ public partial class MainWindow : Window
                 foreach (var number in sense.Evidence.Distinct())
                 {
                     var cited = online.Senses[number - 1];
-                    var evidence = new Button { Content = $"[{number}] {cited.SourceName} ↗", FontSize = 11, Foreground = muted, HorizontalAlignment = HorizontalAlignment.Left, Padding = new(0,3,0,0), ToolTip = cited.Definition };
+                    var evidence = new Button { Content = $"[{number}] {cited.SourceName} ↗", FontSize = 14, Foreground = muted, HorizontalAlignment = HorizontalAlignment.Left, Padding = new(0,3,0,0), ToolTip = cited.Definition };
                     evidence.Click += (_, _) => OpenSource(string.IsNullOrEmpty(cited.SourceUrl) ? online.Url : cited.SourceUrl);
                     card.Children.Add(evidence);
                 }
