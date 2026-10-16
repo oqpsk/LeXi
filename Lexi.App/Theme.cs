@@ -34,9 +34,6 @@ internal static class Theme
         window.SourceInitialized += (_, _) =>
         {
             var handle = new WindowInteropHelper(window).Handle;
-            int dark = 1, rounded = 2;
-            DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
-            DwmSetWindowAttribute(handle, 33, ref rounded, sizeof(int));
             if (HwndSource.FromHwnd(handle) is not { } source) return;
             void Refresh() { if (!source.IsDisposed) ApplyBackdrop(window, source); }
             HwndSourceHook hook = (IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled) =>
@@ -84,8 +81,15 @@ internal static class Theme
     }
     private static void ApplyBackdrop(Window window, HwndSource source)
     {
+        int dark = 1, rounded = 2, noCaption = unchecked((int)0xFFFFFFFE); // DWMWA_COLOR_NONE
+        DwmSetWindowAttribute(source.Handle, 20, ref dark, sizeof(int));
+        DwmSetWindowAttribute(source.Handle, 33, ref rounded, sizeof(int));
+        // Full-client glass can still pick up the system's accent-colored caption fill,
+        // even with WindowStyle.None and no reserved caption area. Suppress that part
+        // explicitly, keeping the full-client backdrop and native resize border.
+        var captionHidden = DwmSetWindowAttribute(source.Handle, 35, ref noCaption, sizeof(int)) == 0;
         var composition = DwmIsCompositionEnabled(out var enabled) == 0 && enabled;
-        var useGlass = SupportsGlass(Environment.OSVersion.Version, composition, TransparencyEnabled(), SystemParameters.HighContrast);
+        var useGlass = captionHidden && SupportsGlass(Environment.OSVersion.Version, composition, TransparencyEnabled(), SystemParameters.HighContrast);
         var chrome = WindowChrome.GetWindowChrome(window);
         if (useGlass)
         {
@@ -104,7 +108,7 @@ internal static class Theme
             // Only the background is translucent. Text and controls retain their full opacity.
             window.Background = Brushes.Transparent;
             source.CompositionTarget.BackgroundColor = Colors.Transparent;
-            window.Resources["WindowSurface"] = new SolidColorBrush(Color.FromArgb(0x48, 0x19, 0x1A, 0x1D));
+            window.Resources["WindowSurface"] = new SolidColorBrush(Color.FromArgb(0x28, 0x19, 0x1A, 0x1D));
         }
         else
         {

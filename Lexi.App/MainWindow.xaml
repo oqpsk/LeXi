@@ -11,8 +11,8 @@
             <Path Data="{StaticResource SearchIcon}" Style="{StaticResource IconPath}" Width="18" Height="18" HorizontalAlignment="Left"/>
           </Border>
           <Grid Grid.Column="1">
-            <TextBox x:Name="SearchBox" FontSize="18" BorderThickness="0" Background="Transparent" Padding="0,12" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50" MaxHeight="160" VerticalScrollBarVisibility="Auto" TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_KeyDown" AutomationProperties.Name="输入单词、短语或待翻译文本"/>
-            <TextBlock x:Name="Placeholder" Text="查一个词，或翻译一段文字…" IsHitTestVisible="False" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="17"/>
+            <TextBox x:Name="SearchBox" FontSize="21" BorderThickness="0" Background="Transparent" Padding="0,12" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50" MaxHeight="160" VerticalScrollBarVisibility="Auto" TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_KeyDown" AutomationProperties.Name="输入单词、短语或待翻译文本"/>
+            <TextBlock x:Name="Placeholder" Text="查一个词，或翻译一段文字…" IsHitTestVisible="False" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="20"/>
           </Grid>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
             <Button Click="Search_Click" Width="30" Height="26" Padding="0" Background="{StaticResource Surface}" BorderThickness="1" ToolTip="查询" AutomationProperties.Name="查询"><Path Data="{StaticResource EnterIcon}" Style="{StaticResource IconPath}" Width="13" Height="13"/></Button>
@@ -22,38 +22,38 @@
           </StackPanel>
         </Grid>
       </Border>
-      <ListBox x:Name="Suggestions" Grid.Row="1" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="14" ScrollViewer.HorizontalScrollBarVisibility="Disabled" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议"/>
+      <ListBox x:Name="Suggestions" Grid.Row="1" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议"/>
       <ScrollViewer x:Name="ResultsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,20,16,20">
         <StackPanel>
           <StackPanel x:Name="Welcome">
-            <TextBlock Text="随手查，随时懂。" FontSize="22" FontWeight="SemiBold" Margin="4,13,0,8"/>
-            <TextBlock Text="词语看释义，文本看翻译。" Foreground="{StaticResource Muted}" FontSize="13" Margin="4,0,0,30"/>
-            <TextBlock Text="试着查一下" Foreground="{StaticResource Muted}" FontSize="11" Margin="4,0,0,10"/>
+            <TextBlock Text="随手查，随时懂。" FontSize="26" FontWeight="SemiBold" Margin="4,13,0,8"/>
+            <TextBlock Text="词语看释义，文本看翻译。" Foreground="{StaticResource Muted}" FontSize="16" Margin="4,0,0,30"/>
+            <TextBlock Text="试着查一下" Foreground="{StaticResource Muted}" FontSize="13" Margin="4,0,0,10"/>
             <Button Tag="telegraph" Click="Example_Click" HorizontalContentAlignment="Stretch" Padding="12" Margin="0,0,0,5">
               <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="Aa" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource Accent}"/></Border>
-                <TextBlock Grid.Column="1" Text="telegraph" FontSize="14" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="英英 · 英汉" Foreground="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="Aa" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{StaticResource Accent}"/></Border>
+                <TextBlock Grid.Column="1" Text="telegraph" FontSize="17" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="英英 · 英汉" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Center"/>
               </Grid>
             </Button>
             <Button Tag="车钟" Click="Example_Click" HorizontalContentAlignment="Stretch" Padding="12" Margin="0,0,0,5">
               <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="词" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource Accent}"/></Border>
-                <TextBlock Grid.Column="1" Text="车钟" FontSize="14" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="专业术语" Foreground="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="词" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{StaticResource Accent}"/></Border>
+                <TextBlock Grid.Column="1" Text="车钟" FontSize="17" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="专业术语" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Center"/>
               </Grid>
             </Button>
             <Button Tag="The ship is ready to depart." Click="Example_Click" HorizontalContentAlignment="Stretch" Padding="12">
               <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="译" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource Accent}"/></Border>
-                <TextBlock Grid.Column="1" Text="The ship is ready to depart." FontSize="14" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="文本翻译" Foreground="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center"/>
+                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="译" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{StaticResource Accent}"/></Border>
+                <TextBlock Grid.Column="1" Text="The ship is ready to depart." FontSize="17" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2" Text="文本翻译" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Center"/>
               </Grid>
             </Button>
           </StackPanel>
           <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
-            <TextBlock x:Name="Headword" FontSize="28" FontWeight="SemiBold" Margin="0,0,0,5"/>
-            <TextBlock x:Name="Phonetic" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,18"/>
+            <TextBlock x:Name="Headword" FontSize="30" FontWeight="SemiBold" Margin="0,0,0,5"/>
+            <TextBlock x:Name="Phonetic" Foreground="{StaticResource Muted}" FontSize="14" Margin="0,0,0,18"/>
             <StackPanel x:Name="AiPanel"/>
             <StackPanel x:Name="LocalPanel"/>
             <StackPanel x:Name="OnlinePanel"/>
@@ -62,21 +62,21 @@
       </ScrollViewer>
       <Grid Grid.Row="3" Margin="22,0,16,10">
         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <TextBlock x:Name="LookupStatus" Text="正在准备词库…" FontSize="11" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-        <Button x:Name="RefreshButton" Grid.Column="1" Content="重新生成" Click="Refresh_Click" Padding="8,4" Margin="8,0,0,0" FontSize="11" Foreground="{StaticResource Muted}" Visibility="Collapsed"/>
+        <TextBlock x:Name="LookupStatus" Text="正在准备词库…" FontSize="13" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        <Button x:Name="RefreshButton" Grid.Column="1" Content="重新生成" Click="Refresh_Click" Padding="8,4" Margin="8,0,0,0" FontSize="13" Foreground="{StaticResource Muted}" Visibility="Collapsed"/>
       </Grid>
       <Border Grid.Row="4" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="16,8">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Background="Transparent">
             <Border Background="#31594B" Width="20" Height="20" CornerRadius="5" Margin="0,0,7,0"><TextBlock Text="L" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-            <TextBlock Text="Lexi" FontSize="12" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+            <TextBlock Text="Lexi" FontSize="14" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
           </StackPanel>
-          <TextBlock x:Name="Footer" Grid.Column="1" Text="词典 · 翻译" FontSize="11" Margin="14,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+          <TextBlock x:Name="Footer" Grid.Column="1" Text="词典 · 翻译" FontSize="13" Margin="14,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-            <Button x:Name="OnlineToggle" Click="Online_Click" FontSize="11" Padding="6,3" ToolTip="关闭后只使用本地词库与已缓存结果" Margin="0,0,12,0"/>
-            <TextBlock Text="收起" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,7,0"/>
-            <Border BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="4" Padding="5,1"><TextBlock Text="Esc" Foreground="{StaticResource Muted}" FontSize="10"/></Border>
+            <Button x:Name="OnlineToggle" Click="Online_Click" FontSize="13" Padding="6,3" ToolTip="关闭后只使用本地词库与已缓存结果" Margin="0,0,12,0"/>
+            <TextBlock Text="收起" Foreground="{StaticResource Muted}" FontSize="13" VerticalAlignment="Center" Margin="0,0,7,0"/>
+            <Border BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="4" Padding="5,1"><TextBlock Text="Esc" Foreground="{StaticResource Muted}" FontSize="12"/></Border>
           </StackPanel>
         </Grid>
       </Border>

@@ -5,7 +5,7 @@ using System.Windows.Media;
 using Lexi;
 using Lexi.Core;
 
-internal static class Program
+internal static partial class Program
 {
     [STAThread]
     private static void Main()
@@ -38,6 +38,7 @@ internal static class Program
         Measure(panel, 480, 600);
         Console.WriteLine("PASS: WPF resources, window content and control templates construct and measure without displaying windows.");
         CheckChrome(app, main, settings, panel);
+        CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)
     {
