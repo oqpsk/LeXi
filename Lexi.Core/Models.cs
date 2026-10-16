@@ -14,10 +14,23 @@ public static partial class Queries
         value.Length > MaxLength ? "每次最多输入 5000 个字符。" :
         value.Any(c => char.IsControl(c) && c is not '\r' and not '\n' and not '\t') ? "内容含有不支持的控制字符。" : null;
     public static bool HasChinese(string text) => text.Any(c => c is >= '\u3400' and <= '\u9fff');
-    public static bool IsText(string text) => text.Contains('\n') || text.Length > 100 ||
-        text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length > 8 ||
-        text.Any(c => "。！？；!?;".Contains(c)) || text.TrimEnd().EndsWith('.') ||
-        text.Count(c => c is >= '\u3400' and <= '\u9fff') > 12;
+    public static bool IsText(string text, bool knownTerm = false)
+    {
+        text = text.Trim();
+        if (text.Contains('\n') || text.Length > 100) return true;
+        if (knownTerm) return false;
+        var words = EnglishWords().Matches(text).Count;
+        return text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length > 8 ||
+            text.Any(c => "。！？；!?;".Contains(c)) || text.EndsWith('.') ||
+            text.Count(c => c is >= '\u3400' and <= '\u9fff') > 12 ||
+            words >= 3 && EnglishSentence().IsMatch(text) || ChineseSentence().IsMatch(text);
+    }
+    public static int EnglishWordCount(string text) => EnglishWords().Matches(text).Count;
+    [GeneratedRegex(@"[A-Za-z]+(?:['’][A-Za-z]+)?")] private static partial Regex EnglishWords();
+    [GeneratedRegex(@"\b(?:am|is|are|was|were|will|would|should|could|must)\b|^(?:please\s|(?:i|you|we|they|he|she|it)\s|(?:can|do|does|did|have|has)\s+(?:i|you|we|they|he|she|it)\b)", RegexOptions.IgnoreCase)]
+    private static partial Regex EnglishSentence();
+    [GeneratedRegex(@"^(?:请|請).{2,}|^(?:我|你|您|他|她|它|我们|我們|他们|他們)(?:想|要|需要|喜欢|喜歡|觉得|覺得|知道|希望|已经|已經|正在|会|會|能|可以|不|没|沒|是|在|有).+")]
+    private static partial Regex ChineseSentence();
     // Convert only the user's search key. Original dictionary text stays unchanged.
     public static string TraditionalKey(string text)
         => ChineseKey(text, 0x04000000);

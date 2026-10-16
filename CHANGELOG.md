@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.4.0
+
+- Replace the main window and settings with a compact Raycast-inspired dark WPF design, custom window chrome, consistent controls and quieter source styling.
+- Remove query-mode and translation-language selectors and the input helper row; automatically route terms, short sentences and paragraphs without switching models.
+- Detect the dominant language in mixed Chinese/English text, preserve known dictionary phrases and add automatic-routing regression checks.
+- Add Ctrl+, for settings and non-displaying WPF resource construction checks; retain taskbar activation, resizing, text selection and keyboard access.
+
 ## 0.3.0
 
 - Add MOE revised Mandarin dictionary, Open English WordNet, CC-CEDICT and NAER maritime/shipbuilding terminology installers, with provenance and license handling.

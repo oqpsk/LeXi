@@ -19,4 +19,6 @@ try {
     if ($LASTEXITCODE) { throw 'Streaming checks failed' }
     & dotnet $runner extended-check (Join-Path $root '.cache/extended-checks')
     if ($LASTEXITCODE) { throw 'Extended dictionary/translation checks failed' }
+    & dotnet run --project tests/Lexi.PresentationChecks -c Release
+    if ($LASTEXITCODE) { throw 'WPF resource construction checks failed' }
 } finally { Pop-Location }

@@ -14,12 +14,12 @@ public partial class MainWindow
         lookup?.Cancel(); lookup?.Dispose(); lookup = new();
         var token = lookup.Token;
         current = text; SetQuery(text);
-        var target = Translation.Target(text, TranslationTarget.SelectedIndex switch { 1 => "zh", 2 => "en", _ => "auto" });
+        var target = Translation.Target(text);
         var key = Translation.Key(text, target, settings);
         Welcome.Visibility = Visibility.Collapsed; EntryPanel.Visibility = Visibility.Visible;
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
-        Headword.Text = target == "zh" ? "译为中文" : "Translate to English"; Headword.FontSize = 28;
-        Phonetic.Text = $"{text.Length:N0} 字符 · {ProviderName} · {settings.Model}";
+        Headword.Text = "翻译"; Headword.FontSize = 24;
+        Phonetic.Text = target == "zh" ? "英文 → 中文" : "中文 → English";
         AiPanel.Children.Clear(); LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); ResultsScroll.ScrollToTop();
         var cached = cache.Read<TranslationEnvelope>("translations-v1", key);
         if (cached != null && !force)
@@ -72,7 +72,7 @@ public partial class MainWindow
         AiPanel.Children.Clear();
         var card = Card(AiPanel, "翻译", ProviderName + (cached ? " · 缓存" : streaming ? " · 生成中" : ""), true);
         card.Children.Add(Hint(streaming ? "生成中的内容尚未完成" : "AI 翻译"));
-        foreach (var paragraph in entry.Paragraphs) card.Children.Add(Selectable(paragraph, 17));
+        foreach (var paragraph in entry.Paragraphs) { var block = Selectable(paragraph, 15); block.Margin = new(0,4,0,14); card.Children.Add(block); }
         if (!string.IsNullOrWhiteSpace(entry.Note)) card.Children.Add(Hint(entry.Note));
         if (!streaming)
         {

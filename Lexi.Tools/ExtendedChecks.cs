@@ -13,7 +13,13 @@ internal static class ExtendedChecks
         Check(Queries.Validate(new string('x', 5000)) == null && Queries.Validate(new string('x', 5001)) != null, "text size boundary");
         Check(Queries.Validate("hello\0world") != null, "unsupported controls rejected");
         Check(Queries.IsText("The captain ordered full astern.") && Queries.IsText("第一段。\n第二段。") && !Queries.IsText("车钟") && !Queries.IsText("engine order telegraph"), "automatic text routing");
-        Check(Translation.Target("车钟") == "en" && Translation.Target("Engine order telegraph") == "zh" && Translation.Target("车钟", "zh") == "zh", "translation target and explicit override");
+        Check(Translation.Target("车钟") == "en" && Translation.Target("Engine order telegraph") == "zh", "automatic translation direction");
+        Check(Queries.IsText("Can you help me") && Queries.IsText("I need some help") && Queries.IsText("The ship is ready"), "short English sentences without punctuation");
+        Check(Queries.IsText("请明天联系我") && Queries.IsText("我想喝水"), "short Chinese sentences without punctuation");
+        Check(!Queries.IsText("as it were", true) && !Queries.IsText("e.g.", true) && !Queries.IsText("look up"), "known terms and phrases remain dictionary lookups");
+        Check(Queries.IsText("First line\nSecond line", true) && Queries.IsText(new string('a', 101), true), "multiline and long inputs always translate");
+        Check(Translation.Target("The Chinese word 车钟 means an engine order telegraph.") == "zh", "Chinese quotation does not flip English prose direction");
+        Check(Translation.Target("请在 GitHub 上确认 ABC-42 的处理结果") == "en", "English product names do not flip Chinese prose direction");
         var settings = new AppSettings { Provider = "claude", Model = "haiku" };
         Check(Translation.Key("US", "zh", settings) != Translation.Key("us", "zh", settings) && Translation.Key("A\nB", "zh", settings) != Translation.Key("A B", "zh", settings), "translation cache preserves case and paragraphs");
         Check(Translation.Key("text", "zh", settings) != Translation.Key("text", "en", settings), "translation cache separates target languages");
