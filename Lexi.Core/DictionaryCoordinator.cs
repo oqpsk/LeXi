@@ -111,7 +111,7 @@ public sealed class DictionaryCoordinator(Cache cache,
             return snapshot with { Groups = SenseMerging.Group(answers, plan), MergeNote = "同义项已整理" };
         }
         catch (Exception ex) when (ExpectedFailure(ex) || ex is OperationCanceledException && !token.IsCancellationRequested)
-        { token.ThrowIfCancellationRequested(); return snapshot with { MergeNote = "同义项判断未完成，已保留全部释义" }; }
+        { token.ThrowIfCancellationRequested(); return snapshot with { MergeNote = "同义项判断未完成，已保留全部释义", MergeFailed = true }; }
     }
 
     private async Task Write<T>(string kind, string key, T value, CancellationToken token)

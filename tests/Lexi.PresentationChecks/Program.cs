@@ -40,6 +40,7 @@ internal static partial class Program
         CheckChrome(app, main, settings, panel);
         CheckParallelResults(main, settings);
         CheckDensity(main);
+        CheckQueryProgress(app, main);
         CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)

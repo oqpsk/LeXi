@@ -22,17 +22,24 @@ public partial class MainWindow
         Headword.Text = "翻译"; Headword.FontSize = 28;
         Phonetic.Text = target == "zh" ? "英文 → 中文" : "中文 → English";
         AiPanel.Children.Clear(); LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); ResultsScroll.ScrollToTop();
+        var initialProgress = QueryProgressState.Translating();
+        var request = QueryProgress.Begin(initialProgress);
         var cached = cache.Read<TranslationEnvelope>("translations-v1", key);
         if (cached != null && !force)
         {
             try
             {
                 var validated = Translation.Parse(JsonSerializer.Serialize(cached.Entry, Json.Options), text, target);
-                RenderTranslation(validated, true); LookupStatus.Text = "已显示缓存翻译"; return;
+                RenderTranslation(validated, true); LookupStatus.Text = "已显示缓存翻译";
+                QueryProgress.Update(request, QueryProgressState.Translated(true)); return;
             }
             catch (InvalidDataException) { }
         }
-        if (!settings.Online) { LookupStatus.Text = "离线模式下没有这段文本的缓存翻译。开启在线补充后可翻译。"; return; }
+        if (!settings.Online)
+        {
+            LookupStatus.Text = "离线模式下没有这段文本的缓存翻译。开启在线补充后可翻译。";
+            QueryProgress.Update(request, initialProgress.Interrupted("没有缓存翻译", "本次查询已结束 · 开启在线补充后可翻译")); return;
+        }
         LookupStatus.Text = $"{ProviderName} 正在翻译…";
         var watch = Stopwatch.StartNew();
         bool finished = false;
@@ -55,14 +62,17 @@ public partial class MainWindow
             await TryCacheAsync("translations-v1", key, new TranslationEnvelope(entry, DateTimeOffset.UtcNow));
             token.ThrowIfCancellationRequested();
             LookupStatus.Text = $"翻译完成 · {watch.Elapsed.TotalSeconds:0.0} 秒";
+            QueryProgress.Update(request, QueryProgressState.Translated());
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        { QueryProgress.Update(request, initialProgress.Interrupted("翻译已中断", "本次翻译已结束，可重新翻译")); }
         catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or InvalidDataException or JsonException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
             if (!token.IsCancellationRequested)
             {
                 AiPanel.Children.Clear(); AiPanel.Children.Add(Hint(ex.Message));
                 LookupStatus.Text = "翻译未完成，可重试";
+                QueryProgress.Update(request, initialProgress.Interrupted("翻译未完成", "本次翻译已结束，可重试"));
             }
         }
         finally { finished = true; }
@@ -77,7 +87,7 @@ public partial class MainWindow
         if (!string.IsNullOrWhiteSpace(entry.Note)) card.Children.Add(Hint(entry.Note));
         if (!streaming)
         {
-            var copy = new Button { Content = "复制译文", Foreground = green, HorizontalAlignment = HorizontalAlignment.Left, Padding = new(0,8,0,2) };
+            var copy = new Button { Content = "复制译文", Foreground = accentBrush, HorizontalAlignment = HorizontalAlignment.Left, Padding = new(0,8,0,2) };
             copy.Click += (_, _) =>
             {
                 try { Clipboard.SetText(string.Join("\n\n", entry.Paragraphs)); }

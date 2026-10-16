@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.5.2
+
+- Use a pink accent and rose text-selection highlight across the main window and settings, retaining readable selected text over Acrylic.
+- Add a fixed, compact query-stage strip for dictionary lookup, model supplementation, sense merging and completion. Keep live counts labeled as preview candidates until the entire query finishes; explain that merging can reduce the count.
+- Distinguish stable completion from model/source failures and incomplete merging. Stop the loading indicator on every terminal path, retain available definitions, and prevent late callbacks from reviving or overwriting a finished/newer query. Translation has its own generation/completion states, including cache and offline exits.
+- Add account-free lifecycle checks for the 2-to-6-to-4 result flow, failure states, stale updates, contrast and minimum-window layout. Keep definition sizes and expandable secondary information unchanged.
+
 ## 0.5.1
 
 - Increase dictionary result density while retaining 20-DIP Chinese definitions, 18-DIP English definitions and existing line spacing. Combine part of speech, register and provenance into one wrapping line, and place pronunciation beside the headword.
