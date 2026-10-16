@@ -8,32 +8,38 @@ namespace Lexi;
 
 public sealed class SettingsWindow : Window
 {
-    private static readonly Brush Muted = new SolidColorBrush(Color.FromRgb(100,115,107));
-    private static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(34,110,89));
-    private static TextBlock Text(string text, double size = 14, Brush? color = null) => new() { Text = text, FontSize = size, Foreground = color ?? new SolidColorBrush(Color.FromRgb(36,59,54)), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,10) };
+    private static Brush Muted => Theme.Brush("Muted");
+    private static Brush Accent => Theme.Brush("Accent");
+    private static TextBlock Text(string text, double size = 13, Brush? color = null) => new() { Text = text, FontSize = size, Foreground = color ?? Theme.Brush("Ink"), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,10) };
     private sealed record ModelChoice(string Label, string Id, string Provider = "codex") { public override string ToString() => Label; }
     public SettingsWindow(AppSettings settings, InstalledDictionary[] installed)
     {
         Title = "Lexi 设置"; Width = 620; Height = 665; MinWidth = 540; MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Style = (Style)Application.Current.FindResource("AppWindow");
-        Background = new SolidColorBrush(Color.FromRgb(248,248,243));
-        var root = new DockPanel { Margin = new(26,20,26,20) }; Content = root;
-        var title = Text("设置", 25); title.Margin = new(0,0,0,20); DockPanel.SetDock(title, Dock.Top); root.Children.Add(title);
+        Theme.ApplyChrome(this);
+        var root = new DockPanel { Margin = new(22,16,22,20) };
+        Content = new Border { Background = Theme.Brush("Canvas"), BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(1), CornerRadius = new(12), Child = root };
+        var header = new DockPanel { Margin = new(0,0,0,15), Background = Brushes.Transparent };
+        DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
+        var close = new Button { Content = "\uE8BB", Style = (Style)FindResource("IconButton"), ToolTip = "关闭设置" };
+        close.Click += (_, _) => DialogResult = false; DockPanel.SetDock(close, Dock.Right); header.Children.Add(close);
+        var title = Text("Lexi 设置", 18); title.Margin = new(0,3,0,0); header.Children.Add(title);
+        header.MouseLeftButtonDown += (_, e) => { if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed) DragMove(); };
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new(0,18,0,0) };
         DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
         var cancel = new Button { Content = "取消", Padding = new(22,10,22,10), Margin = new(0,0,8,0), IsCancel = true };
         cancel.Click += (_, _) => DialogResult = false; actions.Children.Add(cancel);
-        var save = new Button { Content = "保存", Background = Accent, Foreground = Brushes.White, Padding = new(26,10,26,10), IsDefault = true }; actions.Children.Add(save);
-        var tabs = new TabControl { Background = Brushes.Transparent, BorderBrush = new SolidColorBrush(Color.FromRgb(215,225,216)), Padding = new(0,15,0,0) };
+        var save = new Button { Content = "保存", Background = Theme.Brush("Selection"), Foreground = Accent, Padding = new(26,10,26,10), IsDefault = true }; actions.Children.Add(save);
+        var tabs = new TabControl();
         root.Children.Add(tabs);
-        var general = new StackPanel { Margin = new(14,4,14,10) };
+        var general = new StackPanel { Margin = new(2,4,8,10) };
         tabs.Items.Add(new TabItem { Header = "查询与模型", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = general } });
         var online = new CheckBox { Content = "在线补充", IsChecked = settings.Online, Margin = new(0,0,0,14) };
         var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
         general.Children.Add(online); general.Children.Add(ai);
         general.Children.Add(Text("使用本机 Claude Code 或 Codex 的订阅登录。查词时发送查询词与许可允许的词典片段；翻译时发送完整输入。两种功能使用同一个模型，不自动切换。", 12, Muted));
-        var label = Text("释义模型"); label.Margin = new(0,13,0,8); general.Children.Add(label);
+        var label = Text("在线模型"); label.Margin = new(0,13,0,8); general.Children.Add(label);
         var choices = new List<ModelChoice> { new("Claude Haiku · 实测最快 · 流式显示", "haiku", "claude"), new("GPT-6 Luna · Fast", "gpt-6-luna"), new("GPT-6.1 Sol · Fast", "gpt-6.1-sol"), new("Codex 默认 · Fast", "") };
         if (!choices.Any(x => x.Id == settings.Model && x.Provider == settings.Provider)) choices.Add(new(settings.Model, settings.Model, settings.Provider));
         var model = new ComboBox { ItemsSource = choices, SelectedItem = choices.First(x => x.Id == settings.Model && x.Provider == settings.Provider), Margin = new(0,0,0,9) }; general.Children.Add(model);
@@ -44,10 +50,9 @@ public sealed class SettingsWindow : Window
         var path = new TextBox { Text = settings.CodexPath, FontSize = 12 }; advanced.Children.Add(path);
         advanced.Children.Add(Text(CodexDictionary.FindExecutable(settings.CodexPath) == null ? "未检测到 Codex" : "已检测到 Codex",12,Muted));
         general.Children.Add(new Expander { Header = "连接设置", Content = advanced, Margin = new(0,15,0,15) });
-        general.Children.Add(Text("界面字体：微软雅黑 UI",12,Muted));
-        general.Children.Add(Text("Enter 查询 · Esc 收起 · Ctrl+L 再查一个\nCtrl+Q 退出 · 固定到任务栏第 2 位后用 Win+2 切换",12,Muted));
+        general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+, 设置 · Ctrl+Q 退出\n固定到任务栏第 2 位后用 Win+2 切换",12,Muted));
 
-        var dictionaries = new StackPanel { Margin = new(14,4,14,10) };
+        var dictionaries = new StackPanel { Margin = new(2,4,8,10) };
         tabs.Items.Add(new TabItem { Header = "离线词典", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = dictionaries } });
         dictionaries.Children.Add(Text($"已安装 {installed.Count(d => d.Available)} 部词典",19));
         dictionaries.Children.Add(Text("启用的词典用于本地查询与输入建议。",12,Muted));
@@ -71,7 +76,7 @@ public sealed class SettingsWindow : Window
         folder.Click += (_, _) => Open(dictionary.Folder); links.Children.Add(folder);
         var source = new Button { Content = "项目来源 ↗", Foreground = Accent, Padding = new(0,6,0,6) };
         source.Click += (_, _) => Open(dictionary.SourceUrl); links.Children.Add(source); card.Children.Add(links);
-        dictionaries.Children.Add(new Border { Background = Brushes.White, CornerRadius = new(10), BorderBrush = new SolidColorBrush(Color.FromRgb(215,225,216)), BorderThickness = new(1), Padding = new(18), Margin = new(0,9,0,16), Child = card });
+        dictionaries.Children.Add(new Border { Background = Theme.Brush("Surface"), CornerRadius = new(8), BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(1), Padding = new(16), Margin = new(0,6,0,12), Child = card });
         }
         dictionaries.Children.Add(Text("取消勾选并保存即可停用，词库文件会保留。",12,Muted));
         dictionaries.Children.Add(Text("Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。",12,Muted));

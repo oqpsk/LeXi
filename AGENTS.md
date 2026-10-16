@@ -9,6 +9,7 @@
 - Preserve source citations and uncertainty labels. Partial output must remain visibly provisional and must not enter the cache.
 - Keep offline lookup functional without online providers. Preserve user settings during updates.
 - Keep dictionary and translation caches separate. Preserve case and paragraph boundaries in translations. Never automatically switch models.
+- Route words, phrases and text automatically, including translation direction. Do not add query-mode or target-language selectors to the main interface.
 - Retain original dictionary text and attribution. MOE entries must stay in their original form and must not be supplied as AI rewriting evidence.
 - Avoid unrelated refactors and new runtime dependencies. Do not add global shortcut hooks, selection translation, launchers, account systems or subscription services.
 - Use direct Chinese explanations with the result first. Avoid “不是……而是……”, “本质上”, “换句话说”, “总的来说”, “值得注意的是”, “需要注意的是”, “当然”, “其实”, and repetitive conclusions.

@@ -22,11 +22,12 @@ public partial class MainWindow : Window
     private bool quit;
     private bool suppressSuggestions;
     private string current = "";
-    private readonly Brush muted = new SolidColorBrush(Color.FromRgb(116, 129, 123));
-    private readonly Brush green = new SolidColorBrush(Color.FromRgb(34, 110, 89));
+    private readonly Brush muted = Theme.Brush("Muted");
+    private readonly Brush green = Theme.Brush("Accent");
     public MainWindow()
     {
         InitializeComponent();
+        Theme.ApplyChrome(this);
         UpdateOnlineButton();
         dictionaryTask = Task.Run(() => new OfflineLibrary(Path.Combine(App.Root, "data")));
         Loaded += async (_, _) =>
@@ -54,6 +55,9 @@ public partial class MainWindow : Window
         Show(); Activate(); FocusSearch();
     }
     private void FocusSearch() { SearchBox.Focus(); SearchBox.SelectAll(); }
+    private void Hide_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void DragSurface_MouseDown(object sender, MouseButtonEventArgs e)
+    { if (e.ChangedButton == MouseButton.Left && e.LeftButton == MouseButtonState.Pressed) { DragMove(); e.Handled = true; } }
     private void Window_Activated(object? sender, EventArgs e) => Dispatcher.BeginInvoke(FocusSearch);
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
@@ -65,6 +69,7 @@ public partial class MainWindow : Window
         }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.L) { FocusSearch(); e.Handled = true; }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Q) { quit = true; Close(); e.Handled = true; }
+        if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.OemComma) { e.Handled = true; Settings_Click(sender, e); }
     }
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
@@ -86,13 +91,13 @@ public partial class MainWindow : Window
     private async void Suggestions_KeyDown(object sender, KeyEventArgs e)
     { if (e.Key == Key.Enter && Suggestions.SelectedItem is string text) { e.Handled = true; SetQuery(text); await SearchAsync(text); } }
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync(SearchBox.Text);
-    private async void Example_Click(object sender, RoutedEventArgs e) { var text = (string)((Button)sender).Content; SetQuery(text); await SearchAsync(text); }
+    private async void Example_Click(object sender, RoutedEventArgs e) { var text = (string)((Button)sender).Tag; SetQuery(text); await SearchAsync(text); }
     private async void Refresh_Click(object sender, RoutedEventArgs e) { if (current.Length > 0) await SearchAsync(current, true); }
     private void SetQuery(string query)
     { suppressSuggestions = true; SearchBox.Text = query; suppressSuggestions = false; Suggestions.Visibility = Visibility.Collapsed; }
     private void UpdateOnlineButton() { OnlineToggle.Content = settings.Online ? "● 在线补充" : "○ 仅离线"; OnlineToggle.Foreground = settings.Online ? green : muted; }
     private void UpdateFooter() => Footer.Text = !settings.OfflineEnabled ? "离线词典已停用 · 可在设置中启用" :
-        dictionaryTask.IsCompletedSuccessfully ? $"{dictionaryTask.Result.Dictionaries.Count(d => d.Available && !(settings.DisabledDictionaries ?? []).Contains(d.Id))} 部启用的词典 · {dictionaryTask.Result.Dictionaries.Where(d => d.Available && !(settings.DisabledDictionaries ?? []).Contains(d.Id)).Sum(d => d.EntryCount):N0} 个检索词条" : "离线词库不可用";
+        dictionaryTask.IsCompletedSuccessfully ? $"{dictionaryTask.Result.Dictionaries.Count(d => d.Available && !(settings.DisabledDictionaries ?? []).Contains(d.Id))} 部离线词典" : "离线词库不可用";
     private async void Online_Click(object sender, RoutedEventArgs e)
     {
         settings.Online = !settings.Online; SaveSettings(); UpdateOnlineButton();
@@ -121,7 +126,7 @@ public partial class MainWindow : Window
             if (previous != JsonSerializer.Serialize(settings, Json.Options))
             {
                 lookup?.Cancel();
-                  UpdatePreparedModel();
+                UpdatePreparedModel();
                 if (current.Length > 0) await SearchAsync(current);
             }
         }
@@ -131,9 +136,10 @@ public partial class MainWindow : Window
     {
         var validation = Queries.Validate(raw);
         if (validation != null) { LookupStatus.Text = validation; return; }
-        if (QueryMode.SelectedIndex == 2 || QueryMode.SelectedIndex == 0 && Queries.IsText(raw))
+        var knownTerm = raw.Length <= 100 && !raw.Contains('\n') && dictionaryTask.IsCompletedSuccessfully &&
+            dictionaryTask.Result.Lookup(Queries.Normalize(raw), settings).Length > 0;
+        if (Queries.IsText(raw, knownTerm))
         { await TranslateTextAsync(raw.Trim(), force); return; }
-        if (raw.Length > 100) { LookupStatus.Text = "查词模式最多 100 字符；请切换至翻译或自动判断。"; return; }
         var query = Queries.Normalize(raw);
         lookup?.Cancel(); lookup?.Dispose(); lookup = new();
         var token = lookup.Token;
@@ -141,7 +147,7 @@ public partial class MainWindow : Window
         SetQuery(raw.Trim());
         Welcome.Visibility = Visibility.Collapsed; EntryPanel.Visibility = Visibility.Visible;
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
-        Headword.Text = query; Headword.FontSize = 40; Phonetic.Text = "";
+        Headword.Text = raw.Trim(); Headword.FontSize = 28; Phonetic.Text = "";
         LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear();
         ResultsScroll.ScrollToTop(); LookupStatus.Text = "查询本地词库…";
         var notes = new List<string>();
@@ -189,7 +195,7 @@ public partial class MainWindow : Window
             if (aiCache != null && aiCache.EvidenceHash != hash) AiPanel.Children.Clear();
             if (aiCache != null && matchingModel && aiCache.EvidenceHash == hash && !force && DateTimeOffset.UtcNow - aiCache.GeneratedAt < TimeSpan.FromDays(7))
             { RenderAi(aiCache.Entry, evidence, true); LookupStatus.Text = Status(notes, "已显示缓存释义"); return; }
-            if (!settings.AutoAi && !force) { LookupStatus.Text = Status(notes, "查询完成 · 点击“刷新补充”获取双语释义"); return; }
+            if (!settings.AutoAi && !force) { LookupStatus.Text = Status(notes, "查询完成 · 点击“重新生成”获取双语释义"); return; }
             var provider = settings.Provider == "claude" ? "Claude" : "Codex";
             LookupStatus.Text = $"词典结果已显示 · {provider} 正在补充双语释义…";
             if (AiPanel.Children.Count == 0) AiPanel.Children.Add(Hint($"{provider} 正在整理释义…", green));
@@ -231,17 +237,17 @@ public partial class MainWindow : Window
     private static string Status(List<string> notes, string fallback) => notes.Count == 0 ? fallback : string.Join(" · ", notes);
     private async Task TryCacheAsync<T>(string kind, string query, T value)
     { try { await cache.WriteAsync(kind, query, value); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* Cache failure never discards a valid result. */ } }
-    private TextBlock Hint(string text, Brush? brush = null) => new() { Text = text, Foreground = brush ?? muted, FontSize = 12, Margin = new(0,5,0,16), TextWrapping = TextWrapping.Wrap };
-    private TextBox Selectable(string text, double size = 15) => new() { Text = text, Style = (Style)FindResource("Selectable"), FontSize = size, Margin = new(0,3,0,7) };
+    private TextBlock Hint(string text, Brush? brush = null) => new() { Text = text, Foreground = brush ?? muted, FontSize = 11, Margin = new(0,4,0,12), TextWrapping = TextWrapping.Wrap };
+    private TextBox Selectable(string text, double size = 14) => new() { Text = text, Style = (Style)FindResource("Selectable"), FontSize = size, Margin = new(0,3,0,6) };
     private StackPanel Card(Panel parent, string title, string source, bool accent = false)
     {
         var content = new StackPanel();
-        var header = new Grid { Margin = new(0,0,0,13) };
+        var header = new Grid { Margin = new(0,0,0,10) };
         header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        header.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 14, Foreground = accent ? green : Foreground });
-        var tag = new TextBlock { Text = source, FontSize = 11, Foreground = muted, VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(tag,1); header.Children.Add(tag);
+        header.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 12, Foreground = accent ? green : Foreground, Margin = new(0,0,10,0) });
+        var tag = new TextBlock { Text = source, FontSize = 10, Foreground = muted, VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(tag,1); header.Children.Add(tag);
         content.Children.Add(header);
-        parent.Children.Add(new Border { Background = Brushes.White, CornerRadius = new(12), BorderBrush = new SolidColorBrush(Color.FromRgb(226,232,223)), BorderThickness = new(1), Padding = new(20,17,20,16), Margin = new(0,0,0,14), Child = content });
+        parent.Children.Add(new Border { Background = accent ? Theme.Brush("Surface") : Brushes.Transparent, CornerRadius = new(accent ? 8 : 0), BorderBrush = Theme.Brush("Stroke"), BorderThickness = accent ? new(1) : new(0,0,0,1), Padding = accent ? new(16,14,16,12) : new(0,12,0,14), Margin = new(0,0,0,12), Child = content });
         return content;
     }
     private void RenderLocal(LocalHit[] hits, string query)
@@ -284,18 +290,18 @@ public partial class MainWindow : Window
         AiPanel.Children.Clear();
         if (!entry.Found) { AiPanel.Children.Add(Hint(string.IsNullOrWhiteSpace(entry.Note) ? "暂时无法可靠确认这个词的含义。" : entry.Note)); return; }
         var card = Card(AiPanel, "双语释义", (settings.Provider == "claude" ? "Claude" : "Codex") + (cached ? " · 缓存" : streaming ? " · 生成中" : ""), true);
-        card.Children.Add(Hint(streaming ? "AI 正在生成 · 来源依据待完整结果确认" : entry.EvidenceStatus == "source_based" ? "AI 据词典来源整理 · 释义与例句含生成内容" : "AI 补充 · 未获得词典来源核验", streaming || entry.EvidenceStatus == "source_based" ? muted : Brushes.DarkGoldenrod));
+        card.Children.Add(Hint(streaming ? "生成中 · 来源待确认" : entry.EvidenceStatus == "source_based" ? "据词典来源整理 · 含 AI 生成内容" : "AI 补充 · 未经词典来源核验", streaming || entry.EvidenceStatus == "source_based" ? muted : Theme.Brush("Warning")));
         foreach (var (sense, i) in entry.Senses.Select((s,i)=>(s,i)))
         {
             var label = $"{i+1:00}  {sense.PartOfSpeech}" + (string.IsNullOrWhiteSpace(sense.Register) ? "" : "  ·  " + sense.Register);
-            card.Children.Add(new TextBlock { Text = label, Foreground = green, FontSize = 12, Margin = new(0,i == 0 ? 0 : 17,0,5) });
-            card.Children.Add(Selectable(sense.Chinese,17));
+            card.Children.Add(new TextBlock { Text = label, Foreground = muted, FontSize = 11, Margin = new(0,i == 0 ? 0 : 16,0,5) });
+            card.Children.Add(Selectable(sense.Chinese,16));
             card.Children.Add(Selectable(sense.English));
             if (!string.IsNullOrWhiteSpace(sense.Example))
             {
-                var example = new StackPanel(); var en = Selectable(sense.Example,14); en.FontStyle = FontStyles.Italic; example.Children.Add(en);
-                if (!string.IsNullOrWhiteSpace(sense.ExampleChinese)) { var zh = Selectable(sense.ExampleChinese,13); zh.Foreground = muted; example.Children.Add(zh); }
-                card.Children.Add(new Border { Child = example, BorderBrush = new SolidColorBrush(Color.FromRgb(197,218,205)), BorderThickness = new(2,0,0,0), Padding = new(12,2,0,0), Margin = new(0,7,0,4) });
+                var example = new StackPanel(); var en = Selectable(sense.Example,13); en.Foreground = muted; example.Children.Add(en);
+                if (!string.IsNullOrWhiteSpace(sense.ExampleChinese)) { var zh = Selectable(sense.ExampleChinese,12); zh.Foreground = muted; example.Children.Add(zh); }
+                card.Children.Add(new Border { Child = example, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(2,0,0,0), Padding = new(10,0,0,0), Margin = new(0,8,0,4) });
             }
             if (sense.Evidence.Length > 0 && online != null)
             {
