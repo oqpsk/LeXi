@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update pinned GitHub Actions to Node.js 24 releases to remove deprecated runtime warnings.
+
 ## 0.2.0 — 2026-10-16
 
 - Windows WPF desktop dictionary with offline ECDICT lookup and inflection matching.
