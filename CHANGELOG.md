@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.4.1
+
+- Replace private-use icon-font glyphs and disclosure arrows with vector geometry so global text styles cannot turn controls into missing-glyph boxes.
+- Use non-adorner text selection, an explicit contrasting selected-text brush and a translucent highlight for editable and read-only text.
+- Allow dragging from non-interactive areas throughout both windows while preserving selection, buttons, menus, tabs and scrollbar interaction.
+- Add native Windows 11 Desktop Acrylic behind translucent surfaces, retaining opaque text and a solid fallback when transparency, composition or system support is unavailable.
+- Add 15 presentation regression checks for icons, selection contrast, drag exclusions and glass availability without displaying windows or automating the desktop.
+
 ## 0.4.0
 
 - Replace the main window and settings with a compact Raycast-inspired dark WPF design, custom window chrome, consistent controls and quieter source styling.

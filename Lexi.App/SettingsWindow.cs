@@ -19,13 +19,13 @@ public sealed class SettingsWindow : Window
         Style = (Style)Application.Current.FindResource("AppWindow");
         Theme.ApplyChrome(this);
         var root = new DockPanel { Margin = new(22,16,22,20) };
-        Content = new Border { Background = Theme.Brush("Canvas"), BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(1), CornerRadius = new(12), Child = root };
+        var frame = new Border { BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(1), CornerRadius = new(12), Child = root };
+        frame.SetResourceReference(Border.BackgroundProperty, "WindowSurface"); Content = frame;
         var header = new DockPanel { Margin = new(0,0,0,15), Background = Brushes.Transparent };
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-        var close = new Button { Content = "\uE8BB", Style = (Style)FindResource("IconButton"), ToolTip = "关闭设置" };
+        var close = new Button { Content = Theme.Icon("CloseIcon"), Style = (Style)FindResource("IconButton"), ToolTip = "关闭设置" };
         close.Click += (_, _) => DialogResult = false; DockPanel.SetDock(close, Dock.Right); header.Children.Add(close);
         var title = Text("Lexi 设置", 18); title.Margin = new(0,3,0,0); header.Children.Add(title);
-        header.MouseLeftButtonDown += (_, e) => { if (e.LeftButton == System.Windows.Input.MouseButtonState.Pressed) DragMove(); };
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new(0,18,0,0) };
         DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
         var cancel = new Button { Content = "取消", Padding = new(22,10,22,10), Margin = new(0,0,8,0), IsCancel = true };
@@ -76,7 +76,7 @@ public sealed class SettingsWindow : Window
         folder.Click += (_, _) => Open(dictionary.Folder); links.Children.Add(folder);
         var source = new Button { Content = "项目来源 ↗", Foreground = Accent, Padding = new(0,6,0,6) };
         source.Click += (_, _) => Open(dictionary.SourceUrl); links.Children.Add(source); card.Children.Add(links);
-        dictionaries.Children.Add(new Border { Background = Theme.Brush("Surface"), CornerRadius = new(8), BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(1), Padding = new(16), Margin = new(0,6,0,12), Child = card });
+        dictionaries.Children.Add(new Border { Background = Theme.Brush("PanelSurface"), CornerRadius = new(8), BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(1), Padding = new(16), Margin = new(0,6,0,12), Child = card });
         }
         dictionaries.Children.Add(Text("取消勾选并保存即可停用，词库文件会保留。",12,Muted));
         dictionaries.Children.Add(Text("Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。",12,Muted));

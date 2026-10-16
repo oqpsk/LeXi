@@ -8,6 +8,7 @@ namespace Lexi;
 
 public partial class App : Application
 {
+    public App() => AppContext.SetSwitch("Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering", false);
     private Mutex? mutex;
     private readonly CancellationTokenSource lifetime = new();
     public static string Root => AppContext.BaseDirectory;

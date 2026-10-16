@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Lexi;
@@ -36,6 +37,49 @@ internal static class Program
         panel.Children.Add(new TextBox { Style = (Style)app.FindResource("Selectable"), Text = "Read-only text" });
         Measure(panel, 480, 600);
         Console.WriteLine("PASS: WPF resources, window content and control templates construct and measure without displaying windows.");
+        CheckChrome(app, main, settings, panel);
+    }
+    private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)
+    {
+        int count = 0;
+        void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
+        Check(AppContext.TryGetSwitch("Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering", out var adorner) && !adorner,
+            "selection uses the text renderer instead of an opaque overlay");
+        var boxes = Descendants((DependencyObject)main.Content).OfType<TextBox>().Concat(panel.Children.OfType<TextBox>()).ToArray();
+        Check(boxes.Length >= 3 && boxes.All(b => b.SelectionOpacity > 0 && b.SelectionOpacity <= 0.5 &&
+            b.SelectionTextBrush is SolidColorBrush ink && b.SelectionBrush is SolidColorBrush selection && Contrast(ink.Color, selection.Color) >= 4.5),
+            "editable and read-only selections retain contrasting text");
+        foreach (var name in new[] { "SearchIcon", "CloseIcon", "EnterIcon", "SettingsIcon", "ChevronRightIcon", "ChevronDownIcon" })
+        {
+            var icon = Theme.Icon(name); Measure(icon, 16, 16);
+            Check(!icon.Data.Bounds.IsEmpty && icon.Stroke != null && icon.RenderSize.Width > 0, name + " uses drawable vector geometry");
+        }
+        Check(!Descendants((DependencyObject)main.Content).Concat(Descendants((DependencyObject)settings.Content)).OfType<TextBlock>()
+            .Any(t => t.Text.Any(c => c is >= '\uE000' and <= '\uF8FF')), "window controls have no private-use font glyphs");
+        Check(Theme.CanDragFrom((DependencyObject)main.Content) && Theme.CanDragFrom((DependencyObject)main.FindName("Headword")) &&
+            Theme.CanDragFrom((DependencyObject)main.FindName("Footer")), "frame, result heading and footer are draggable");
+        var search = (TextBox)main.FindName("SearchBox");
+        Check(!Theme.CanDragFrom(search) && Descendants(search).All(d => !Theme.CanDragFrom(d)), "input and its internal visuals never start a window drag");
+        var settingsButton = Descendants((DependencyObject)main.Content).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "设置");
+        Check(!Theme.CanDragFrom(settingsButton) && !Theme.CanDragFrom((DependencyObject)settingsButton.Content), "button icons remain clickable instead of dragging the window");
+        var host = new Window { Content = panel };
+        Check(panel.Children.OfType<TextBox>().All(b => !Theme.CanDragFrom(b)) &&
+            panel.Children.OfType<CheckBox>().All(b => !Theme.CanDragFrom(b)) &&
+            panel.Children.OfType<ComboBox>().All(b => !Theme.CanDragFrom(b)), "text selection, toggles and dropdowns are excluded from dragging");
+        Check(Theme.SupportsGlass(new Version(10, 0, 22621), true, true, false) &&
+            !Theme.SupportsGlass(new Version(10, 0, 22000), true, true, false) &&
+            !Theme.SupportsGlass(new Version(10, 0, 26200), false, true, false) &&
+            !Theme.SupportsGlass(new Version(10, 0, 26200), true, false, false) &&
+            !Theme.SupportsGlass(new Version(10, 0, 26200), true, true, true), "glass availability respects OS, composition and accessibility preferences");
+        Check(main.Opacity == 1 && !main.AllowsTransparency && ((Border)main.Content).Background is SolidColorBrush fallback && fallback.Color.A == 255,
+            "the full window stays opaque and has a solid fallback until native glass succeeds");
+        Console.WriteLine($"{count} presentation regression checks passed");
+    }
+    private static double Contrast(Color a, Color b)
+    {
+        static double Linear(byte value) { var channel = value / 255.0; return channel <= 0.04045 ? channel / 12.92 : Math.Pow((channel + 0.055) / 1.055, 2.4); }
+        static double Light(Color c) => 0.2126 * Linear(c.R) + 0.7152 * Linear(c.G) + 0.0722 * Linear(c.B);
+        var x = Light(a); var y = Light(b); return (Math.Max(x, y) + 0.05) / (Math.Min(x, y) + 0.05);
     }
     private static void Measure(FrameworkElement element, double width, double height)
     {
