@@ -138,6 +138,8 @@ else if (args[0] == "live")
 }
 
 else if (args[0] == "extended-check") ExtendedChecks.Run(args[1]);
+else if (args[0] == "parallel-check") await ParallelChecks.Run(args[1]);
+else if (args[0] == "parallel-live") await ParallelLive.Run(args[1], args[2], args[3], args.Skip(4));
 else if (args[0] == "inspect-library")
 {
     using var library = new OfflineLibrary(args[1]);

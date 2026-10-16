@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.5.0
+
+- Query two configurable dictionary models concurrently, showing the first available definition immediately; retain the other model's results when one fails. Keep text translation on the selected primary model.
+- Add configurable Codex subscription-based semantic comparison after lookup. Group confidently equivalent senses, keep distinct or uncertain meanings, prefer the primary wording and retain every original variant with its own source labels in expandable sections.
+- Separate complete-definition caches by model and evidence, cache validated comparison plans, reject mismatched or incomplete judgments, and preserve all definitions on judge failure or timeout.
+- Improve coverage of contemporary Internet meanings and keep slang evidence ahead of older senses when preparing dictionary context. Preserve original offline and online dictionary text in expandable source sections.
+- Add account-free concurrency, cancellation, cache and semantic-grouping regression checks, non-displaying result/settings checks, and an opt-in live comparison runner.
+
 ## 0.4.2
 
 - Suppress DWM's system-accent caption fill on full-client Acrylic windows, including after system theme changes, while retaining resizing and background material.

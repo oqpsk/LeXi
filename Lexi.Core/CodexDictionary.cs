@@ -21,24 +21,32 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
     }
     public static string EvidenceText(OnlineEntry? online) => online == null ? "No external evidence. Use reliable knowledge and mark it unverified." :
         string.Join("\n", online.Senses.Take(20).Select((s, i) => $"[{i + 1}] {s.SourceName} {s.PartOfSpeech}: {s.Definition}"));
-    public static string EvidenceHash(OnlineEntry? online) => Cache.Hash("bilingual-v2\n" + EvidenceText(online));
+    public static string EvidenceHash(OnlineEntry? online) => Cache.Hash("bilingual-v3\n" + EvidenceText(online));
     public static string DefineRequest(string query, OnlineEntry? evidence)
     {
         var terminologyOnly = evidence != null && evidence.Senses.All(s => s.PartOfSpeech.StartsWith("terminology pair"));
         return "Define the complete English or Chinese term. Use established specialist meanings when appropriate. " +
             (terminologyOnly ? "The evidence contains terminology equivalents, not explanatory definitions. Give the dominant technical meaning in ONE sense. Do not invent a functional distinction between synonymous names. Mark explanatory details unverified. " : "") + "\n" +
-            JsonSerializer.Serialize(new { task = "define", query, maxSenses = terminologyOnly ? 1 : 3, evidence = EvidenceText(evidence) }, Json.Options);
+            JsonSerializer.Serialize(new
+            {
+                task = "define", query, maxSenses = terminologyOnly ? 1 : 4,
+                priorityEvidence = evidence?.Senses.Select((s, i) => new { sense = s, number = i + 1 })
+                    .Where(s => SenseMerging.IsCurrent(s.sense.PartOfSpeech + " " + s.sense.Definition)).Select(s => s.number).ToArray() ?? [],
+                coverage = "Include established Internet/slang meanings from priorityEvidence before older meanings. Distinguish slang, literal and proper-name senses; preserve common meanings rather than spending the limit on obscure names or language families. Case-insensitive input may still refer to a capitalized meme name. Do not invent a slang meaning when none is known.",
+                evidence = EvidenceText(evidence)
+            }, Json.Options);
     }
     public static AiEntry ParseAndValidate(string text, string query, OnlineEntry? online)
     {
         var entry = JsonSerializer.Deserialize<AiEntry>(text, Json.Options) ?? throw new InvalidDataException("Codex 未返回释义。");
-        if (Queries.Normalize(entry.Word) != Queries.Normalize(query) || entry.Senses == null)
+        if (string.IsNullOrWhiteSpace(entry.Word) || Queries.Normalize(entry.Word) != Queries.Normalize(query) || entry.Senses == null)
             throw new InvalidDataException("Codex 返回了不匹配的词条。");
         if (!entry.Found || entry.Senses.Length == 0) return entry with { Found = false, Senses = [], EvidenceStatus = "unknown" };
         if (entry.Senses.Length > 8) throw new InvalidDataException("Codex 返回的词条过长。");
         foreach (var s in entry.Senses)
         {
-            if (string.IsNullOrWhiteSpace(s.English) || string.IsNullOrWhiteSpace(s.Chinese) || s.Evidence == null ||
+            if (s == null || string.IsNullOrWhiteSpace(s.English) || string.IsNullOrWhiteSpace(s.Chinese) ||
+                s.PartOfSpeech == null || s.Register == null || s.Example == null || s.ExampleChinese == null || s.Evidence == null ||
                 s.Evidence.Any(n => n < 1 || n > (online?.Senses.Length ?? 0)))
                 throw new InvalidDataException("Codex 返回的释义或来源编号无效。");
         }
@@ -59,7 +67,13 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
         var result = await RunAsync(Translation.Request(text, target), "translation.schema.json", settings, token);
         return Translation.Parse(result, text, target);
     }
-    private async Task<string> RunAsync(string prompt, string schemaFile, AppSettings settings, CancellationToken token)
+    public async Task<SenseMergePlan> JudgeSensesAsync(SenseMergeRequest request, AppSettings settings, CancellationToken token)
+    {
+        var result = await RunAsync(request.Prompt, "sense-merge.schema.json", settings, token, "sense-merge.instructions.txt", 25);
+        return SenseMerging.Parse(result, request);
+    }
+    private async Task<string> RunAsync(string prompt, string schemaFile, AppSettings settings, CancellationToken token,
+        string instructionsFile = "dictionary.instructions.txt", int timeoutSeconds = 70)
     {
         var exe = FindExecutable(settings.CodexPath) ?? throw new InvalidOperationException("未找到 Codex。请在设置中指定 codex.exe。");
         var dir = Path.Combine(userRoot, "codex-work");
@@ -73,14 +87,14 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
             "service_tier=" + JsonSerializer.Serialize(settings.ServiceTier), "features.fast_mode=true",
             "features.shell_tool=false", "features.apps=false", "features.plugins=false", "features.memories=false", "features.multi_agent=false",
             "features.computer_use=false", "features.browser_use=false", "features.skip_host_skill_discovery=true",
-            "model_instructions_file=" + JsonSerializer.Serialize(Path.Combine(assetFolder, "dictionary.instructions.txt")) })
+            "model_instructions_file=" + JsonSerializer.Serialize(Path.Combine(assetFolder, instructionsFile)) })
         { info.ArgumentList.Add("-c"); info.ArgumentList.Add(config); }
         if (!string.IsNullOrWhiteSpace(settings.Model)) { info.ArgumentList.Add("--model"); info.ArgumentList.Add(settings.Model.Trim()); }
         info.ArgumentList.Add("-");
         // The CLI manages OAuth itself. No access token, refresh token, or auth file is read by Lexi.
         using var process = new Process { StartInfo = info };
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        timeout.CancelAfter(TimeSpan.FromSeconds(70));
+        timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
         token.ThrowIfCancellationRequested();
         process.Start();
         using var registration = timeout.Token.Register(() => { try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { } });
@@ -116,7 +130,7 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
             }
             return final ?? throw new InvalidDataException("Codex 未返回可读取的结果。");
         }
-        catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException("Codex 查询超过 70 秒，已取消。可以稍后重试。"); }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException($"Codex 查询超过 {timeoutSeconds} 秒，已取消。可以稍后重试。"); }
         finally
         {
             try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { }

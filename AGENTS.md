@@ -9,6 +9,7 @@
 - Preserve source citations and uncertainty labels. Partial output must remain visibly provisional and must not enter the cache.
 - Keep offline lookup functional without online providers. Preserve user settings during updates.
 - Keep dictionary and translation caches separate. Preserve case and paragraph boundaries in translations. Never automatically switch models.
+- Dictionary lookup may run two explicitly configured models concurrently, followed by the configured Codex sense judge; translation uses only the primary model. Keep model caches and evidence identities separate. Show the first result before merging, retain every original variant, and never upgrade provenance based on model agreement. Uncertain or contradictory senses must remain separate; judge failure must not discard definitions.
 - Route words, phrases and text automatically, including translation direction. Do not add query-mode or target-language selectors to the main interface.
 - Use vector geometry for UI icons. Keep selected text legible and exclude interactive controls from window dragging; system backdrops must retain an opaque fallback.
 - Retain original dictionary text and attribution. MOE entries must stay in their original form and must not be supplied as AI rewriting evidence.

@@ -37,7 +37,8 @@ public static class DictionaryEvidence
     public static OnlineEntry? Combine(string query, IEnumerable<LocalHit> local, OnlineEntry? online)
     {
         var senses = new List<Sense>();
-        if (online != null) senses.AddRange(online.Senses.Take(12).Select(s => s with { SourceName = "Wiktionary", SourceUrl = online.Url }));
+        if (online != null) senses.AddRange(online.Senses.OrderBy(s => SenseMerging.IsCurrent(s.PartOfSpeech + " " + s.Definition) ? 0 : 1)
+            .Take(12).Select(s => s with { SourceName = "Wiktionary", SourceUrl = online.Url }));
         senses.AddRange(local.Where(h => h.Dictionary.AllowAiEvidence).Take(8).Select(h => new Sense(h.Dictionary.Id.StartsWith("naer-") ? "terminology pair, not a full definition" : "",
             Excerpt(string.Join("\n", new[] { h.Entry.English, h.Entry.Chinese }.Where(s => !string.IsNullOrWhiteSpace(s)))),
             [], h.Dictionary.Name, h.Dictionary.SourceUrl)));
