@@ -48,7 +48,7 @@ public static class StreamingEntry
         catch (JsonException) { return null; }
         if (fields != null) AddSense(fields, senses);
         if (word == null || Queries.Normalize(word) != Queries.Normalize(query) || senses.Count == 0 || senses.Count > 8) return null;
-        return new(query, true, senses.ToArray(), "", "unverified");
+        return new(query, true, CodexDictionary.PrioritizeCurrent(senses), "", "unverified");
     }
 
     private static void AddSense(Dictionary<string, string> fields, List<AiSense> senses)

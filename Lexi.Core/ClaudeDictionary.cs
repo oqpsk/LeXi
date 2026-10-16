@@ -59,10 +59,11 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
         if (executable.Script != null) info.ArgumentList.Add(executable.Script);
         var instructions = File.ReadAllText(Path.Combine(assetFolder, "dictionary.instructions.txt"));
         var schema = File.ReadAllText(Path.Combine(assetFolder, "dictionary.schema.json"));
+        var translationSchema = File.ReadAllText(Path.Combine(assetFolder, "translation.schema.json"));
         foreach (var arg in new[] { "-p", "--model", model, "--tools", "", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}",
             "--setting-sources", "", "--settings", "{\"disableAllHooks\":true,\"alwaysThinkingEnabled\":false}",
             "--no-chrome", "--no-session-persistence", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
-            "--system-prompt", instructions + "\nReturn raw JSON matching this schema, without markdown fences:\n" + schema }) info.ArgumentList.Add(arg);
+            "--system-prompt", instructions + "\nFor define, use this JSON schema:\n" + schema + "\nFor translate, use this JSON schema:\n" + translationSchema }) info.ArgumentList.Add(arg);
         // Only the official CLI handles subscription credentials. Lexi never reads or copies tokens.
         foreach (var key in new[] { "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN" }) info.Environment.Remove(key);
         info.Environment["MAX_THINKING_TOKENS"] = "0";
@@ -70,6 +71,41 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
     }
 
     public async Task<AiEntry> LookupAsync(string query, OnlineEntry? online, string model, CancellationToken token, IProgress<AiEntry>? progress = null)
+    {
+        string? last = null;
+        for (int attempt = 0; ; attempt++)
+        {
+            try
+            {
+                var result = await RunAsync(CodexDictionary.DefineRequest(query, online) + RetryInstruction(attempt), model, token, text =>
+                {
+                    if (progress != null && StreamingEntry.Read(text, query) is { } preview)
+                    { var value = JsonSerializer.Serialize(preview, Json.Options); if (last != value) { last = value; progress.Report(preview); } }
+                });
+                return CodexDictionary.ParseAndValidate(StreamingEntry.Unwrap(result), query, online);
+            }
+            catch (Exception ex) when (attempt == 0 && !token.IsCancellationRequested && ex is JsonException or InvalidDataException) { last = null; }
+        }
+    }
+    public async Task<TranslationEntry> TranslateAsync(string text, string target, string model, CancellationToken token, IProgress<TranslationEntry>? progress = null)
+    {
+        string? last = null;
+        for (int attempt = 0; ; attempt++)
+        {
+            try
+            {
+                var result = await RunAsync(Translation.Request(text, target) + RetryInstruction(attempt), model, token, json =>
+                {
+                    if (progress != null && Translation.Preview(json, text, target) is { } preview)
+                    { var value = JsonSerializer.Serialize(preview, Json.Options); if (last != value) { last = value; progress.Report(preview); } }
+                });
+                return Translation.Parse(result, text, target);
+            }
+            catch (Exception ex) when (attempt == 0 && !token.IsCancellationRequested && ex is JsonException or InvalidDataException) { last = null; }
+        }
+    }
+    private static string RetryInstruction(int attempt) => attempt == 0 ? "" : "\nThe previous response failed structural validation. Regenerate one complete valid JSON object. Escape every embedded double quote and newline inside strings. Follow the requested schema and exact input identity. No commentary or markdown.";
+    private async Task<string> RunAsync(string prompt, string model, CancellationToken token, Action<string>? preview)
     {
         Worker worker;
         lock (sync)
@@ -82,15 +118,13 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
         using (worker)
         using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(token))
         {
-            timeout.CancelAfter(TimeSpan.FromSeconds(35));
+            timeout.CancelAfter(TimeSpan.FromSeconds(75));
             using var cancel = timeout.Token.Register(worker.Stop);
             var output = new StringBuilder();
-            string? final = null, lastPreview = null;
+            string? final = null;
             try
             {
                 token.ThrowIfCancellationRequested();
-                var prompt = "Define this exact word or phrase. Put current Internet slang before old or rare meanings.\n" +
-                    JsonSerializer.Serialize(new { query, source = online?.Url, evidence = CodexDictionary.EvidenceText(online) }, Json.Options);
                 await worker.Process.StandardInput.WriteLineAsync(prompt.AsMemory(), timeout.Token);
                 worker.Process.StandardInput.Close();
                 await foreach (var line in worker.Lines.Reader.ReadAllAsync(timeout.Token))
@@ -107,11 +141,7 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
                         {
                             output.Append(delta.GetProperty("text").GetString());
                             if (output.Length > 100000) throw new InvalidDataException("模型返回内容过长。");
-                            if (progress != null && StreamingEntry.Read(output.ToString(), query) is { } partial)
-                            {
-                                var preview = JsonSerializer.Serialize(partial, Json.Options);
-                                if (preview != lastPreview) { progress.Report(partial); lastPreview = preview; }
-                            }
+                            preview?.Invoke(output.ToString());
                         }
                     }
                     if (kind.GetString() == "result")
@@ -127,7 +157,7 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
                     }
                 }
                 timeout.Token.ThrowIfCancellationRequested();
-                return CodexDictionary.ParseAndValidate(StreamingEntry.Unwrap(final ?? throw new InvalidDataException("Claude 未返回完整释义。")), query, online);
+                return final ?? throw new InvalidDataException("Claude 未返回完整结果。");
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException("补充查询超时，请重试。"); }
             finally { _ = Task.Run(() => Replenish(model)); }

@@ -1,0 +1,10 @@
+{
+  "type": "object", "additionalProperties": false,
+  "properties": {
+    "inputHash": {"type": "string"},
+    "targetLanguage": {"type": "string", "enum": ["zh", "en"]},
+    "paragraphs": {"type": "array", "items": {"type": "string"}},
+    "note": {"type": "string"}
+  },
+  "required": ["inputHash", "targetLanguage", "paragraphs", "note"]
+}
