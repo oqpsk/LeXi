@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using Lexi;
 using Lexi.Core;
 
@@ -9,11 +10,6 @@ internal static partial class Program
     {
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
-        static IEnumerable<DependencyObject> Contents(DependencyObject parent)
-        {
-            foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
-            { yield return child; foreach (var nested in Contents(child)) yield return nested; }
-        }
         var tabs = Contents(settings).OfType<TabControl>().Single();
         tabs.SelectedIndex = 0;
         Measure((FrameworkElement)settings.Content, 538, 478);
@@ -38,16 +34,16 @@ internal static partial class Program
         main.RenderAnswers(snapshot, evidence);
         Measure((FrameworkElement)main.Content, 558, 398);
         var ai = (Panel)main.FindName("AiPanel");
-        var visible = Descendants(ai).OfType<TextBox>().Select(t => t.Text).ToArray();
+        var visible = Contents(ai, true).OfType<TextBox>().Select(t => t.Text).ToArray();
         Check(visible.Contains(sense.Chinese) && visible.Contains(country.Chinese) && !visible.Contains(alternate.Chinese),
             "merged results show one wording and retain the distinct country meaning");
-        var alternatives = Contents(ai).OfType<Expander>().Single();
-        Check(Contents((DependencyObject)alternatives.Content).OfType<TextBox>().Any(t => t.Text == alternate.Chinese) &&
-            Contents((DependencyObject)alternatives.Content).OfType<TextBlock>().Any(t => t.Text == "AI 补充 · 未经词典来源核验"),
+        var alternatives = Contents(ai).OfType<ToggleButton>().Single(t => t.Content.ToString()!.StartsWith("其他表述"));
+        Check(Contents(ai).OfType<TextBox>().Any(t => t.Text == alternate.Chinese) &&
+            Contents(ai).OfType<TextBlock>().Any(t => t.Text.Contains("AI 补充 · 未经词典来源核验")),
             "collapsed alternative keeps its original text and unverified label");
-        alternatives.IsExpanded = true;
+        alternatives.IsChecked = true;
         Measure((FrameworkElement)main.Content, 558, 398);
-        Check(Descendants(ai).OfType<TextBox>().Any(t => t.Text == alternate.Chinese), "expanded alternate definitions remain selectable");
+        Check(Contents(ai, true).OfType<TextBox>().Any(t => t.Text == alternate.Chinese), "expanded alternate definitions remain selectable");
         var originals = local.Children.OfType<Expander>().Single();
         Check(!originals.IsExpanded && Contents(originals).Contains(original), "offline source text is retained verbatim in a collapsed section");
         originals.IsExpanded = true;

@@ -14,6 +14,7 @@ public partial class MainWindow
         lookup?.Cancel(); lookup?.Dispose(); lookup = new();
         var token = lookup.Token;
         current = text; SetQuery(text);
+        ResetSenseDetails();
         var target = Translation.Target(text);
         var key = Translation.Key(text, target, settings);
         Welcome.Visibility = Visibility.Collapsed; EntryPanel.Visibility = Visibility.Visible;
