@@ -56,8 +56,6 @@ public partial class MainWindow : Window
     }
     private void FocusSearch() { SearchBox.Focus(); SearchBox.SelectAll(); }
     private void Hide_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
-    private void DragSurface_MouseDown(object sender, MouseButtonEventArgs e)
-    { if (e.ChangedButton == MouseButton.Left && e.LeftButton == MouseButtonState.Pressed) { DragMove(); e.Handled = true; } }
     private void Window_Activated(object? sender, EventArgs e) => Dispatcher.BeginInvoke(FocusSearch);
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
@@ -247,7 +245,7 @@ public partial class MainWindow : Window
         header.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 12, Foreground = accent ? green : Foreground, Margin = new(0,0,10,0) });
         var tag = new TextBlock { Text = source, FontSize = 10, Foreground = muted, VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(tag,1); header.Children.Add(tag);
         content.Children.Add(header);
-        parent.Children.Add(new Border { Background = accent ? Theme.Brush("Surface") : Brushes.Transparent, CornerRadius = new(accent ? 8 : 0), BorderBrush = Theme.Brush("Stroke"), BorderThickness = accent ? new(1) : new(0,0,0,1), Padding = accent ? new(16,14,16,12) : new(0,12,0,14), Margin = new(0,0,0,12), Child = content });
+        parent.Children.Add(new Border { Background = accent ? Theme.Brush("PanelSurface") : Brushes.Transparent, CornerRadius = new(accent ? 8 : 0), BorderBrush = Theme.Brush("Stroke"), BorderThickness = accent ? new(1) : new(0,0,0,1), Padding = accent ? new(16,14,16,12) : new(0,12,0,14), Margin = new(0,0,0,12), Child = content });
         return content;
     }
     private void RenderLocal(LocalHit[] hits, string query)

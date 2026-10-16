@@ -2,6 +2,8 @@
   <Application.Resources>
     <FontFamily x:Key="UiFont">Segoe UI, Microsoft YaHei UI</FontFamily>
     <SolidColorBrush x:Key="Canvas" Color="#191A1D"/>
+    <SolidColorBrush x:Key="WindowSurface" Color="#191A1D"/>
+    <SolidColorBrush x:Key="PanelSurface" Color="#B8222327"/>
     <SolidColorBrush x:Key="Surface" Color="#222327"/>
     <SolidColorBrush x:Key="Hover" Color="#303136"/>
     <SolidColorBrush x:Key="Stroke" Color="#36383F"/>
@@ -10,6 +12,18 @@
     <SolidColorBrush x:Key="Accent" Color="#9DDAC3"/>
     <SolidColorBrush x:Key="Selection" Color="#354B45"/>
     <SolidColorBrush x:Key="Warning" Color="#DDBD82"/>
+    <Geometry x:Key="SearchIcon">M 10,3 A 7,7 0 1 0 10,17 A 7,7 0 1 0 10,3 M 15,15 L 21,21</Geometry>
+    <Geometry x:Key="CloseIcon">M 5,5 L 19,19 M 19,5 L 5,19</Geometry>
+    <Geometry x:Key="EnterIcon">M 19,5 L 19,14 L 5,14 M 10,9 L 5,14 L 10,19</Geometry>
+    <Geometry x:Key="SettingsIcon">M 9,3 L 15,3 L 16,6 L 19,7 L 21,12 L 19,17 L 16,18 L 15,21 L 9,21 L 8,18 L 5,17 L 3,12 L 5,7 L 8,6 Z M 16,12 A 4,4 0 1 0 8,12 A 4,4 0 1 0 16,12</Geometry>
+    <Geometry x:Key="ChevronRightIcon">M 8,5 L 15,12 L 8,19</Geometry>
+    <Geometry x:Key="ChevronDownIcon">M 5,8 L 12,15 L 19,8</Geometry>
+    <Style x:Key="IconPath" TargetType="Path">
+      <Setter Property="Stroke" Value="{StaticResource Muted}"/><Setter Property="StrokeThickness" Value="1.6"/>
+      <Setter Property="StrokeStartLineCap" Value="Round"/><Setter Property="StrokeEndLineCap" Value="Round"/><Setter Property="StrokeLineJoin" Value="Round"/>
+      <Setter Property="Width" Value="16"/><Setter Property="Height" Value="16"/><Setter Property="Stretch" Value="Uniform"/>
+      <Setter Property="VerticalAlignment" Value="Center"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="IsHitTestVisible" Value="False"/>
+    </Style>
     <Style x:Key="AppWindow" TargetType="Window">
       <Setter Property="FontFamily" Value="{StaticResource UiFont}"/><Setter Property="FontSize" Value="14"/>
       <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Background" Value="{StaticResource Canvas}"/>
@@ -35,7 +49,6 @@
       </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-      <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/><Setter Property="FontSize" Value="14"/>
       <Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/>
     </Style>
     <Style TargetType="TextBox">
@@ -43,7 +56,8 @@
       <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="CaretBrush" Value="{StaticResource Ink}"/>
       <Setter Property="Background" Value="{StaticResource Surface}"/><Setter Property="BorderBrush" Value="{StaticResource Stroke}"/>
       <Setter Property="BorderThickness" Value="1"/><Setter Property="VerticalContentAlignment" Value="Center"/>
-      <Setter Property="SelectionBrush" Value="{StaticResource Selection}"/><Setter Property="SelectionOpacity" Value="1"/>
+      <Setter Property="SelectionBrush" Value="{StaticResource Selection}"/><Setter Property="SelectionOpacity" Value="0.45"/>
+      <Setter Property="SelectionTextBrush" Value="{StaticResource Ink}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
         <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
           <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
@@ -92,7 +106,7 @@
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
         <Grid>
           <ToggleButton Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" ClickMode="Press">
-            <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border x:Name="Box" Background="{StaticResource Surface}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="6"><TextBlock Text="⌄" Foreground="{StaticResource Muted}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,4"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="Background" Value="{StaticResource Hover}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template>
+            <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border x:Name="Box" Background="{StaticResource Surface}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="6"><Path Data="{StaticResource ChevronDownIcon}" Style="{StaticResource IconPath}" Width="10" Height="10" HorizontalAlignment="Right" Margin="0,0,12,0"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="Background" Value="{StaticResource Hover}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template>
           </ToggleButton>
           <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="11,9,35,9" IsHitTestVisible="False" VerticalAlignment="Center"/>
           <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False">
@@ -121,7 +135,7 @@
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Expander">
         <StackPanel>
           <ToggleButton Foreground="{TemplateBinding Foreground}" Content="{TemplateBinding Header}" HorizontalContentAlignment="Left" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
-            <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border x:Name="Head" Background="Transparent" Padding="0,8" CornerRadius="5"><DockPanel><TextBlock x:Name="Arrow" Text="›" FontSize="17" Width="18" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/><ContentPresenter VerticalAlignment="Center"/></DockPanel></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Arrow" Property="Text" Value="⌄"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Head" Property="Background" Value="{StaticResource Surface}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template>
+            <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border x:Name="Head" Background="Transparent" Padding="0,8" CornerRadius="5"><DockPanel><Path x:Name="Arrow" Data="{StaticResource ChevronRightIcon}" Style="{StaticResource IconPath}" Width="10" Height="10" Margin="0,0,8,0"/><ContentPresenter VerticalAlignment="Center"/></DockPanel></Border><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Arrow" Property="Data" Value="{StaticResource ChevronDownIcon}"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Head" Property="Background" Value="{StaticResource Surface}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template>
           </ToggleButton>
           <ContentPresenter x:Name="Body" Visibility="Collapsed" Margin="0,4,0,0"/>
         </StackPanel>
