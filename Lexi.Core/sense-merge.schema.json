@@ -1,0 +1,18 @@
+{
+  "type": "object", "additionalProperties": false,
+  "properties": {
+    "inputHash": { "type": "string" },
+    "pairs": {
+      "type": "array", "items": {
+        "type": "object", "additionalProperties": false,
+        "properties": {
+          "a": { "type": "string" }, "b": { "type": "string" },
+          "relation": { "type": "string", "enum": ["equivalent", "different", "uncertain"] },
+          "confidence": { "type": "number" }
+        },
+        "required": ["a", "b", "relation", "confidence"]
+      }
+    }
+  },
+  "required": ["inputHash", "pairs"]
+}

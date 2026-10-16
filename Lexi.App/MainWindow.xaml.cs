@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly Cache cache = new(App.UserRoot);
     private readonly CodexDictionary codex = new(Path.Combine(App.Root, "assets"), App.UserRoot);
     private readonly ClaudeDictionary claude = new(Path.Combine(App.Root, "assets"), App.UserRoot);
+    private readonly ClaudeDictionary secondaryClaude = new(Path.Combine(App.Root, "assets"), App.UserRoot);
     private readonly AppSettings settings = AppSettings.Load(App.UserRoot);
     private CancellationTokenSource? lookup;
     private bool quit;
@@ -47,7 +48,7 @@ public partial class MainWindow : Window
         {
             if (!quit && !Dispatcher.HasShutdownStarted) { e.Cancel = true; WindowState = WindowState.Minimized; }
         };
-        Closed += (_, _) => { lookup?.Cancel(); claude.Dispose(); web.Dispose(); if (dictionaryTask.IsCompletedSuccessfully) dictionaryTask.Result.Dispose(); };
+        Closed += (_, _) => { lookup?.Cancel(); claude.Dispose(); secondaryClaude.Dispose(); web.Dispose(); if (dictionaryTask.IsCompletedSuccessfully) dictionaryTask.Result.Dispose(); };
     }
     public void Restore()
     {
@@ -107,6 +108,9 @@ public partial class MainWindow : Window
     {
         if (settings.Online && settings.AutoAi && settings.Provider == "claude") claude.Prepare(settings.Model);
         else claude.ReleasePrepared();
+        var second = LookupModel.Secondary(settings);
+        if (settings.Online && settings.AutoAi && settings.ParallelLookup && second.Provider == "claude" && second != LookupModel.Primary(settings)) secondaryClaude.Prepare(second.Model);
+        else secondaryClaude.ReleasePrepared();
     }
     private void SaveSettings()
     {
@@ -148,6 +152,7 @@ public partial class MainWindow : Window
         Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = "";
         LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear();
         ResultsScroll.ScrollToTop(); LookupStatus.Text = "查询本地词库…";
+        var watch = Stopwatch.StartNew();
         var notes = new List<string>();
         LocalHit[] local = [];
         try
@@ -167,9 +172,9 @@ public partial class MainWindow : Window
             var online = cache.Read<OnlineEntry>("online-v2", query);
             if (online != null) RenderOnline(online, true);
             var evidence = DictionaryEvidence.Combine(query, local, online);
-            var aiCache = cache.Read<AiEnvelope>("ai-v2", query);
-            var matchingModel = aiCache?.Model == settings.Model && aiCache.ReasoningEffort == settings.ReasoningEffort && aiCache.Provider == settings.Provider;
-            if (aiCache != null && matchingModel && aiCache.EvidenceHash == CodexDictionary.EvidenceHash(evidence)) RenderAi(aiCache.Entry, evidence, true);
+            var coordinator = CreateCoordinator();
+            var cachedAnswers = coordinator.Cached(query, evidence, settings);
+            if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence);
             if (!settings.Online) { LookupStatus.Text = "离线模式 · 使用本地词库与已缓存释义"; return; }
             var fresh = !force && online != null && DateTimeOffset.UtcNow - online.FetchedAt < TimeSpan.FromDays(1);
             if (!fresh && (force || !Queries.HasChinese(query) || !local.Any(h => h.Dictionary.AllowAiEvidence)))
@@ -189,50 +194,38 @@ public partial class MainWindow : Window
             if (online != null) RenderOnline(online, fresh || DateTimeOffset.UtcNow - online.FetchedAt > TimeSpan.FromMinutes(1));
             else { OnlinePanel.Children.Clear(); if (local.Length == 0) OnlinePanel.Children.Add(Hint("Wiktionary 暂无可用词条。")); }
             evidence = DictionaryEvidence.Combine(query, local, online);
-            var hash = CodexDictionary.EvidenceHash(evidence);
-            if (aiCache != null && aiCache.EvidenceHash != hash) AiPanel.Children.Clear();
-            if (aiCache != null && matchingModel && aiCache.EvidenceHash == hash && !force && DateTimeOffset.UtcNow - aiCache.GeneratedAt < TimeSpan.FromDays(7))
-            { RenderAi(aiCache.Entry, evidence, true); LookupStatus.Text = Status(notes, "已显示缓存释义"); return; }
+            AiPanel.Children.Clear();
+            cachedAnswers = coordinator.Cached(query, evidence, settings);
+            if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence);
             if (!settings.AutoAi && !force) { LookupStatus.Text = Status(notes, "查询完成 · 点击“重新生成”获取双语释义"); return; }
-            var provider = settings.Provider == "claude" ? "Claude" : "Codex";
-            LookupStatus.Text = $"词典结果已显示 · {provider} 正在补充双语释义…";
-            if (AiPanel.Children.Count == 0) AiPanel.Children.Add(Hint($"{provider} 正在整理释义…", green));
-            var watch = Stopwatch.StartNew();
             long? firstDefinitionMs = null;
-            var streamingFinished = false;
+            var finished = false;
             try
             {
-                var progress = new Progress<AiEntry>(partial =>
+                var progress = new Progress<LookupSnapshot>(snapshot =>
                 {
-                    if (streamingFinished || token.IsCancellationRequested || current != query) return;
-                    firstDefinitionMs ??= watch.ElapsedMilliseconds;
-                    RenderAi(partial, evidence, false, streaming: true);
-                    LookupStatus.Text = $"释义已显示 · 正在补充例句…";
+                    if (finished || token.IsCancellationRequested || current != query) return;
+                    if (snapshot.Groups.Length > 0) firstDefinitionMs ??= watch.ElapsedMilliseconds;
+                    RenderAnswers(snapshot, evidence);
+                    LookupStatus.Text = snapshot.Merging ? "释义已显示 · 正在合并同义项…" : ModelStatus(snapshot);
                 });
-                var ai = settings.Provider == "claude"
-                    ? await claude.LookupAsync(query, evidence, settings.Model, token, progress)
-                    : await codex.LookupAsync(query, evidence, settings, token);
+                var result = await coordinator.LookupAsync(query, evidence, settings, force, token, progress);
                 token.ThrowIfCancellationRequested();
-                streamingFinished = true;
-                RenderAi(ai, evidence, false);
-                if (ai.Found) await TryCacheAsync("ai-v2", query, new AiEnvelope(ai, hash, DateTimeOffset.UtcNow, settings.Model, settings.ReasoningEffort, settings.Provider));
-                token.ThrowIfCancellationRequested();
+                finished = true;
+                if (result.Groups.Length > 0) firstDefinitionMs ??= watch.ElapsedMilliseconds;
+                RenderAnswers(result, evidence);
+                var failures = result.Answers.Count(a => a.Phase == ModelPhase.Failed);
+                var status = failures > 0 ? $"{failures} 个模型未完成 · 其余结果已保留" : "查询完成";
+                if (!string.IsNullOrEmpty(result.MergeNote)) status += " · " + result.MergeNote;
+                LookupStatus.Text = Status(notes, (firstDefinitionMs is { } first ? $"首条释义 {first / 1000.0:0.0} 秒 · " : "") + status);
             }
-            catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or InvalidDataException or JsonException or System.ComponentModel.Win32Exception)
-            {
-                streamingFinished = true;
-                token.ThrowIfCancellationRequested();
-                if (aiCache != null && matchingModel && aiCache.EvidenceHash == hash) RenderAi(aiCache.Entry, evidence, true);
-                else { AiPanel.Children.Clear(); AiPanel.Children.Add(Hint(ex.Message)); }
-                notes.Add($"{provider} 补充未完成");
-            }
-            LookupStatus.Text = Status(notes, firstDefinitionMs is { } first ? $"首条释义 {first / 1000.0:0.0} 秒 · 查询完成" : "查询完成");
+            finally { finished = true; }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         { if (!token.IsCancellationRequested) LookupStatus.Text = "读取失败，请检查词库文件是否完整。"; }
     }
-    private static string Status(List<string> notes, string fallback) => notes.Count == 0 ? fallback : string.Join(" · ", notes);
+    private static string Status(List<string> notes, string fallback) => string.Join(" · ", new[] { fallback }.Concat(notes));
     private async Task TryCacheAsync<T>(string kind, string query, T value)
     { try { await cache.WriteAsync(kind, query, value); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* Cache failure never discards a valid result. */ } }
     private TextBlock Hint(string text, Brush? brush = null) => new() { Text = text, Foreground = brush ?? muted, FontSize = 14, Margin = new(0,4,0,12), TextWrapping = TextWrapping.Wrap };
@@ -288,38 +281,6 @@ public partial class MainWindow : Window
         stack.Children.Add(source);
         stack.Children.Add(Hint($"{(cached ? "缓存于" : "查询于")} {entry.FetchedAt.ToLocalTime():yyyy-MM-dd HH:mm} · CC BY-SA 4.0"));
         OnlinePanel.Children.Add(new Expander { Header = $"Wiktionary 原文 · {entry.Senses.Length} 条释义", Content = stack, IsExpanded = AiPanel.Children.Count == 0, Foreground = Foreground, Margin = new(2,5,2,10) });
-    }
-    private void RenderAi(AiEntry entry, OnlineEntry? online, bool cached, bool streaming = false)
-    {
-        AiPanel.Children.Clear();
-        if (!entry.Found) { AiPanel.Children.Add(Hint(string.IsNullOrWhiteSpace(entry.Note) ? "暂时无法可靠确认这个词的含义。" : entry.Note)); return; }
-        var card = Card(AiPanel, "双语释义", (settings.Provider == "claude" ? "Claude" : "Codex") + (cached ? " · 缓存" : streaming ? " · 生成中" : ""), true);
-        card.Children.Add(Hint(streaming ? "生成中 · 来源待确认" : entry.EvidenceStatus == "source_based" ? "据词典来源整理 · 含 AI 生成内容" : "AI 补充 · 未经词典来源核验", streaming || entry.EvidenceStatus == "source_based" ? muted : Theme.Brush("Warning")));
-        foreach (var (sense, i) in entry.Senses.Select((s,i)=>(s,i)))
-        {
-            var label = $"{i+1:00}  {sense.PartOfSpeech}" + (string.IsNullOrWhiteSpace(sense.Register) ? "" : "  ·  " + sense.Register);
-            card.Children.Add(new TextBlock { Text = label, Foreground = muted, FontSize = 14, Margin = new(0,i == 0 ? 0 : 16,0,5) });
-            card.Children.Add(Selectable(sense.Chinese,20));
-            card.Children.Add(Selectable(sense.English));
-            if (!string.IsNullOrWhiteSpace(sense.Example))
-            {
-                var example = new StackPanel(); var en = Selectable(sense.Example,16); en.Foreground = muted; example.Children.Add(en);
-                if (!string.IsNullOrWhiteSpace(sense.ExampleChinese)) { var zh = Selectable(sense.ExampleChinese,16); zh.Foreground = muted; example.Children.Add(zh); }
-                card.Children.Add(new Border { Child = example, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(2,0,0,0), Padding = new(10,0,0,0), Margin = new(0,8,0,4) });
-            }
-            if (sense.Evidence.Length > 0 && online != null)
-            {
-                foreach (var number in sense.Evidence.Distinct())
-                {
-                    var cited = online.Senses[number - 1];
-                    var evidence = new Button { Content = $"[{number}] {cited.SourceName} ↗", FontSize = 14, Foreground = muted, HorizontalAlignment = HorizontalAlignment.Left, Padding = new(0,3,0,0), ToolTip = cited.Definition };
-                    evidence.Click += (_, _) => OpenSource(string.IsNullOrEmpty(cited.SourceUrl) ? online.Url : cited.SourceUrl);
-                    card.Children.Add(evidence);
-                }
-            }
-        }
-        if (!string.IsNullOrWhiteSpace(entry.Note)) card.Children.Add(Hint(entry.Note));
-        if (OnlinePanel.Children.OfType<Expander>().FirstOrDefault() is { } onlinePanel) onlinePanel.IsExpanded = false;
     }
     private static void OpenSource(string url)
     {

@@ -19,7 +19,7 @@ internal static partial class Program
         Measure((FrameworkElement)main.Content, 1078, 798);
         var dictionary = new InstalledDictionary("Synthetic dictionary", "en / zh", 42, 1024,
             "synthetic-data", "https://example.org/dictionary", "Test license", "Installed", true, "synthetic");
-        var settings = new SettingsWindow(new AppSettings(), [dictionary]);
+        var settings = new SettingsWindow(new AppSettings { Model = "gpt-6.1-sol" }, [dictionary]);
         Measure((FrameworkElement)settings.Content, 538, 478);
         var tabs = Descendants((DependencyObject)settings.Content).OfType<TabControl>().Single();
         foreach (TabItem tab in tabs.Items)
@@ -38,6 +38,7 @@ internal static partial class Program
         Measure(panel, 480, 600);
         Console.WriteLine("PASS: WPF resources, window content and control templates construct and measure without displaying windows.");
         CheckChrome(app, main, settings, panel);
+        CheckParallelResults(main, settings);
         CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)

@@ -38,11 +38,31 @@ public sealed class SettingsWindow : Window
         var online = new CheckBox { Content = "在线补充", IsChecked = settings.Online, Margin = new(0,0,0,14) };
         var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
         general.Children.Add(online); general.Children.Add(ai);
-        general.Children.Add(Text("使用本机 Claude Code 或 Codex 的订阅登录。查词时发送查询词与许可允许的词典片段；翻译时发送完整输入。两种功能使用同一个模型，不自动切换。", 14, Muted));
-        var label = Text("在线模型"); label.Margin = new(0,13,0,8); general.Children.Add(label);
-        var choices = new List<ModelChoice> { new("Claude Haiku · 实测最快 · 流式显示", "haiku", "claude"), new("GPT-6 Luna · Fast", "gpt-6-luna"), new("GPT-6.1 Sol · Fast", "gpt-6.1-sol"), new("Codex 默认 · Fast", "") };
-        if (!choices.Any(x => x.Id == settings.Model && x.Provider == settings.Provider)) choices.Add(new(settings.Model, settings.Model, settings.Provider));
-        var model = new ComboBox { ItemsSource = choices, SelectedItem = choices.First(x => x.Id == settings.Model && x.Provider == settings.Provider), Margin = new(0,0,0,9) }; general.Children.Add(model);
+        general.Children.Add(Text("使用本机 Claude Code / Codex 的订阅登录。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。", 14, Muted));
+        var label = Text("主要模型 · 查词与翻译"); label.Margin = new(0,13,0,8); general.Children.Add(label);
+        var choices = new List<ModelChoice> { new("Claude Haiku · 流式显示", "haiku", "claude"), new("GPT-6 Luna · Fast", "gpt-6-luna"), new("GPT-6.1 Sol · Fast", "gpt-6.1-sol"), new("Codex 默认 · Fast", "") };
+        var primaryChoice = LookupModel.Primary(settings); var secondChoice = LookupModel.Secondary(settings);
+        foreach (var selected in new[] { primaryChoice, secondChoice, new LookupModel("codex", settings.JudgeModel) })
+            if (!choices.Any(x => x.Id == selected.Model && x.Provider == selected.Provider)) choices.Add(new(selected.Name, selected.Model, selected.Provider));
+        ComboBox ModelSelector(LookupModel selected, IEnumerable<ModelChoice> available) => new()
+        {
+            ItemsSource = available, IsSynchronizedWithCurrentItem = false,
+            SelectedItem = choices.First(x => x.Id == selected.Model && x.Provider == selected.Provider), Margin = new(0,0,0,12)
+        };
+        var model = ModelSelector(primaryChoice, choices); general.Children.Add(model);
+        var parallel = new CheckBox { Content = "双模型同时查词", IsChecked = settings.ParallelLookup, Margin = new(0,12,0,12) }; general.Children.Add(parallel);
+        var secondaryPanel = new StackPanel(); general.Children.Add(secondaryPanel);
+        secondaryPanel.Children.Add(Text("第二个查询模型"));
+        var secondary = ModelSelector(secondChoice, choices); secondaryPanel.Children.Add(secondary);
+        var merge = new CheckBox { Content = "自动合并同义项", IsChecked = settings.MergeSenses, Margin = new(0,6,0,12) }; secondaryPanel.Children.Add(merge);
+        var judgePanel = new StackPanel(); secondaryPanel.Children.Add(judgePanel);
+        judgePanel.Children.Add(Text("义项判断模型 · 使用 Codex 订阅"));
+        var judge = ModelSelector(new("codex", settings.JudgeModel), choices.Where(c => c.Provider == "codex").ToArray()); judgePanel.Children.Add(judge);
+        secondaryPanel.Children.Add(Text("判断为同义时优先显示主要模型的表述，可展开查看另一份。独有含义和分歧保留；判断失败时保留全部结果。模型一致不代表词典来源已核验。", 14, Muted));
+        void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true; }
+        parallel.Checked += (_, _) => UpdateParallelControls(); parallel.Unchecked += (_, _) => UpdateParallelControls();
+        merge.Checked += (_, _) => UpdateParallelControls(); merge.Unchecked += (_, _) => UpdateParallelControls(); UpdateParallelControls();
+        var modelError = Text("", 14, Theme.Brush("Warning")); modelError.Visibility = Visibility.Collapsed; general.Children.Add(modelError);
         general.Children.Add(Text("Claude 关闭额外思考，释义生成后立即显示。Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。", 14, Muted));
         general.Children.Add(Text(ClaudeDictionary.FindExecutable() == null ? "未检测到 Claude Code" : "已检测到 Claude Code · 登录由官方程序管理", 14,Muted));
         var advanced = new StackPanel { Margin = new(0,12,0,0) };
@@ -82,11 +102,17 @@ public sealed class SettingsWindow : Window
         dictionaries.Children.Add(Text("Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。", 14,Muted));
         save.Click += (_, _) =>
         {
+            var primaryValue = (ModelChoice)model.SelectedItem; var secondaryValue = (ModelChoice)secondary.SelectedItem;
+            if (parallel.IsChecked == true && primaryValue.Provider == secondaryValue.Provider && primaryValue.Id == secondaryValue.Id)
+            { modelError.Text = "请选择两个不同的查询模型。"; modelError.Visibility = Visibility.Visible; modelError.BringIntoView(); return; }
             settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
             settings.OfflineEnabled = master.IsChecked == true;
             settings.DisabledDictionaries = toggles.Where(t => t.Toggle.IsChecked != true).Select(t => t.Dictionary.Id).ToArray();
             settings.CodexPath = path.Text.Trim().Trim('"'); settings.Model = ((ModelChoice)model.SelectedItem).Id;
             settings.Provider = ((ModelChoice)model.SelectedItem).Provider;
+            settings.ParallelLookup = parallel.IsChecked == true; settings.MergeSenses = merge.IsChecked == true;
+            settings.SecondaryProvider = secondaryValue.Provider; settings.SecondaryModel = secondaryValue.Id;
+            settings.JudgeModel = ((ModelChoice)judge.SelectedItem).Id;
             settings.ReasoningEffort = "low"; settings.ServiceTier = "fast"; DialogResult = true;
         };
     }
