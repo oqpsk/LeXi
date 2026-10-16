@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "word": {"type": "string"},
+    "found": {"type": "boolean"},
+    "senses": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "partOfSpeech": {"type": "string"},
+        "english": {"type": "string"},
+        "chinese": {"type": "string"},
+        "register": {"type": "string"},
+        "example": {"type": "string"},
+        "exampleChinese": {"type": "string"},
+        "evidence": {"type": "array", "items": {"type": "integer"}}
+      },
+      "required": ["partOfSpeech", "english", "chinese", "register", "example", "exampleChinese", "evidence"]
+    }},
+    "note": {"type": "string"},
+    "evidenceStatus": {"type": "string", "enum": ["source_based", "unverified", "unknown"]}
+  },
+  "required": ["word", "found", "senses", "note", "evidenceStatus"]
+}

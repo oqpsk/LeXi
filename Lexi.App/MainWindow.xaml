@@ -1,0 +1,67 @@
+<Window x:Class="Lexi.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Lexi 词典" Style="{StaticResource AppWindow}" Width="760" Height="790" MinWidth="560" MinHeight="500" WindowStartupLocation="CenterScreen" Background="#F8F8F3"
+    Icon="Assets/Lexi.ico" PreviewKeyDown="Window_KeyDown" Activated="Window_Activated">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Grid Margin="28,20,24,17">
+      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <Border Background="#226E59" Width="32" Height="32" CornerRadius="9" Margin="0,0,10,0"><TextBlock Text="L" Foreground="#FCFCF6" FontFamily="Georgia" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+        <TextBlock Text="lexi" FontSize="25" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        <TextBlock Text="英英 · 英汉" Foreground="{StaticResource Muted}" FontSize="12" Margin="14,3,0,0" VerticalAlignment="Center"/>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button x:Name="OnlineToggle" Click="Online_Click" ToolTip="关闭后只使用本地词库与已缓存结果" Margin="0,0,6,0"/>
+        <Button Content="设置" Click="Settings_Click" AutomationProperties.Name="设置"/>
+      </StackPanel>
+    </Grid>
+    <StackPanel Grid.Row="1" Margin="28,0,28,0">
+      <Border Background="White" CornerRadius="12" BorderBrush="#CAD9D0" BorderThickness="1" Padding="16,5,6,5">
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <Grid>
+            <TextBox x:Name="SearchBox" FontSize="22" BorderThickness="0" Background="Transparent" Padding="0,8" TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_KeyDown" AutomationProperties.Name="查询单词或短语"/>
+            <TextBlock x:Name="Placeholder" Text="输入单词或短语" IsHitTestVisible="False" VerticalAlignment="Center" Foreground="#9AA79F" FontSize="20"/>
+          </Grid>
+          <Button Grid.Column="1" Content="查询  ↵" Click="Search_Click" Foreground="White" Background="{StaticResource Accent}" Padding="17,11" Margin="8,4,0,4" AutomationProperties.Name="查询"/>
+        </Grid>
+      </Border>
+      <ListBox x:Name="Suggestions" Visibility="Collapsed" MaxHeight="210" Margin="0,5,0,0" Background="White" BorderBrush="#E1E6DF" Padding="4" FontSize="15" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议">
+        <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Padding" Value="10,5"/></Style></ListBox.ItemContainerStyle>
+      </ListBox>
+      <Grid Margin="1,10,0,12"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock x:Name="LookupStatus" Text="正在准备离线词库…" FontSize="12" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+        <Button x:Name="RefreshButton" Grid.Column="1" Content="刷新补充" Click="Refresh_Click" Padding="7,2" FontSize="12" Foreground="{StaticResource Accent}" Visibility="Collapsed"/>
+      </Grid>
+    </StackPanel>
+    <ScrollViewer x:Name="ResultsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="28,0,28,24">
+      <StackPanel>
+        <StackPanel x:Name="Welcome" Margin="6,42,0,0">
+          <TextBlock Text="每一个词，都有来处。" FontSize="28" FontWeight="Normal"/>
+          <TextBlock Text="熟悉的词，即刻查。新遇见的词，也能查。" Foreground="{StaticResource Muted}" Margin="0,14,0,28" FontSize="15"/>
+          <WrapPanel>
+            <Button Content="serendipity" Click="Example_Click" Background="#EAF0E8" Margin="0,0,8,8" Padding="15,9"/>
+            <Button Content="look up" Click="Example_Click" Background="#EAF0E8" Margin="0,0,8,8" Padding="15,9"/>
+            <Button Content="mog" Click="Example_Click" Background="#EAF0E8" Margin="0,0,8,8" Padding="15,9"/>
+            <Button Content="spill the tea" Click="Example_Click" Background="#EAF0E8" Margin="0,0,8,8" Padding="15,9"/>
+          </WrapPanel>
+          <Border BorderBrush="#E1E6DF" BorderThickness="0,1,0,0" Margin="0,35,0,0" Padding="0,20,0,0">
+            <TextBlock Text="Enter 查询     Esc 收起     Ctrl+L 再查一个" Foreground="{StaticResource Muted}" FontSize="12"/>
+          </Border>
+        </StackPanel>
+        <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
+          <TextBlock x:Name="Headword" FontFamily="Georgia" FontSize="40" Margin="0,4,0,3"/>
+          <TextBlock x:Name="Phonetic" Foreground="{StaticResource Muted}" FontSize="15" Margin="1,0,0,19"/>
+          <StackPanel x:Name="AiPanel"/>
+          <StackPanel x:Name="LocalPanel"/>
+          <StackPanel x:Name="OnlinePanel"/>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+    <Border Grid.Row="3" Background="#EFF2EB" BorderBrush="#E0E6DD" BorderThickness="0,1,0,0" Padding="28,11">
+      <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <TextBlock x:Name="Footer" Text="Lexi 0.1" FontSize="11" Foreground="{StaticResource Muted}"/>
+        <TextBlock Grid.Column="1" Text="Esc 收起 · Ctrl+Q 退出" FontSize="11" Foreground="{StaticResource Muted}"/>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

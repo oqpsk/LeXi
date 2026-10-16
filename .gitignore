@@ -1,0 +1,37 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+
+# Personal state and credentials must never enter Git history.
+**/userdata/
+**/cache/
+**/auth.json
+**/credentials*
+**/settings.json
+**/.env*
+**/.codex/
+**/.claude/
+**/.grok/
+*.log
+*.jsonl
+
+# Downloads, build products, local tooling and full dictionaries.
+/.cache/
+/artifacts/
+/dist/
+/work/
+/tools/
+/data/
+*.exe
+*.dll
+*.pdb
+*.zip
+*.idx
+*.dat
+*.csv
+!tests/fixtures/*.csv

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Lexi</AssemblyName>
+    <ApplicationIcon>Assets/Lexi.ico</ApplicationIcon>
+    <Product>Lexi 词典</Product>
+    <Description>A small English dictionary for Windows</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Lexi.Core/Lexi.Core.csproj" />
+    <Content Include="../Lexi.Core/dictionary.schema.json" Link="assets/dictionary.schema.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../Lexi.Core/dictionary.instructions.txt" Link="assets/dictionary.instructions.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets/Lexi.ico" />
+  </ItemGroup>
+</Project>

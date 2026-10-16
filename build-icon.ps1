@@ -1,0 +1,31 @@
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+$folder = Join-Path $PSScriptRoot 'Lexi.App\Assets'
+New-Item -ItemType Directory -Path $folder -Force | Out-Null
+$image = [System.Drawing.Bitmap]::new(256, 256)
+$graphics = [System.Drawing.Graphics]::FromImage($image)
+$graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+$graphics.Clear([System.Drawing.Color]::Transparent)
+$shape = [System.Drawing.Drawing2D.GraphicsPath]::new()
+$shape.AddArc(8,8,72,72,180,90)
+$shape.AddArc(176,8,72,72,270,90)
+$shape.AddArc(176,176,72,72,0,90)
+$shape.AddArc(8,176,72,72,90,90)
+$shape.CloseFigure()
+$brush = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#226E59'))
+$graphics.FillPath($brush,$shape)
+$cream = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#F8F8F3'))
+$graphics.FillRectangle($cream,66,54,25,143)
+$graphics.FillRectangle($cream,66,174,123,23)
+$pen = [System.Drawing.Pen]::new([System.Drawing.ColorTranslator]::FromHtml('#B7D9C8'),10)
+$graphics.DrawLine($pen,122,65,190,65)
+$graphics.DrawLine($pen,122,96,178,96)
+$graphics.DrawLine($pen,122,127,166,127)
+$stream = [System.IO.MemoryStream]::new()
+$image.Save($stream,[System.Drawing.Imaging.ImageFormat]::Png)
+$png = $stream.ToArray()
+$writer = [System.IO.BinaryWriter]::new([System.IO.File]::Create((Join-Path $folder 'Lexi.ico')))
+$writer.Write([UInt16]0); $writer.Write([UInt16]1); $writer.Write([UInt16]1)
+$writer.Write([byte]0); $writer.Write([byte]0); $writer.Write([byte]0); $writer.Write([byte]0)
+$writer.Write([UInt16]1); $writer.Write([UInt16]32); $writer.Write([UInt32]$png.Length); $writer.Write([UInt32]22); $writer.Write($png)
+$writer.Dispose(); $stream.Dispose(); $pen.Dispose(); $cream.Dispose(); $brush.Dispose(); $shape.Dispose(); $graphics.Dispose(); $image.Dispose()

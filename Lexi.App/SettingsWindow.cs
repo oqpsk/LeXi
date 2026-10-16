@@ -1,0 +1,82 @@
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using Lexi.Core;
+
+namespace Lexi;
+
+public sealed class SettingsWindow : Window
+{
+    private static readonly Brush Muted = new SolidColorBrush(Color.FromRgb(100,115,107));
+    private static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(34,110,89));
+    private static TextBlock Text(string text, double size = 14, Brush? color = null) => new() { Text = text, FontSize = size, Foreground = color ?? new SolidColorBrush(Color.FromRgb(36,59,54)), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,10) };
+    private sealed record ModelChoice(string Label, string Id, string Provider = "codex") { public override string ToString() => Label; }
+    public SettingsWindow(AppSettings settings, InstalledDictionary dictionary)
+    {
+        Title = "Lexi 设置"; Width = 620; Height = 665; MinWidth = 540; MinHeight = 480;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Style = (Style)Application.Current.FindResource("AppWindow");
+        Background = new SolidColorBrush(Color.FromRgb(248,248,243));
+        var root = new DockPanel { Margin = new(26,20,26,20) }; Content = root;
+        var title = Text("设置", 25); title.Margin = new(0,0,0,20); DockPanel.SetDock(title, Dock.Top); root.Children.Add(title);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new(0,18,0,0) };
+        DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
+        var cancel = new Button { Content = "取消", Padding = new(22,10,22,10), Margin = new(0,0,8,0), IsCancel = true };
+        cancel.Click += (_, _) => DialogResult = false; actions.Children.Add(cancel);
+        var save = new Button { Content = "保存", Background = Accent, Foreground = Brushes.White, Padding = new(26,10,26,10), IsDefault = true }; actions.Children.Add(save);
+        var tabs = new TabControl { Background = Brushes.Transparent, BorderBrush = new SolidColorBrush(Color.FromRgb(215,225,216)), Padding = new(0,15,0,0) };
+        root.Children.Add(tabs);
+        var general = new StackPanel { Margin = new(14,4,14,10) };
+        tabs.Items.Add(new TabItem { Header = "查询与模型", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = general } });
+        var online = new CheckBox { Content = "在线补充", IsChecked = settings.Online, Margin = new(0,0,0,14) };
+        var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
+        general.Children.Add(online); general.Children.Add(ai);
+        general.Children.Add(Text("使用本机 Claude Code 或 Codex 的订阅登录。查询词与在线词条发送至所选服务，重复查询优先使用本机缓存。", 12, Muted));
+        var label = Text("释义模型"); label.Margin = new(0,13,0,8); general.Children.Add(label);
+        var choices = new List<ModelChoice> { new("Claude Haiku · 实测最快 · 流式显示", "haiku", "claude"), new("GPT-6 Luna · Fast", "gpt-6-luna"), new("GPT-6.1 Sol · Fast", "gpt-6.1-sol"), new("Codex 默认 · Fast", "") };
+        if (!choices.Any(x => x.Id == settings.Model && x.Provider == settings.Provider)) choices.Add(new(settings.Model, settings.Model, settings.Provider));
+        var model = new ComboBox { ItemsSource = choices, SelectedItem = choices.First(x => x.Id == settings.Model && x.Provider == settings.Provider), Margin = new(0,0,0,9) }; general.Children.Add(model);
+        general.Children.Add(Text("Claude 关闭额外思考，释义生成后立即显示。Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。", 12, Muted));
+        general.Children.Add(Text(ClaudeDictionary.FindExecutable() == null ? "未检测到 Claude Code" : "已检测到 Claude Code · 登录由官方程序管理",12,Muted));
+        var advanced = new StackPanel { Margin = new(0,12,0,0) };
+        advanced.Children.Add(Text("Codex 程序路径（留空自动检测）",12));
+        var path = new TextBox { Text = settings.CodexPath, FontSize = 12 }; advanced.Children.Add(path);
+        advanced.Children.Add(Text(CodexDictionary.FindExecutable(settings.CodexPath) == null ? "未检测到 Codex" : "已检测到 Codex",12,Muted));
+        general.Children.Add(new Expander { Header = "连接设置", Content = advanced, Margin = new(0,15,0,15) });
+        general.Children.Add(Text("界面字体：微软雅黑 UI",12,Muted));
+        general.Children.Add(Text("Enter 查询 · Esc 收起 · Ctrl+L 再查一个\nCtrl+Q 退出 · 固定到任务栏第 2 位后用 Win+2 切换",12,Muted));
+
+        var dictionaries = new StackPanel { Margin = new(14,4,14,10) };
+        tabs.Items.Add(new TabItem { Header = "离线词典", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = dictionaries } });
+        dictionaries.Children.Add(Text(dictionary.Available ? "已安装 1 部词典" : "尚无完整安装的离线词典",19));
+        dictionaries.Children.Add(Text("启用的词典用于本地查询与输入建议。",12,Muted));
+        var card = new StackPanel();
+        var enabled = new CheckBox { Content = dictionary.Name, IsChecked = settings.OfflineEnabled && dictionary.Available, IsEnabled = dictionary.Available, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new(0,0,0,16) };
+        card.Children.Add(enabled);
+        card.Children.Add(Text(dictionary.Languages,13));
+        card.Children.Add(Text($"{dictionary.Status}   ·   {dictionary.EntryCount:N0} 个词条   ·   {dictionary.Bytes / 1048576.0:N1} MB",13,Muted));
+        card.Children.Add(Text($"来源：skywind3000 / ECDICT   ·   许可：{dictionary.License}",12,Muted));
+        card.Children.Add(Text("词库位置",12));
+        var location = new TextBox { Text = dictionary.Folder, IsReadOnly = true, BorderThickness = new(0), Background = Brushes.Transparent, TextWrapping = TextWrapping.Wrap, FontSize = 12, Padding = new(0), Foreground = Muted };
+        card.Children.Add(location);
+        var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new(0,14,0,0) };
+        var folder = new Button { Content = "打开词库文件夹", Foreground = Accent, Padding = new(0,6,16,6) };
+        folder.Click += (_, _) => Open(dictionary.Folder); links.Children.Add(folder);
+        var source = new Button { Content = "项目来源 ↗", Foreground = Accent, Padding = new(0,6,0,6) };
+        source.Click += (_, _) => Open(dictionary.SourceUrl); links.Children.Add(source); card.Children.Add(links);
+        dictionaries.Children.Add(new Border { Background = Brushes.White, CornerRadius = new(10), BorderBrush = new SolidColorBrush(Color.FromRgb(215,225,216)), BorderThickness = new(1), Padding = new(18), Margin = new(0,9,0,16), Child = card });
+        dictionaries.Children.Add(Text("取消勾选并保存即可停用，词库文件会保留。",12,Muted));
+        dictionaries.Children.Add(Text("Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。",12,Muted));
+        save.Click += (_, _) =>
+        {
+            settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
+            settings.OfflineEnabled = enabled.IsChecked == true;
+            settings.CodexPath = path.Text.Trim().Trim('"'); settings.Model = ((ModelChoice)model.SelectedItem).Id;
+            settings.Provider = ((ModelChoice)model.SelectedItem).Provider;
+            settings.ReasoningEffort = "low"; settings.ServiceTier = "fast"; DialogResult = true;
+        };
+    }
+    private static void Open(string target)
+    { try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); } catch (System.ComponentModel.Win32Exception) { } }
+}
