@@ -17,13 +17,15 @@ public partial class MainWindow
     private static string ModelStatus(LookupSnapshot snapshot) => string.Join(" · ", snapshot.Answers.Select(a => a.Model.Name + (a.Phase switch
     { ModelPhase.Pending => " 查询中", ModelPhase.Streaming => " 生成中", ModelPhase.Complete => a.Cached ? " 缓存" : " 完成", ModelPhase.Failed => " 未完成", _ => a.Cached ? " 缓存" : " 无缓存" })));
 
-    internal void RenderAnswers(LookupSnapshot snapshot, OnlineEntry? evidence)
+    internal void RenderAnswers(LookupSnapshot snapshot, OnlineEntry? evidence, bool finalized = true)
     {
         AiPanel.Children.Clear();
         if (snapshot.Groups.Length == 0 && snapshot.Answers.All(a => a.Phase == ModelPhase.Offline)) return;
-        var card = Card(AiPanel, "双语释义", $"{snapshot.Groups.Length} 个义项 · {snapshot.Answers.Length} 个模型", true);
+        var stable = finalized && !snapshot.Provisional;
+        var countLabel = !stable ? $"预览 · {snapshot.Groups.Length} 条候选" : snapshot.MergeFailed
+            ? $"已保留 {snapshot.Groups.Length} 条释义" : $"{snapshot.Groups.Length} 个义项 · {snapshot.Answers.Length} 个模型";
+        var card = Card(AiPanel, "双语释义", countLabel, true);
         ((FrameworkElement)card.Children[0]).ToolTip = ModelStatus(snapshot);
-        if (snapshot.Provisional) card.Children.Add(CompactHint(snapshot.Merging ? "正在整理同义项 · 释义已可阅读" : "生成中 · 义项和来源尚未完整"));
         foreach (var (group, i) in snapshot.Groups.Select((g, i) => (g, i)))
             card.Children.Add(SenseRow(group, i, evidence));
         foreach (var answer in snapshot.Answers)
@@ -39,7 +41,7 @@ public partial class MainWindow
             card.Children.Add(controls); card.Children.Add(details);
             AddDisclosure(controls, details, "lookup:notes", "补充说明", content);
         }
-        if (snapshot.MergeNote.Contains("未完成")) card.Children.Add(CompactHint(snapshot.MergeNote, true));
+        if (snapshot.MergeFailed) card.Children.Add(CompactHint(snapshot.MergeNote, true));
         if (snapshot.Groups.Length > 0)
         {
             if (OnlinePanel.Children.OfType<Expander>().FirstOrDefault() is { Tag: null } onlineOriginal)

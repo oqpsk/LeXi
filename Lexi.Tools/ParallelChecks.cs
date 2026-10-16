@@ -105,7 +105,7 @@ internal static class ParallelChecks
         var judgeFailure = new DictionaryCoordinator(new Cache(Path.Combine(work, "judge-failed")), (m, q, e, s, t, p) => Task.FromResult(m == primary ? Entry(slang) : Entry(reworded)),
             (r, s, t) => Task.FromException<SenseMergePlan>(new TimeoutException("synthetic timeout")));
         var retained = await judgeFailure.LookupAsync("chad", null, settings, false, CancellationToken.None);
-        Check(retained.Groups.Length == 2 && retained.MergeNote.Contains("保留全部"), "judge timeout preserves every original definition");
+        Check(retained.Groups.Length == 2 && retained.MergeFailed && retained.MergeNote.Contains("保留全部"), "judge timeout preserves every original definition and reports an explicit incomplete merge");
         using var cancellation = new CancellationTokenSource();
         var previewed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelCache = new Cache(Path.Combine(work, "cancel"));

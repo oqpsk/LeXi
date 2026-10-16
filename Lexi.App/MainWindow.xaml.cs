@@ -24,7 +24,7 @@ public partial class MainWindow : Window
     private bool suppressSuggestions;
     private string current = "";
     private readonly Brush muted = Theme.Brush("Muted");
-    private readonly Brush green = Theme.Brush("Accent");
+    private readonly Brush accentBrush = Theme.Brush("Accent");
     public MainWindow()
     {
         InitializeComponent();
@@ -94,7 +94,7 @@ public partial class MainWindow : Window
     private async void Refresh_Click(object sender, RoutedEventArgs e) { if (current.Length > 0) await SearchAsync(current, true); }
     private void SetQuery(string query)
     { suppressSuggestions = true; SearchBox.Text = query; suppressSuggestions = false; Suggestions.Visibility = Visibility.Collapsed; }
-    private void UpdateOnlineButton() { OnlineToggle.Content = settings.Online ? "● 在线补充" : "○ 仅离线"; OnlineToggle.Foreground = settings.Online ? green : muted; }
+    private void UpdateOnlineButton() { OnlineToggle.Content = settings.Online ? "● 在线补充" : "○ 仅离线"; OnlineToggle.Foreground = settings.Online ? accentBrush : muted; }
     private void UpdateFooter() => Footer.Text = !settings.OfflineEnabled ? "离线词典已停用 · 可在设置中启用" :
         dictionaryTask.IsCompletedSuccessfully ? $"{dictionaryTask.Result.Dictionaries.Count(d => d.Available && !(settings.DisabledDictionaries ?? []).Contains(d.Id))} 部离线词典" : "离线词库不可用";
     private async void Online_Click(object sender, RoutedEventArgs e)
@@ -153,8 +153,13 @@ public partial class MainWindow : Window
         Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = "";
         LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear();
         ResultsScroll.ScrollToTop(); LookupStatus.Text = "查询本地词库…";
+        var modelsEnabled = settings.Online && (settings.AutoAi || force);
+        var mergeEnabled = modelsEnabled && settings.MergeSenses && LookupModel.Selected(settings).Length > 1;
+        var initialProgress = QueryProgressState.Dictionary(modelsEnabled, mergeEnabled);
+        var request = QueryProgress.Begin(initialProgress);
         var watch = Stopwatch.StartNew();
         var notes = new List<string>();
+        var sourceIncomplete = false;
         LocalHit[] local = [];
         try
         {
@@ -167,7 +172,7 @@ public partial class MainWindow : Window
                     local = dictionary.Lookup(query, settings);
                 }
             }
-            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }
             token.ThrowIfCancellationRequested();
             RenderLocal(local, query);
             var online = cache.Read<OnlineEntry>("online-v2", query);
@@ -175,8 +180,12 @@ public partial class MainWindow : Window
             var evidence = DictionaryEvidence.Combine(query, local, online);
             var coordinator = CreateCoordinator();
             var cachedAnswers = coordinator.Cached(query, evidence, settings);
-            if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence);
-            if (!settings.Online) { LookupStatus.Text = "离线模式 · 使用本地词库与已缓存释义"; return; }
+            if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence, !settings.Online);
+            if (!settings.Online)
+            {
+                LookupStatus.Text = "离线模式 · 使用本地词库与已缓存释义";
+                QueryProgress.Update(request, QueryProgressState.SourcesFinished(true, sourceIncomplete)); return;
+            }
             var fresh = !force && online != null && DateTimeOffset.UtcNow - online.FetchedAt < TimeSpan.FromDays(1);
             if (!fresh && (force || !Queries.HasChinese(query) || !local.Any(h => h.Dictionary.AllowAiEvidence)))
             {
@@ -188,8 +197,8 @@ public partial class MainWindow : Window
                     if (fetched != null) { online = fetched; await TryCacheAsync("online-v2", query, online); }
                     else if (online == null) notes.Add("在线词典未收录");
                 }
-                catch (OperationCanceledException) when (!token.IsCancellationRequested) { notes.Add("在线查询超时"); }
-                catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidDataException) { notes.Add("在线来源暂不可用"); }
+                catch (OperationCanceledException) when (!token.IsCancellationRequested) { notes.Add("在线查询超时"); sourceIncomplete = true; }
+                catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidDataException) { notes.Add("在线来源暂不可用"); sourceIncomplete = true; }
             }
             token.ThrowIfCancellationRequested();
             if (online != null) RenderOnline(online, fresh || DateTimeOffset.UtcNow - online.FetchedAt > TimeSpan.FromMinutes(1));
@@ -197,8 +206,13 @@ public partial class MainWindow : Window
             evidence = DictionaryEvidence.Combine(query, local, online);
             AiPanel.Children.Clear();
             cachedAnswers = coordinator.Cached(query, evidence, settings);
-            if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence);
-            if (!settings.AutoAi && !force) { LookupStatus.Text = Status(notes, "查询完成 · 点击“重新生成”获取双语释义"); return; }
+            if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence, !modelsEnabled);
+            if (!modelsEnabled)
+            {
+                LookupStatus.Text = Status(notes, "查询完成 · 点击“重新生成”获取双语释义");
+                QueryProgress.Update(request, QueryProgressState.SourcesFinished(false, sourceIncomplete)); return;
+            }
+            QueryProgress.Update(request, QueryProgressState.Updating(new(LookupModel.Selected(settings).Select(m => new ModelAnswer(m, ModelPhase.Pending)).ToArray(), []), mergeEnabled));
             long? firstDefinitionMs = null;
             var finished = false;
             try
@@ -207,7 +221,8 @@ public partial class MainWindow : Window
                 {
                     if (finished || token.IsCancellationRequested || current != query) return;
                     if (snapshot.Groups.Length > 0) firstDefinitionMs ??= watch.ElapsedMilliseconds;
-                    RenderAnswers(snapshot, evidence);
+                    RenderAnswers(snapshot, evidence, false);
+                    QueryProgress.Update(request, QueryProgressState.Updating(snapshot, mergeEnabled));
                     LookupStatus.Text = snapshot.Merging ? "释义已显示 · 正在合并同义项…" : ModelStatus(snapshot);
                 });
                 var result = await coordinator.LookupAsync(query, evidence, settings, force, token, progress);
@@ -215,6 +230,7 @@ public partial class MainWindow : Window
                 finished = true;
                 if (result.Groups.Length > 0) firstDefinitionMs ??= watch.ElapsedMilliseconds;
                 RenderAnswers(result, evidence);
+                QueryProgress.Update(request, QueryProgressState.Finished(result, mergeEnabled, sourceIncomplete));
                 var failures = result.Answers.Count(a => a.Phase == ModelPhase.Failed);
                 var status = failures > 0 ? $"{failures} 个模型未完成 · 其余结果已保留" : "查询完成";
                 if (!string.IsNullOrEmpty(result.MergeNote)) status += " · " + result.MergeNote;
@@ -222,9 +238,16 @@ public partial class MainWindow : Window
             }
             finally { finished = true; }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        { QueryProgress.Update(request, initialProgress.Interrupted("查询已中断", "本次查询已结束，可重新查询")); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { if (!token.IsCancellationRequested) LookupStatus.Text = "读取失败，请检查词库文件是否完整。"; }
+        {
+            if (!token.IsCancellationRequested)
+            {
+                LookupStatus.Text = "读取失败，请检查词库文件是否完整。";
+                QueryProgress.Update(request, initialProgress.Interrupted("查询未完成", "读取失败 · 本次查询已结束，可重试"));
+            }
+        }
     }
     private static string Status(List<string> notes, string fallback) => string.Join(" · ", new[] { fallback }.Concat(notes));
     private async Task TryCacheAsync<T>(string kind, string query, T value)
@@ -242,7 +265,7 @@ public partial class MainWindow : Window
         var content = new StackPanel();
         var header = new Grid { Margin = new(0,0,0,10) };
         header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        header.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 15, Foreground = accent ? green : Foreground, Margin = new(0,0,10,0) });
+        header.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 15, Foreground = accent ? accentBrush : Foreground, Margin = new(0,0,10,0) });
         var tag = new TextBlock { Text = source, FontSize = 13, Foreground = muted, VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(tag,1); header.Children.Add(tag);
         content.Children.Add(header);
         parent.Children.Add(new Border { Background = accent ? Theme.Brush("PanelSurface") : Brushes.Transparent, CornerRadius = new(accent ? 8 : 0), BorderBrush = Theme.Brush("Stroke"), BorderThickness = accent ? new(1) : new(0,0,0,1), Padding = accent ? new(16,14,16,12) : new(0,12,0,14), Margin = new(0,0,0,12), Child = content });
@@ -273,11 +296,11 @@ public partial class MainWindow : Window
         var stack = new StackPanel { Margin = new(0,10,0,0) };
         for (int i = 0; i < entry.Senses.Length; i++)
         {
-            stack.Children.Add(new TextBlock { Text = $"[{i+1}]  {entry.Senses[i].PartOfSpeech.ToLowerInvariant()}", Foreground = green, FontSize = 15, Margin = new(0,7,0,3) });
+            stack.Children.Add(new TextBlock { Text = $"[{i+1}]  {entry.Senses[i].PartOfSpeech.ToLowerInvariant()}", Foreground = accentBrush, FontSize = 15, Margin = new(0,7,0,3) });
             stack.Children.Add(Selectable(entry.Senses[i].Definition));
             foreach (var example in entry.Senses[i].Examples) { var text = Selectable(example,16); text.Foreground = muted; stack.Children.Add(text); }
         }
-        var source = new Button { Content = "查看 Wiktionary 来源 ↗", HorizontalAlignment = HorizontalAlignment.Left, Foreground = green, Padding = new(0,8,0,8) };
+        var source = new Button { Content = "查看 Wiktionary 来源 ↗", HorizontalAlignment = HorizontalAlignment.Left, Foreground = accentBrush, Padding = new(0,8,0,8) };
         source.Click += (_, _) => OpenSource(entry.Url);
         stack.Children.Add(source);
         stack.Children.Add(Hint($"{(cached ? "缓存于" : "查询于")} {entry.FetchedAt.ToLocalTime():yyyy-MM-dd HH:mm} · CC BY-SA 4.0"));

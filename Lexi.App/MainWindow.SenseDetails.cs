@@ -35,7 +35,7 @@ public partial class MainWindow
     {
         var label = CompactHint(""); label.Margin = new(0,0,0,3);
         label.ToolTip = candidate.Model.Name + "\n" + Provenance(candidate);
-        label.Inlines.Add(new Run(prefix + "  ") { Foreground = green });
+        label.Inlines.Add(new Run(prefix + "  ") { Foreground = accentBrush });
         label.Inlines.Add(new Run(candidate.Sense.PartOfSpeech +
             (string.IsNullOrWhiteSpace(candidate.Sense.Register) ? "" : " · " + candidate.Sense.Register)));
         var shortStatus = candidate.Provisional ? "生成中 · 待核验" : candidate.EvidenceStatus == "source_based" ? "AI · 据来源" : "AI · 未核验";

@@ -30,7 +30,7 @@ public sealed class SettingsWindow : Window
         DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
         var cancel = new Button { Content = "取消", Padding = new(22,10,22,10), Margin = new(0,0,8,0), IsCancel = true };
         cancel.Click += (_, _) => DialogResult = false; actions.Children.Add(cancel);
-        var save = new Button { Content = "保存", Background = Theme.Brush("Selection"), Foreground = Accent, Padding = new(26,10,26,10), IsDefault = true }; actions.Children.Add(save);
+        var save = new Button { Content = "保存", Background = Theme.Brush("Selection"), Foreground = Theme.Brush("Ink"), Padding = new(26,10,26,10), IsDefault = true }; actions.Children.Add(save);
         var tabs = new TabControl();
         root.Children.Add(tabs);
         var general = new StackPanel { Margin = new(2,4,8,10) };

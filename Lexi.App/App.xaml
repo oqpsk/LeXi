@@ -9,8 +9,9 @@
     <SolidColorBrush x:Key="Stroke" Color="#36383F"/>
     <SolidColorBrush x:Key="Ink" Color="#EDEEF1"/>
     <SolidColorBrush x:Key="Muted" Color="#ADB0BA"/>
-    <SolidColorBrush x:Key="Accent" Color="#9DDAC3"/>
-    <SolidColorBrush x:Key="Selection" Color="#354B45"/>
+    <SolidColorBrush x:Key="Accent" Color="#FFADD2"/>
+    <SolidColorBrush x:Key="AccentSurface" Color="#583044"/>
+    <SolidColorBrush x:Key="Selection" Color="#9D3E72"/>
     <SolidColorBrush x:Key="Warning" Color="#DDBD82"/>
     <Geometry x:Key="SearchIcon">M 10,3 A 7,7 0 1 0 10,17 A 7,7 0 1 0 10,3 M 15,15 L 21,21</Geometry>
     <Geometry x:Key="CloseIcon">M 5,5 L 19,19 M 19,5 L 5,19</Geometry>
@@ -74,7 +75,7 @@
       <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="CaretBrush" Value="{StaticResource Ink}"/>
       <Setter Property="Background" Value="{StaticResource Surface}"/><Setter Property="BorderBrush" Value="{StaticResource Stroke}"/>
       <Setter Property="BorderThickness" Value="1"/><Setter Property="VerticalContentAlignment" Value="Center"/>
-      <Setter Property="SelectionBrush" Value="{StaticResource Selection}"/><Setter Property="SelectionOpacity" Value="0.45"/>
+      <Setter Property="SelectionBrush" Value="{StaticResource Selection}"/><Setter Property="SelectionOpacity" Value="0.5"/>
       <Setter Property="SelectionTextBrush" Value="{StaticResource Ink}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
         <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">

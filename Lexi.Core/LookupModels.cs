@@ -19,7 +19,7 @@ public sealed record LookupModel(string Provider, string Model)
 
 public enum ModelPhase { Pending, Streaming, Complete, Failed, Offline }
 public sealed record ModelAnswer(LookupModel Model, ModelPhase Phase, AiEntry? Entry = null, bool Cached = false, string Error = "");
-public sealed record LookupSnapshot(ModelAnswer[] Answers, SenseGroup[] Groups, bool Merging = false, string MergeNote = "")
+public sealed record LookupSnapshot(ModelAnswer[] Answers, SenseGroup[] Groups, bool Merging = false, string MergeNote = "", bool MergeFailed = false)
 {
     public bool Provisional => Merging || Answers.Any(a => a.Phase is ModelPhase.Pending or ModelPhase.Streaming);
 }
