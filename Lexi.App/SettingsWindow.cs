@@ -12,7 +12,7 @@ public sealed class SettingsWindow : Window
     private static readonly Brush Accent = new SolidColorBrush(Color.FromRgb(34,110,89));
     private static TextBlock Text(string text, double size = 14, Brush? color = null) => new() { Text = text, FontSize = size, Foreground = color ?? new SolidColorBrush(Color.FromRgb(36,59,54)), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,10) };
     private sealed record ModelChoice(string Label, string Id, string Provider = "codex") { public override string ToString() => Label; }
-    public SettingsWindow(AppSettings settings, InstalledDictionary dictionary)
+    public SettingsWindow(AppSettings settings, InstalledDictionary[] installed)
     {
         Title = "Lexi 设置"; Width = 620; Height = 665; MinWidth = 540; MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -32,7 +32,7 @@ public sealed class SettingsWindow : Window
         var online = new CheckBox { Content = "在线补充", IsChecked = settings.Online, Margin = new(0,0,0,14) };
         var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
         general.Children.Add(online); general.Children.Add(ai);
-        general.Children.Add(Text("使用本机 Claude Code 或 Codex 的订阅登录。查询词与在线词条发送至所选服务，重复查询优先使用本机缓存。", 12, Muted));
+        general.Children.Add(Text("使用本机 Claude Code 或 Codex 的订阅登录。查词时发送查询词与许可允许的词典片段；翻译时发送完整输入。两种功能使用同一个模型，不自动切换。", 12, Muted));
         var label = Text("释义模型"); label.Margin = new(0,13,0,8); general.Children.Add(label);
         var choices = new List<ModelChoice> { new("Claude Haiku · 实测最快 · 流式显示", "haiku", "claude"), new("GPT-6 Luna · Fast", "gpt-6-luna"), new("GPT-6.1 Sol · Fast", "gpt-6.1-sol"), new("Codex 默认 · Fast", "") };
         if (!choices.Any(x => x.Id == settings.Model && x.Provider == settings.Provider)) choices.Add(new(settings.Model, settings.Model, settings.Provider));
@@ -49,14 +49,20 @@ public sealed class SettingsWindow : Window
 
         var dictionaries = new StackPanel { Margin = new(14,4,14,10) };
         tabs.Items.Add(new TabItem { Header = "离线词典", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = dictionaries } });
-        dictionaries.Children.Add(Text(dictionary.Available ? "已安装 1 部词典" : "尚无完整安装的离线词典",19));
+        dictionaries.Children.Add(Text($"已安装 {installed.Count(d => d.Available)} 部词典",19));
         dictionaries.Children.Add(Text("启用的词典用于本地查询与输入建议。",12,Muted));
+        var master = new CheckBox { Content = "启用离线查询", IsChecked = settings.OfflineEnabled, Margin = new(0,0,0,12) };
+        dictionaries.Children.Add(master);
+        var toggles = new List<(InstalledDictionary Dictionary, CheckBox Toggle)>();
+        foreach (var dictionary in installed)
+        {
         var card = new StackPanel();
-        var enabled = new CheckBox { Content = dictionary.Name, IsChecked = settings.OfflineEnabled && dictionary.Available, IsEnabled = dictionary.Available, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new(0,0,0,16) };
+        var enabled = new CheckBox { Content = dictionary.Name, IsChecked = !(settings.DisabledDictionaries ?? []).Contains(dictionary.Id) && dictionary.Available, IsEnabled = dictionary.Available, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new(0,0,0,16) };
+        toggles.Add((dictionary, enabled));
         card.Children.Add(enabled);
         card.Children.Add(Text(dictionary.Languages,13));
-        card.Children.Add(Text($"{dictionary.Status}   ·   {dictionary.EntryCount:N0} 个词条   ·   {dictionary.Bytes / 1048576.0:N1} MB",13,Muted));
-        card.Children.Add(Text($"来源：skywind3000 / ECDICT   ·   许可：{dictionary.License}",12,Muted));
+        card.Children.Add(Text($"{dictionary.Status}   ·   {dictionary.EntryCount:N0} 个检索词条   ·   {dictionary.Bytes / 1048576.0:N1} MB",13,Muted));
+        card.Children.Add(Text($"{dictionary.Attribution}\n版本：{dictionary.Version}   ·   许可：{dictionary.License}",12,Muted));
         card.Children.Add(Text("词库位置",12));
         var location = new TextBox { Text = dictionary.Folder, IsReadOnly = true, BorderThickness = new(0), Background = Brushes.Transparent, TextWrapping = TextWrapping.Wrap, FontSize = 12, Padding = new(0), Foreground = Muted };
         card.Children.Add(location);
@@ -66,12 +72,14 @@ public sealed class SettingsWindow : Window
         var source = new Button { Content = "项目来源 ↗", Foreground = Accent, Padding = new(0,6,0,6) };
         source.Click += (_, _) => Open(dictionary.SourceUrl); links.Children.Add(source); card.Children.Add(links);
         dictionaries.Children.Add(new Border { Background = Brushes.White, CornerRadius = new(10), BorderBrush = new SolidColorBrush(Color.FromRgb(215,225,216)), BorderThickness = new(1), Padding = new(18), Margin = new(0,9,0,16), Child = card });
+        }
         dictionaries.Children.Add(Text("取消勾选并保存即可停用，词库文件会保留。",12,Muted));
         dictionaries.Children.Add(Text("Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。",12,Muted));
         save.Click += (_, _) =>
         {
             settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
-            settings.OfflineEnabled = enabled.IsChecked == true;
+            settings.OfflineEnabled = master.IsChecked == true;
+            settings.DisabledDictionaries = toggles.Where(t => t.Toggle.IsChecked != true).Select(t => t.Dictionary.Id).ToArray();
             settings.CodexPath = path.Text.Trim().Trim('"'); settings.Model = ((ModelChoice)model.SelectedItem).Id;
             settings.Provider = ((ModelChoice)model.SelectedItem).Provider;
             settings.ReasoningEffort = "low"; settings.ServiceTier = "fast"; DialogResult = true;

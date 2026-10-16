@@ -17,4 +17,6 @@ try {
     if ($LASTEXITCODE) { throw 'Dictionary checks failed' }
     & dotnet $runner stream-check
     if ($LASTEXITCODE) { throw 'Streaming checks failed' }
+    & dotnet $runner extended-check (Join-Path $root '.cache/extended-checks')
+    if ($LASTEXITCODE) { throw 'Extended dictionary/translation checks failed' }
 } finally { Pop-Location }

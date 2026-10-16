@@ -8,7 +8,7 @@
       <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
         <Border Background="#226E59" Width="32" Height="32" CornerRadius="9" Margin="0,0,10,0"><TextBlock Text="L" Foreground="#FCFCF6" FontFamily="Georgia" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
         <TextBlock Text="lexi" FontSize="25" FontWeight="SemiBold" VerticalAlignment="Center"/>
-        <TextBlock Text="英英 · 英汉" Foreground="{StaticResource Muted}" FontSize="12" Margin="14,3,0,0" VerticalAlignment="Center"/>
+        <TextBlock Text="词典 · 翻译" Foreground="{StaticResource Muted}" FontSize="12" Margin="14,3,0,0" VerticalAlignment="Center"/>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
         <Button x:Name="OnlineToggle" Click="Online_Click" ToolTip="关闭后只使用本地词库与已缓存结果" Margin="0,0,6,0"/>
@@ -19,12 +19,21 @@
       <Border Background="White" CornerRadius="12" BorderBrush="#CAD9D0" BorderThickness="1" Padding="16,5,6,5">
         <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <Grid>
-            <TextBox x:Name="SearchBox" FontSize="22" BorderThickness="0" Background="Transparent" Padding="0,8" TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_KeyDown" AutomationProperties.Name="查询单词或短语"/>
-            <TextBlock x:Name="Placeholder" Text="输入单词或短语" IsHitTestVisible="False" VerticalAlignment="Center" Foreground="#9AA79F" FontSize="20"/>
+            <TextBox x:Name="SearchBox" FontSize="20" BorderThickness="0" Background="Transparent" Padding="0,8" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48" MaxHeight="180" VerticalScrollBarVisibility="Auto" TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_KeyDown" AutomationProperties.Name="输入单词、短语或待翻译文本"/>
+            <TextBlock x:Name="Placeholder" Text="输入单词、短语或一段文本" IsHitTestVisible="False" VerticalAlignment="Center" Foreground="#9AA79F" FontSize="18"/>
           </Grid>
           <Button Grid.Column="1" Content="查询  ↵" Click="Search_Click" Foreground="White" Background="{StaticResource Accent}" Padding="17,11" Margin="8,4,0,4" AutomationProperties.Name="查询"/>
         </Grid>
       </Border>
+      <WrapPanel Margin="0,8,0,0" VerticalAlignment="Center">
+        <ComboBox x:Name="QueryMode" SelectedIndex="0" MinWidth="110" Margin="0,0,8,0" FontSize="12" Padding="8,4" AutomationProperties.Name="查询模式">
+          <ComboBoxItem Content="自动判断"/><ComboBoxItem Content="查词"/><ComboBoxItem Content="翻译"/>
+        </ComboBox>
+        <ComboBox x:Name="TranslationTarget" SelectedIndex="0" MinWidth="145" Margin="0,0,12,0" FontSize="12" Padding="8,4" AutomationProperties.Name="翻译目标语言">
+          <ComboBoxItem Content="翻译方向：自动"/><ComboBoxItem Content="译为中文"/><ComboBoxItem Content="Translate to English"/>
+        </ComboBox>
+        <TextBlock Text="Enter 查询 · Shift+Enter 换行" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center"/>
+      </WrapPanel>
       <ListBox x:Name="Suggestions" Visibility="Collapsed" MaxHeight="210" Margin="0,5,0,0" Background="White" BorderBrush="#E1E6DF" Padding="4" FontSize="15" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议">
         <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Padding" Value="10,5"/></Style></ListBox.ItemContainerStyle>
       </ListBox>
@@ -49,7 +58,7 @@
           </Border>
         </StackPanel>
         <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
-          <TextBlock x:Name="Headword" FontFamily="Georgia" FontSize="40" Margin="0,4,0,3"/>
+          <TextBlock x:Name="Headword" FontFamily="{StaticResource UiFont}" FontSize="40" Margin="0,4,0,3"/>
           <TextBlock x:Name="Phonetic" Foreground="{StaticResource Muted}" FontSize="15" Margin="1,0,0,19"/>
           <StackPanel x:Name="AiPanel"/>
           <StackPanel x:Name="LocalPanel"/>

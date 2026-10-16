@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="../Lexi.Core/Lexi.Core.csproj" />
     <Content Include="../Lexi.Core/dictionary.schema.json" Link="assets/dictionary.schema.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../Lexi.Core/translation.schema.json" Link="assets/translation.schema.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../Lexi.Core/dictionary.instructions.txt" Link="assets/dictionary.instructions.txt" CopyToOutputDirectory="PreserveNewest" />
     <Resource Include="Assets/Lexi.ico" />
   </ItemGroup>

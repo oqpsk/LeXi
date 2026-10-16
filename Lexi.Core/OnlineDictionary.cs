@@ -25,12 +25,14 @@ public sealed partial class OnlineDictionary : IDisposable
     public static OnlineEntry? Parse(string query, string json)
     {
         using var document = JsonDocument.Parse(json);
-        if (!document.RootElement.TryGetProperty("en", out var groups)) return null;
+        var chinese = Queries.HasChinese(query);
+        if (!document.RootElement.TryGetProperty(chinese ? "zh" : "en", out var groups)) return null;
         var senses = new List<Sense>();
         foreach (var group in groups.EnumerateArray())
         {
             // The en bucket can contain Translingual entries; filter the explicit language.
-            if (group.GetProperty("language").GetString() != "English") continue;
+            var language = group.GetProperty("language").GetString();
+            if (chinese ? language is not "Chinese" and not "Mandarin" : language != "English") continue;
             var pos = group.GetProperty("partOfSpeech").GetString() ?? "";
             foreach (var entry in group.GetProperty("definitions").EnumerateArray())
             {
@@ -42,7 +44,7 @@ public sealed partial class OnlineDictionary : IDisposable
             }
         }
         return senses.Count == 0 ? null : new(query, senses.Take(40).ToArray(),
-            "https://en.wiktionary.org/wiki/" + Uri.EscapeDataString(query) + "#English", DateTimeOffset.UtcNow);
+            "https://en.wiktionary.org/wiki/" + Uri.EscapeDataString(query) + (chinese ? "#Chinese" : "#English"), DateTimeOffset.UtcNow);
     }
     public static string Plain(string html) => Spaces().Replace(WebUtility.HtmlDecode(Tags().Replace(Script().Replace(html, ""), "")), " ").Trim();
     [GeneratedRegex(@"<(script|style)\b[^>]*>.*?</\1>", RegexOptions.IgnoreCase | RegexOptions.Singleline)] private static partial Regex Script();

@@ -1,0 +1,33 @@
+[
+  {
+    "file": "moe.zip", "format": "moe", "minimumEntries": 150000,
+    "url": "https://language.moe.gov.tw/001/Upload/Files/site_content/M0001/respub/download/dict_revised_2015_20260929.zip",
+    "sha256": "65a24fff76d0fbfa078541f39761bb9f302bdf7ad6bb48be4ce1052d1b49f609",
+    "usageUrl": "https://language.moe.gov.tw/001/Upload/Files/site_content/M0001/respub/reviseddict_10312.pdf",
+    "usageSha256": "0854656a196d3f2583f1e931c3cb4f2d0d7821dacb2d6b80ee5fc9d0563b86b9",
+    "metadata": { "id": "moe-revised", "name": "教育部《重編國語辭典修訂本》", "languages": "国语释义 · 原始繁体条目 · 支持简体查询", "sourceUrl": "https://dict.revised.moe.edu.tw/", "license": "CC BY-ND 3.0 TW", "version": "2015_20260929", "attribution": "中華民國教育部（Ministry of Education, R.O.C.）。《重編國語辭典修訂本》（版本編號：2015_20260929）網址：https://dict.revised.moe.edu.tw/", "allowAiEvidence": false }
+  },
+  {
+    "file": "oewn.xml.gz", "format": "wordnet", "minimumEntries": 130000,
+    "url": "https://github.com/globalwordnet/english-wordnet/releases/download/2025-edition/english-wordnet-2025-plus.xml.gz",
+    "sha256": "31f4af16c54b532fd5484d4cc33aee588a31bb5b70683ae8197842fde5b586bc",
+    "metadata": { "id": "wordnet", "name": "Open English WordNet", "languages": "英英释义 · 词义与例句", "sourceUrl": "https://en-word.net/downloads", "license": "CC BY 4.0", "version": "2025+", "attribution": "Open English WordNet Team; derived from Princeton WordNet", "allowAiEvidence": true }
+  },
+  {
+    "file": "cedict.gz", "format": "cedict", "minimumEntries": 120000,
+    "url": "https://cc-cedict.org/editor/editor_export_cedict.php?c=gz", "sha256": "",
+    "metadata": { "id": "cedict", "name": "CC-CEDICT 汉英词典", "languages": "简体与繁体中文 → 英语释义", "sourceUrl": "https://www.mdbg.net/chinese/dictionary?page=cc-cedict", "license": "CC BY-SA 4.0", "version": "rolling", "attribution": "CC-CEDICT / MDBG; indexed from the original UTF-8 text", "allowAiEvidence": true }
+  },
+  {
+    "file": "naer-maritime.csv", "format": "naer", "minimumEntries": 25000,
+    "url": "https://opendata.naer.edu.tw/學術名詞/國家教育研究院-海事學術名詞.csv",
+    "sha256": "c5ba9449d5e6aa98e9bb047af6cd1a76ccbdd057ad3f97305f1831ec1d0ddeb7",
+    "metadata": { "id": "naer-maritime", "name": "国家教育研究院 · 海事术语", "languages": "海事专业术语 · 中英双向检索", "sourceUrl": "https://data.gov.tw/dataset/15339", "license": "政府資料開放授權條款第1版", "version": "2026-10 snapshot", "attribution": "國家教育研究院；來源 https://terms.naer.edu.tw/；原词表建立双向索引", "allowAiEvidence": true }
+  },
+  {
+    "file": "naer-shipbuilding.csv", "format": "naer", "minimumEntries": 20000,
+    "url": "https://opendata.naer.edu.tw/學術名詞/國家教育研究院-造船工程學術名詞.csv",
+    "sha256": "f7cbba13f878f052837279d1fb12020119b024c833945751540ddeed99f0bebd",
+    "metadata": { "id": "naer-shipbuilding", "name": "国家教育研究院 · 造船工程术语", "languages": "造船与轮机专业术语 · 中英双向检索", "sourceUrl": "https://data.gov.tw/dataset/15399", "license": "政府資料開放授權條款第1版", "version": "2026-10 snapshot", "attribution": "國家教育研究院；來源 https://terms.naer.edu.tw/；原词表建立双向索引", "allowAiEvidence": true }
+  }
+]
