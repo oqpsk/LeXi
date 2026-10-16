@@ -146,6 +146,7 @@ public partial class MainWindow : Window
         lookup?.Cancel(); lookup?.Dispose(); lookup = new();
         var token = lookup.Token;
         current = query;
+        ResetSenseDetails();
         SetQuery(raw.Trim());
         Welcome.Visibility = Visibility.Collapsed; EntryPanel.Visibility = Visibility.Visible;
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;

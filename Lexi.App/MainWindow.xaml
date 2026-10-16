@@ -23,7 +23,7 @@
         </Grid>
       </Border>
       <ListBox x:Name="Suggestions" Grid.Row="1" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议"/>
-      <ScrollViewer x:Name="ResultsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,20,16,20">
+      <ScrollViewer x:Name="ResultsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,14,16,14">
         <StackPanel>
           <StackPanel x:Name="Welcome">
             <TextBlock Text="随手查，随时懂。" FontSize="26" FontWeight="SemiBold" Margin="4,13,0,8"/>
@@ -52,8 +52,10 @@
             </Button>
           </StackPanel>
           <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
-            <TextBlock x:Name="Headword" FontSize="30" FontWeight="SemiBold" Margin="0,0,0,5"/>
-            <TextBlock x:Name="Phonetic" Foreground="{StaticResource Muted}" FontSize="14" Margin="0,0,0,18"/>
+            <WrapPanel Margin="0,0,0,10">
+              <TextBlock x:Name="Headword" FontSize="30" FontWeight="SemiBold" Margin="0,0,12,0"/>
+              <TextBlock x:Name="Phonetic" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+            </WrapPanel>
             <StackPanel x:Name="AiPanel"/>
             <StackPanel x:Name="LocalPanel"/>
             <StackPanel x:Name="OnlinePanel"/>

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.5.1
+
+- Increase dictionary result density while retaining 20-DIP Chinese definitions, 18-DIP English definitions and existing line spacing. Combine part of speech, register and provenance into one wrapping line, and place pronunciation beside the headword.
+- Hide examples, detailed citations, alternate wording and model notes behind compact, keyboard-accessible disclosure controls. Keep core definitions, uncertainty, incomplete-output labels and failures visible.
+- Preserve each disclosure's open or closed state during streaming and merging, including an open example from the faster model when it moves under alternate wording. Reset details for a new lookup.
+- Add non-displaying checks for result height, unchanged typography, selectable examples, complete citations and disclosure state. The five-sense fixture uses about 59% less result height at the default window width.
+
 ## 0.5.0
 
 - Query two configurable dictionary models concurrently, showing the first available definition immediately; retain the other model's results when one fails. Keep text translation on the selected primary model.

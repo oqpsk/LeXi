@@ -48,6 +48,24 @@
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
+    <Style x:Key="DisclosureButton" TargetType="ToggleButton">
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="FontFamily" Value="{StaticResource UiFont}"/><Setter Property="FontSize" Value="14"/>
+      <Setter Property="Cursor" Value="Hand"/><Setter Property="Padding" Value="3,2"/><Setter Property="Margin" Value="0,0,10,0"/><Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+        <Border x:Name="Head" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="4" Padding="{TemplateBinding Padding}">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Path x:Name="Arrow" Data="{StaticResource ChevronRightIcon}" Style="{StaticResource IconPath}" Stroke="{TemplateBinding Foreground}" Width="9" Height="9" Margin="0,0,5,0"/>
+            <ContentPresenter VerticalAlignment="Center"/>
+          </StackPanel>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Arrow" Property="Data" Value="{StaticResource ChevronDownIcon}"/><Setter Property="Foreground" Value="{StaticResource Accent}"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Head" Property="Background" Value="{StaticResource Hover}"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Head" Property="BorderBrush" Value="{StaticResource Accent}"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/>
     </Style>

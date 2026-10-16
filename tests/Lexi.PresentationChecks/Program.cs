@@ -39,6 +39,7 @@ internal static partial class Program
         Console.WriteLine("PASS: WPF resources, window content and control templates construct and measure without displaying windows.");
         CheckChrome(app, main, settings, panel);
         CheckParallelResults(main, settings);
+        CheckDensity(main);
         CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)
@@ -97,6 +98,15 @@ internal static partial class Program
         {
             var child = VisualTreeHelper.GetChild(parent, i); yield return child;
             foreach (var descendant in Descendants(child)) yield return descendant;
+        }
+    }
+    private static IEnumerable<DependencyObject> Contents(DependencyObject parent, bool visibleOnly = false)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+        {
+            if (visibleOnly && child is UIElement element && element.Visibility != Visibility.Visible) continue;
+            yield return child;
+            foreach (var nested in Contents(child, visibleOnly)) yield return nested;
         }
     }
 }
