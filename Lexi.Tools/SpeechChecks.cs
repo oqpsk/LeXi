@@ -83,9 +83,10 @@ internal static class SpeechChecks
             try { await client.GenerateAsync("word", openai, "synthetic", cancel.Token); Check(false, "speech cancellation"); }
             catch (OperationCanceledException) { Check(true, "canceling speech cancels the network operation"); }
         }
-        Check(new AppSettings().SpeechProvider == "windows" && SpeechCatalog.Voices("openai", "gpt-4o-mini-tts").Length == 13,
+        Check(new AppSettings().SpeechProvider == SpeechCatalog.Local.Provider && SpeechCatalog.Voices("openai", "gpt-4o-mini-tts").Length == 13,
             "speech defaults to local synthesis and exposes documented OpenAI voices");
         await ElevenSpeechChecks.Run();
+        await SpeechAudioChecks.Run();
         Console.WriteLine($"{count} pronunciation and speech checks passed");
     }
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
