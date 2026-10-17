@@ -39,9 +39,9 @@ internal static partial class Program
         Check(Texts().Count(t => t.FontSize == 20) == 5 && Texts().Count(t => t.FontSize == 18) == 5 &&
             Texts().All(t => t.IsReadOnly && t.Text != sense.Example && t.Text != sense.ExampleChinese),
             "all bilingual definitions retain 20/18 DIP selectable text with examples hidden");
-        Check(Contents(ai, true).OfType<TextBlock>().Count(t => new TextRange(t.ContentStart, t.ContentEnd).Text.Contains("未核验")) == 5 &&
+        Check(Contents(ai, true).OfType<ToggleButton>().Count(t => t.Content.ToString() == "来源 · 模型补充") == 5 &&
             !Contents(ai, true).OfType<Button>().Any(t => t.Content.ToString()!.Contains("Source")),
-            "uncertainty remains visible while detailed citations are collapsed");
+            "model supplementation is quietly identified in source disclosures while citations remain collapsed");
         var exampleToggle = Toggle(":examples");
         Check(exampleToggle.Focusable && exampleToggle.IsTabStop && !Theme.CanDragFrom(exampleToggle), "disclosure controls support keyboard focus and never drag the window");
         exampleToggle.IsChecked = true;

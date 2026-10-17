@@ -29,6 +29,12 @@ public sealed class OfflineLibrary : IDisposable
     }
     public string[] Suggest(string query, AppSettings settings) => Queries.IsText(query) ? [] :
         Enabled(settings).SelectMany(d => d.Data.Suggest(query)).Distinct().Take(7).ToArray();
+    public WordFormSet[] Forms(string query, AppSettings settings)
+    {
+        var entries = Enabled(settings).Where(d => d.Info.Id == "ecdict").SelectMany(d =>
+            new[] { d.Data.Lookup(query), d.Data.LookupInflectionLemma(query) }.OfType<LocalEntry>().Distinct().Select(e => new LocalHit(d.Info, e))).ToArray();
+        return WordForms.Resolve(entries, lemma => Lookup(lemma, settings));
+    }
     public void Dispose() { foreach (var dictionary in loaded) dictionary.Data.Dispose(); }
 }
 

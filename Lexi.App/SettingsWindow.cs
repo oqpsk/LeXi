@@ -14,7 +14,7 @@ public sealed partial class SettingsWindow : Window
     private sealed record ModelChoice(string Label, string Id, string Provider = "codex") { public override string ToString() => Label; }
     public SettingsWindow(AppSettings settings, InstalledDictionary[] installed)
     {
-        Title = "Lexi 设置"; Width = 620; Height = 665; MinWidth = 540; MinHeight = 480;
+        Title = "LeXi 设置"; Width = 620; Height = 665; MinWidth = 540; MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Style = (Style)Application.Current.FindResource("AppWindow");
         Theme.ApplyChrome(this);
@@ -25,7 +25,7 @@ public sealed partial class SettingsWindow : Window
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
         var close = new Button { Content = Theme.Icon("CloseIcon"), Style = (Style)FindResource("IconButton"), ToolTip = "关闭设置" };
         close.Click += (_, _) => DialogResult = false; DockPanel.SetDock(close, Dock.Right); header.Children.Add(close);
-        var title = Text("Lexi 设置", 22); title.Margin = new(0,3,0,0); header.Children.Add(title);
+        var title = Text("LeXi 设置", 22); title.Margin = new(0,3,0,0); header.Children.Add(title);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new(0,18,0,0) };
         DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
         var cancel = new Button { Content = "取消", Padding = new(22,10,22,10), Margin = new(0,0,8,0), IsCancel = true };
@@ -50,6 +50,7 @@ public sealed partial class SettingsWindow : Window
             SelectedItem = choices.First(x => x.Id == selected.Model && x.Provider == selected.Provider), Margin = new(0,0,0,12)
         };
         var model = ModelSelector(primaryChoice, choices); general.Children.Add(model);
+        var accounts = ConnectionButton("账号登录与连接…"); accounts.HorizontalAlignment = HorizontalAlignment.Left; general.Children.Add(accounts);
         var parallel = new CheckBox { Content = "双模型同时查词", IsChecked = settings.ParallelLookup, Margin = new(0,12,0,12) }; general.Children.Add(parallel);
         var secondaryPanel = new StackPanel(); general.Children.Add(secondaryPanel);
         secondaryPanel.Children.Add(Text("第二个查询模型"));
@@ -64,12 +65,9 @@ public sealed partial class SettingsWindow : Window
         merge.Checked += (_, _) => UpdateParallelControls(); merge.Unchecked += (_, _) => UpdateParallelControls(); UpdateParallelControls();
         var modelError = Text("", 14, Theme.Brush("Warning")); modelError.Visibility = Visibility.Collapsed; general.Children.Add(modelError);
         general.Children.Add(Text("Claude 关闭额外思考，释义生成后立即显示。Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。", 14, Muted));
-        general.Children.Add(Text(ClaudeDictionary.FindExecutable() == null ? "未检测到 Claude Code" : "已检测到 Claude Code · 登录由官方程序管理", 14,Muted));
-        var advanced = new StackPanel { Margin = new(0,12,0,0) };
-        advanced.Children.Add(Text("Codex 程序路径（留空自动检测）", 14));
-        var path = new TextBox { Text = settings.CodexPath, FontSize = 14 }; advanced.Children.Add(path);
-        advanced.Children.Add(Text(CodexDictionary.FindExecutable(settings.CodexPath) == null ? "未检测到 Codex" : "已检测到 Codex", 14,Muted));
-        general.Children.Add(new Expander { Header = "连接设置", Content = advanced, Margin = new(0,15,0,15) });
+        var path = new TextBox { Text = settings.CodexPath, FontSize = 14 };
+        var connectionTab = AddConnectionsTab(tabs, path);
+        accounts.Click += (_, _) => tabs.SelectedItem = connectionTab;
         general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+, 设置 · Ctrl+Q 退出\n固定到任务栏第 2 位后用 Win+2 切换", 14,Muted));
 
         var dictionaries = new StackPanel { Margin = new(2,4,8,10) };

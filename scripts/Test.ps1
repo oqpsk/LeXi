@@ -15,6 +15,8 @@ try {
     if ($LASTEXITCODE) { throw 'Fixture creation failed' }
     & dotnet $runner check $fixture --fixture
     if ($LASTEXITCODE) { throw 'Dictionary checks failed' }
+    & dotnet $runner usability-check $fixture
+    if ($LASTEXITCODE) { throw 'Dictionary usability and connection checks failed' }
     & dotnet $runner stream-check
     if ($LASTEXITCODE) { throw 'Streaming checks failed' }
     & dotnet $runner extended-check (Join-Path $root '.cache/extended-checks')

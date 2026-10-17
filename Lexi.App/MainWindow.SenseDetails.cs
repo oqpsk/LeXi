@@ -28,26 +28,27 @@ public partial class MainWindow
         return block;
     }
 
-    private static string Provenance(SenseCandidate candidate) => candidate.Provisional ? "生成中 · 来源待确认" :
-        candidate.EvidenceStatus == "source_based" ? "据词典来源整理 · 含 AI 生成内容" : "AI 补充 · 未经词典来源核验";
+    private static string Provenance(SenseCandidate candidate) => candidate.Provisional ? "释义仍在生成，来源信息尚未完整。" :
+        candidate.EvidenceStatus == "source_based" ? "模型参考下列词典整理；释义与例句由模型生成。" :
+        "这条解释由模型补充，现有词典原文不足以核对全部内容；这不表示释义错误。";
 
-    private TextBlock SenseHeading(SenseCandidate candidate, string prefix, int variants = 1)
+    private TextBlock SenseHeading(SenseCandidate candidate, string prefix)
     {
         var label = CompactHint(""); label.Margin = new(0,0,0,3);
-        label.ToolTip = candidate.Model.Name + "\n" + Provenance(candidate);
+        label.ToolTip = candidate.Sense.PartOfSpeech + " · " + candidate.Sense.Register;
         label.Inlines.Add(new Run(prefix + "  ") { Foreground = accentBrush });
-        label.Inlines.Add(new Run(candidate.Sense.PartOfSpeech +
-            (string.IsNullOrWhiteSpace(candidate.Sense.Register) ? "" : " · " + candidate.Sense.Register)));
-        var shortStatus = candidate.Provisional ? "生成中 · 待核验" : candidate.EvidenceStatus == "source_based" ? "AI · 据来源" : "AI · 未核验";
-        label.Inlines.Add(new Run(" · " + shortStatus) { Foreground = !candidate.Provisional && candidate.EvidenceStatus != "source_based" ? Theme.Brush("Warning") : muted });
-        if (variants > 1) label.Inlines.Add(new Run($" · {variants} 份表述"));
+        label.Inlines.Add(new Run(LexicalLabels.PartOfSpeech(candidate.Sense.PartOfSpeech))
+            { Foreground = Theme.Brush("Warning"), FontWeight = FontWeights.SemiBold, FontSize = 16 });
+        var usage = string.Join(" · ", new[] { LexicalLabels.Form(candidate.Sense.PartOfSpeech), LexicalLabels.Usage(candidate.Sense.Register) }.Where(s => s.Length > 0));
+        if (usage.Length > 0) label.Inlines.Add(new Run("  " + usage));
+        if (candidate.Provisional) label.Inlines.Add(new Run(" · 生成中"));
         return label;
     }
 
     private Border SenseRow(SenseGroup group, int index, OnlineEntry? evidence)
     {
         var content = new StackPanel();
-        content.Children.Add(SenseHeading(group.Representative, $"{index + 1:00}", group.Variants.Length));
+        content.Children.Add(SenseHeading(group.Representative, $"{index + 1:00}"));
         RenderSenseContent(content, group.Representative, evidence, group.Variants.Where(v => v.Id != group.Representative.Id).ToArray(), group.IncludesUsageVariants);
         return new Border { Child = content, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(0,index == 0 ? 0 : 1,0,0), Padding = new(0,index == 0 ? 0 : 10,0,8) };
     }
@@ -70,6 +71,7 @@ public partial class MainWindow
 
         var sources = new StackPanel();
         sources.Children.Add(CompactHint(candidate.Model.Name + " · " + Provenance(candidate)));
+        sources.Children.Add(CompactHint("原始用法标签：" + candidate.Sense.PartOfSpeech + " · " + candidate.Sense.Register));
         var numbers = candidate.Provisional || evidence == null ? [] : sense.Evidence.Distinct().Where(n => n >= 1 && n <= evidence.Senses.Length).ToArray();
         var links = new WrapPanel(); sources.Children.Add(links);
         foreach (var number in numbers)
@@ -79,8 +81,9 @@ public partial class MainWindow
             link.Click += (_, _) => OpenSource(string.IsNullOrEmpty(cited.SourceUrl) ? evidence.Url : cited.SourceUrl);
             links.Children.Add(link);
         }
-        if (numbers.Length == 0 && !candidate.Provisional) sources.Children.Add(CompactHint("未引用词典来源。"));
-        AddDisclosure(controls, details, key + ":sources", numbers.Length == 0 ? "来源" : $"来源 · {numbers.Length}", sources);
+        if (numbers.Length == 0 && !candidate.Provisional) sources.Children.Add(CompactHint("暂无对应词典引文，可对照其他表述或重新生成。"));
+        var sourceLabel = candidate.Provisional ? "来源" : candidate.EvidenceStatus != "source_based" ? "来源 · 模型补充" : $"来源 · {numbers.Length}";
+        AddDisclosure(controls, details, key + ":sources", sourceLabel, sources);
 
         if (alternatives is not { Length: > 0 }) return;
         var originals = new StackPanel();
