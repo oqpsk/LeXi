@@ -25,6 +25,11 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.17 (Windows)
+
+- Build and package per-definition and per-example speech for Windows: reveal the speaker on hover, offer whole-block or selected-text reading in the context menu, and keep stop/highlight state attached to the item being read. Use the configured provider and existing audio cache.
+- Keep English examples in italic serif type and Chinese example translations in upright serif type, matching the macOS implementation.
+
 ## 0.9.16
 
 - Focus the search input immediately on startup, taskbar activation and explicit restore, with an input-priority retry after WPF layout and focus restoration. Declare the input as the window's logical focus target and align native keyboard focus only while the main window is already foreground and enabled.

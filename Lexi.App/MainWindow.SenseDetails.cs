@@ -28,7 +28,7 @@ public partial class MainWindow
     {
         var block = CompactText(text, 18);
         block.FontFamily = (FontFamily)FindResource(chinese ? "ChineseExampleFont" : "LexicalFont");
-        block.FontStyle = FontStyles.Italic;
+        block.FontStyle = chinese ? FontStyles.Normal : FontStyles.Italic;
         return block;
     }
 
