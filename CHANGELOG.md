@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.9.13
+
+- Move the quick-read text up by 2 DIP to center its visible letterforms beside the TL/DR badge. Preserve the existing 19-DIP type, 28-DIP line spacing, selectable text, badge size and equal horizontal gaps; the correction applies to single-line and wrapped summaries.
+
 ## 0.9.12
 
 - Reduce the TL/DR badge from 28 to 20 DIP to sit closer to the summary's 19-DIP type size, with proportionally smaller vector letterforms. Account for the text box's internal leading inset so the visible gaps on either side of the badge are both 12 DIP; keep vertical centering and the existing summary text size.
