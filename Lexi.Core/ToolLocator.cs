@@ -92,9 +92,12 @@ public static class ToolLocator
     {
         var directories = SearchDirectories(env);
         if (env.Windows || !NodeScript(path)) return new(path, null, env.Windows ? null : [Path.GetDirectoryName(path)!, .. directories]);
-        // Prefer node from the same prefix as the shim, then any searched directory.
+        // Prefer node from the same npm prefix as the client (beside a bin/ shim, or <prefix>/bin for
+        // <prefix>/lib/node_modules/…), then any searched directory such as Homebrew's.
         var folder = Path.GetDirectoryName(path)!;
-        var node = new[] { folder }.Concat(directories).Select(d => Path.Combine(d, "node")).FirstOrDefault(File.Exists);
+        var modules = path.IndexOf(Path.DirectorySeparatorChar + Path.Combine("lib", "node_modules") + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+        var prefix = modules > 0 ? new[] { Path.Combine(path[..modules], "bin") } : [];
+        var node = new[] { folder }.Concat(prefix).Concat(directories).Select(d => Path.Combine(d, "node")).FirstOrDefault(File.Exists);
         return node == null ? new(path, null, [folder, .. directories]) : new(node, path, [Path.GetDirectoryName(node)!, folder, .. directories]);
     }
 
