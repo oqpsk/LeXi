@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add `Lexi.Host`, a JSON-lines host for native front ends. It exposes query, translation, suggestions, history, settings, dictionaries and official-client status, streams every `QueryView` in order, supports cancelling individual requests, and keeps stdout to protocol messages only. It publishes as a self-contained single file with model schemas beside it. See docs/host-protocol.md.
+- Share model choices, the “two different models” rule and the fixed Codex options through `ModelCatalog`, used by the Windows settings dialog and the host.
+- Add `host-check`, covering streaming, cancellation, errors and settings validation in process, and the host executable's stdout and exit behavior; the macOS CI job also checks the published single-file host.
+
 - Move the query lifecycle into `Lexi.Core`. `QuerySession` now performs routing, source and cache reads, model streaming, merging, saved-view restoration, translation, history and navigation, and publishes a complete `QueryView` at each step: progress stage, status text, sense rows with provenance and citations, sources, word forms, pronunciation, etymology, TL;DR and translation. The WPF window only renders these views, keeping its existing disclosure, scroll and source-expansion behavior. Settings changes mark the kept result before cancelling, so the order no longer depends on the UI thread.
 - Derive simplified/traditional search keys from embedded OpenCC character tables on every platform instead of Windows `LCMapStringEx`. Older traditional-only indexes are searched with a bounded set of candidate spellings (for example 车钟 → 車鐘). Displayed dictionary text is unchanged.
 - Find Codex and Claude Code without relying on the login shell PATH: besides PATH, check `~/.local/bin`, Homebrew, `/usr/local/bin`, npm global prefixes and Node version managers; run npm entry scripts through the matching `node` and pass the found folders to the client. Windows discovery is unchanged. The missing-Codex message no longer assumes `codex.exe`.
