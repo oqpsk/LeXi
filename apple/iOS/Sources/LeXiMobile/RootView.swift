@@ -31,8 +31,10 @@ struct RootView: View {
         }
         .onChange(of: store.view.request) { _, _ in pageChanged() }
         .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
-        // The lookup is ready the moment LeXi opens, as on the desktop.
-        .onAppear { searching = true }
+        // The lookup is ready the moment LeXi opens, as on the desktop. The field may join the
+        // hierarchy a moment after the first appearance, so focus is asked for again on the next turn.
+        .defaultFocus($searching, true)
+        .task { await Task.yield(); searching = true }
     }
 
     @ViewBuilder private var content: some View {
