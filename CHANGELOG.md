@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Move the query lifecycle into `Lexi.Core`. `QuerySession` now performs routing, source and cache reads, model streaming, merging, saved-view restoration, translation, history and navigation, and publishes a complete `QueryView` at each step: progress stage, status text, sense rows with provenance and citations, sources, word forms, pronunciation, etymology, TL;DR and translation. The WPF window only renders these views, keeping its existing disclosure, scroll and source-expansion behavior. Settings changes mark the kept result before cancelling, so the order no longer depends on the UI thread.
+- Derive simplified/traditional search keys from embedded OpenCC character tables on every platform instead of Windows `LCMapStringEx`. Older traditional-only indexes are searched with a bounded set of candidate spellings (for example 车钟 → 車鐘). Displayed dictionary text is unchanged.
+- Find Codex and Claude Code without relying on the login shell PATH: besides PATH, check `~/.local/bin`, Homebrew, `/usr/local/bin`, npm global prefixes and Node version managers; run npm entry scripts through the matching `node` and pass the found folders to the client. Windows discovery is unchanged. The missing-Codex message no longer assumes `codex.exe`.
+- Choose data folders per platform: Windows keeps the portable `userdata`/`data` folders; macOS uses `~/Library/Application Support/LeXi`.
+- Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
+- Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
+
 ## 0.9.15
 
 - Read ElevenLabs account voices on the first dropdown expansion, reuse that list within the settings dialog, and provide an explicit “刷新声线列表” action. Keep loading and connection errors beside the voice selector; invalidate results on key edits, reject stale responses, and preserve saved/custom choices without inventing voices for empty accounts.
