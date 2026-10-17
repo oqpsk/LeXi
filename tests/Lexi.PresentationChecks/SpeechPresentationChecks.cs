@@ -3,6 +3,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using Lexi;
 using Lexi.Core;
 
@@ -30,8 +31,9 @@ internal static partial class Program
         var answer = new ModelAnswer(model, ModelPhase.Complete, new("word", true,
             [new("noun", "definition", "释义", "", "Example.", "例句。", [])], "", "unverified", "/wɜːd/"));
         main.RenderAnswers(new([answer], SenseMerging.Group([answer])), null);
-        var phonetic = (TextBlock)main.FindName("Phonetic");
-        Check(phonetic.Text.Contains("/wɜːd/") && phonetic.Text.Contains("AI") && phonetic.ToolTip.ToString()!.Contains("未经"),
+        var phonetic = (Run)main.FindName("Phonetic");
+        var label = (Run)main.FindName("PhoneticLabel");
+        Check(phonetic.Text.Contains("/wɜːd/") && label.Text.Contains("AI") && phonetic.ToolTip.ToString()!.Contains("未经"),
             "model pronunciation is displayed with an explicit unverified AI label");
         var work = Path.Combine(Environment.CurrentDirectory, ".cache", "speech-presentation", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);

@@ -153,7 +153,8 @@ public partial class MainWindow : Window
         SetQuery(raw.Trim());
         Welcome.Visibility = Visibility.Collapsed; EntryPanel.Visibility = Visibility.Visible;
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
-        Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = ""; Phonetic.ToolTip = null; sourcePronunciation = false;
+        Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = ""; Phonetic.ToolTip = null;
+        PhoneticLabel.Text = ""; PhoneticLabel.ToolTip = null; sourcePronunciation = false;
         LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear();
         ResultsScroll.ScrollToTop(); LookupStatus.Text = "查询本地词库…";
         var modelsEnabled = settings.Online && (settings.AutoAi || force);

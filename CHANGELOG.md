@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.6.1
+
+- Unify search-row controls into evenly spaced 32-DIP targets with 18-DIP vector icons and consistent strokes. Remove the isolated Enter-button background and divider.
+- Replace the four-dot diamond with a quiet status ring: an indeterminate arc while working, a check on completion and a warning symbol for incomplete results. Preserve full stage details on hover/focus and reduced-motion behavior.
+- Increase IPA from 14 to 20 DIP and lay out the headword, phonetics and speech button in a shared inline text flow. Keep the headword and IPA on one baseline, retain wrapping for long terms, and separate the smaller AI provenance label from the phonetic text.
+
 ## 0.6.0
 
 - Compare senses within each model as well as across models. Group confident facets of one lexical usage, prefer the most comprehensive original wording, and preserve all original definitions and attribution under expandable details. Keep materially different usages separate and invalidate older merge plans without discarding model results.
