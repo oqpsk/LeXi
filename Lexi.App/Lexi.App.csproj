@@ -5,7 +5,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>Lexi</AssemblyName>
     <ApplicationIcon>Assets/Lexi.ico</ApplicationIcon>
-    <Product>Lexi 词典</Product>
+    <Product>LeXi 词典</Product>
     <Description>A small English dictionary for Windows</Description>
   </PropertyGroup>
   <ItemGroup>

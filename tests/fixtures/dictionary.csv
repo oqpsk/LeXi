@@ -2,4 +2,6 @@ word,phonetic,definition,translation,pos,collins,oxford,tag,bnc,frq,exchange
 hello,,a word used when greeting someone,你好,int.,0,0,,1,1,
 look up,,to find information in a reference,查阅,v.,0,0,,2,2,
 serendipity,,the chance discovery of something useful,偶然发现有用事物,n.,0,0,,3,3,
-walk,,to move forward on foot,步行,v.,0,0,,4,4,p:walked/i:walking
+walk,,to move forward on foot,步行,v.,0,0,,4,4,p:walked/d:walked/i:walking/3:walks
+go,,to travel to another place,前往,v.,0,0,,5,5,p:went/d:gone/i:going/3:goes
+went,,past tense of go,前往（过去式）,v.,0,0,,6,6,

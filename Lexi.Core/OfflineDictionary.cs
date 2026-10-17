@@ -42,6 +42,8 @@ public sealed class OfflineDictionary : IDisposable
         if (hit != null) return hit;
         return forms.TryGetValue(query, out var lemma) ? Exact(lemma) : null;
     }
+    public LocalEntry? LookupInflectionLemma(string query) =>
+        forms.TryGetValue(Queries.Normalize(query), out var lemma) ? Exact(lemma) : null;
     public string[] Suggest(string query, int limit = 7)
     {
         query = Queries.Normalize(query);

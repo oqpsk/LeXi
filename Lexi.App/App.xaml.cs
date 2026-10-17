@@ -30,11 +30,11 @@ public partial class App : Application
                 client.Connect(1800);
                 using var writer = new StreamWriter(client); writer.WriteLine("activate");
             }
-            catch (Exception ex) when (ex is IOException or TimeoutException) { MessageBox.Show("词典正在启动，请稍后再试。", "Lexi"); }
+            catch (Exception ex) when (ex is IOException or TimeoutException) { MessageBox.Show("词典正在启动，请稍后再试。", "LeXi"); }
             Shutdown(); return;
         }
         try { Directory.CreateDirectory(UserRoot); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show("请把 Lexi 文件夹放到可以写入的位置。", "Lexi"); Shutdown(); return; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show("请把 LeXi 文件夹放到可以写入的位置。", "LeXi"); Shutdown(); return; }
         var window = new MainWindow(); MainWindow = window; window.Show();
         _ = Task.Run(async () =>
         {

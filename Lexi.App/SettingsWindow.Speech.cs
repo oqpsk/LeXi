@@ -33,7 +33,7 @@ public sealed partial class SettingsWindow
         panel.Children.Add(new Expander { Header = "在线语音连接", Content = credentials, Margin = new(0,3,0,12) });
         panel.Children.Add(Text("OpenAI / Grok 语音使用 API Key 和独立 API 额度，现有查词订阅登录仅用于查词。Windows 发音无需联网。这里播放的是合成语音。", 14, Muted));
         var testRow = new StackPanel { Orientation = Orientation.Horizontal };
-        var sample = new TextBox { Text = "Hello, this is Lexi.", Width = 260, FontSize = 15, Margin = new(0,0,10,0) };
+        var sample = new TextBox { Text = "Hello, this is LeXi.", Width = 260, FontSize = 15, Margin = new(0,0,10,0) };
         var preview = new Button { Content = "试听", Padding = new(16,6,16,6) }; testRow.Children.Add(sample); testRow.Children.Add(preview); panel.Children.Add(testRow);
         var status = Text("", 14, Muted); status.Margin = new(0,10,0,0); panel.Children.Add(status);
         var playback = new SpeechPlayback(App.UserRoot); bool playing = false; int generation = 0;

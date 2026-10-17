@@ -40,7 +40,7 @@ internal static partial class Program
             "merge stage explicitly explains why the displayed count can shrink");
         main.RenderAnswers(four, null); view.Update(request, QueryProgressState.Finished(four, true));
         Check(view.Current is { Busy: false, Outcome: QueryOutcome.Complete } && view.Current.Title.Contains("4 个义项") &&
-            CardLabels().Contains("4 个义项 · 2 个模型") && AutomationProperties.GetName(view).Contains("结果已稳定"),
+            CardLabels().Contains("4 个义项") && AutomationProperties.GetName(view).Contains("结果已稳定"),
             "only the final return marks four stable senses and announces completion");
         view.Update(request, QueryProgressState.Updating(two, true));
         Check(view.Current?.Busy == false, "late streaming callbacks cannot revive a finished query");

@@ -96,7 +96,7 @@ public partial class MainWindow : Window
     private void UpdateOnlineButton()
     {
         OnlineToggle.IsChecked = settings.Online;
-        OnlineToggle.Content = settings.Online ? "在线补充" : "仅离线";
+        OnlineToggle.Content = settings.Online ? "在线补充" : "离线查询";
         OnlineToggle.ToolTip = settings.Online ? "在线补充已开启 · 点击关闭，仅使用本地词库与缓存" : "仅离线 · 点击开启在线词典与模型补充";
         RefreshButton.IsEnabled = settings.Online;
         RefreshButton.ToolTip = settings.Online ? "重新查询并生成结果，跳过本次查询的已有缓存" : "开启在线补充后可重新生成";
@@ -167,7 +167,7 @@ public partial class MainWindow : Window
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
         Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = ""; Phonetic.ToolTip = null;
         PhoneticLabel.Text = ""; PhoneticLabel.ToolTip = null; sourcePronunciation = false;
-        LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear();
+        LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear(); FormsPanel.Children.Clear();
         ResultsScroll.ScrollToTop(); LookupStatus.Text = "查询本地词库…";
         var modelsEnabled = settings.Online && (settings.AutoAi || force);
         var mergeEnabled = modelsEnabled && settings.MergeSenses;
@@ -186,6 +186,7 @@ public partial class MainWindow : Window
                     var dictionary = await dictionaryTask;
                     token.ThrowIfCancellationRequested();
                     local = dictionary.Lookup(query, settings);
+                    RenderWordForms(query, dictionary.Forms(query, settings));
                 }
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }

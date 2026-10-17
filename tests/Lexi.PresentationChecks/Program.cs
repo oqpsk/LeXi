@@ -45,6 +45,7 @@ internal static partial class Program
         CheckDensity(main);
         CheckQueryProgress(app, main);
         CheckSpeechPresentation(main, settings);
+        CheckDictionaryUsability(main, settings);
         CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)

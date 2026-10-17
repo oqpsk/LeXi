@@ -39,7 +39,7 @@ internal static partial class Program
             "merged results show one wording and retain the distinct country meaning");
         var alternatives = Contents(ai).OfType<ToggleButton>().Single(t => t.Content.ToString()!.StartsWith("其他表述"));
         Check(Contents(ai).OfType<TextBox>().Any(t => t.Text == alternate.Chinese) &&
-            Contents(ai).OfType<TextBlock>().Any(t => t.Text.Contains("AI 补充 · 未经词典来源核验")),
+            Contents(ai).OfType<TextBlock>().Any(t => t.Text.Contains("现有词典原文不足以核对全部内容")),
             "collapsed alternative keeps its original text and unverified label");
         alternatives.IsChecked = true;
         Measure((FrameworkElement)main.Content, 558, 398);

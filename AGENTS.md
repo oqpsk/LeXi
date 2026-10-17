@@ -1,4 +1,4 @@
-# Lexi maintenance
+# LeXi maintenance
 
 - Keep the product focused on quick dictionary lookup and user-requested text translation. Windows is the current target; macOS is future work.
 - Use this repository as the canonical source. Work in a topic branch after the initial import and record changes in CHANGELOG.md.
@@ -14,11 +14,14 @@
 - Prefer sourced pronunciation over model IPA, label model-only IPA as unverified, and retain pronunciation attribution. Speech is explicitly triggered by the user, defaults to Windows synthesis, and never automatically changes provider. Cloud speech uses separate user-entered API keys encrypted with Windows current-user protection; never reuse or inspect subscription OAuth credentials. Keep audio and keys out of Git and release packages.
 - Route words, phrases and text automatically, including translation direction. Do not add query-mode or target-language selectors to the main interface.
 - Use vector geometry for UI icons. Keep selected text legible and exclude interactive controls from window dragging; system backdrops must retain an opaque fallback.
-- Keep bilingual definitions readable at 20/18 DIP. Treat examples, detailed sources and alternate wording as expandable secondary information; retain visible uncertainty labels and preserve disclosure state while model results update.
+- Keep bilingual definitions readable at 20/18 DIP. Treat examples, detailed sources and alternate wording as expandable secondary information. Prominently label Chinese parts of speech in the warm accent; use plain Chinese usage labels and omit neutral boilerplate. Keep model supplementation identified quietly in the source disclosure, with full provenance inside; lack of supporting excerpts must not look like an incorrect-definition verdict. Preserve disclosure state during updates.
 - Keep search-row controls aligned with consistent icon and hit-target sizes. Use a compact indeterminate status ring with hover and keyboard-accessible stage details, a completion check and a distinct incomplete-state symbol. Model completion is not whole-query completion: only finalize after merging returns or an explicit terminal exit. Label live counts as previews, distinguish incomplete outcomes, and reject stale updates without inventing percentages or time estimates.
 - Keep IPA legible at 20 DIP on the same text baseline as the headword. Place model-only provenance in a smaller adjacent label without removing its uncertainty explanation; allow long headings to wrap.
 - Keep query status in the single bottom bar, regeneration visibly styled as a button and online mode as an accessible two-state switch. Keep dictionary management in settings rather than displaying a passive footer count.
 - Preserve regional terminology as separate labeled source text and index both variants. Terminology pairs do not verify a generated explanatory definition. Add selected dictionaries without replacing unrelated installed sources.
 - Retain original dictionary text and attribution. MOE entries must stay in their original form and must not be supplied as AI rewriting evidence.
+- Display recorded word forms outside the generated-definition card. Resolve inflected entries to their lemma even when an exact entry exists; do not guess unrecorded endings or hide differences between noun and verb uses.
+- OAuth entry points launch the official client only on an explicit user click. Check status through official commands, display sanitized summaries, never log account identifiers or read credential files. Keep sign-in effects separate from saving application settings.
+- Use LeXi / ξ for the public brand. Preserve existing executable, IPC, AppUserModelID and userdata identities for upgrade compatibility. Keep future macOS work in this repository and share the core; do not claim WPF or Windows services run on macOS.
 - Avoid unrelated refactors and new runtime dependencies. Do not add global shortcut hooks, selection translation, launchers, account systems or subscription services.
 - Use direct Chinese explanations with the result first. Avoid “不是……而是……”, “本质上”, “换句话说”, “总的来说”, “值得注意的是”, “需要注意的是”, “当然”, “其实”, and repetitive conclusions.

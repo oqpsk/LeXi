@@ -24,9 +24,9 @@ public partial class MainWindow
         if (snapshot.Groups.Length == 0 && snapshot.Answers.All(a => a.Phase == ModelPhase.Offline)) return;
         var stable = finalized && !snapshot.Provisional;
         var countLabel = !stable ? $"预览 · {snapshot.Groups.Length} 条候选" : snapshot.MergeFailed
-            ? $"已保留 {snapshot.Groups.Length} 条释义" : $"{snapshot.Groups.Length} 个义项 · {snapshot.Answers.Length} 个模型";
+            ? $"已保留 {snapshot.Groups.Length} 条释义" : $"{snapshot.Groups.Length} 个义项";
         var card = Card(AiPanel, "双语释义", countLabel, true);
-        ((FrameworkElement)card.Children[0]).ToolTip = ModelStatus(snapshot);
+        ((FrameworkElement)card.Children[0]).ToolTip = "模型整理的双语释义 · 展开“来源”查看词典引文与补充说明\n" + ModelStatus(snapshot);
         foreach (var (group, i) in snapshot.Groups.Select((g, i) => (g, i)))
             card.Children.Add(SenseRow(group, i, evidence));
         foreach (var answer in snapshot.Answers)
