@@ -28,7 +28,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         }).ToArray();
         var request = SenseMerging.Request(query, answers);
         SenseMergePlan? plan = null;
-        if (settings.MergeSenses && cache.Read<SenseMergePlan>("sense-merges-v1", request.InputHash + ":" + settings.JudgeModel) is { } savedPlan)
+        if (settings.MergeSenses && cache.Read<SenseMergePlan>(SenseMerging.CacheKind, request.InputHash + ":" + settings.JudgeModel) is { } savedPlan)
         {
             try { plan = SenseMerging.Parse(JsonSerializer.Serialize(savedPlan, Json.Options), request); }
             catch (Exception ex) when (ExpectedFailure(ex)) { }
@@ -95,7 +95,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         try
         {
             SenseMergePlan? plan = null;
-            if (!force && cache.Read<SenseMergePlan>("sense-merges-v1", mergeKey) is { } cached)
+            if (!force && cache.Read<SenseMergePlan>(SenseMerging.CacheKind, mergeKey) is { } cached)
             {
                 try { plan = SenseMerging.Parse(JsonSerializer.Serialize(cached, Json.Options), request); }
                 catch (Exception ex) when (ExpectedFailure(ex)) { }
@@ -105,7 +105,7 @@ public sealed class DictionaryCoordinator(Cache cache,
                 plan = await judge(request, settings.ForModel(new("codex", settings.JudgeModel)), token);
                 plan = SenseMerging.Parse(JsonSerializer.Serialize(plan, Json.Options), request);
                 token.ThrowIfCancellationRequested();
-                await Write("sense-merges-v1", mergeKey, plan, token);
+                await Write(SenseMerging.CacheKind, mergeKey, plan, token);
             }
             token.ThrowIfCancellationRequested();
             return snapshot with { Groups = SenseMerging.Group(answers, plan), MergeNote = "同义项已整理" };

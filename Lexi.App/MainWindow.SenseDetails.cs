@@ -48,11 +48,11 @@ public partial class MainWindow
     {
         var content = new StackPanel();
         content.Children.Add(SenseHeading(group.Representative, $"{index + 1:00}", group.Variants.Length));
-        RenderSenseContent(content, group.Representative, evidence, group.Variants.Where(v => v.Id != group.Representative.Id).ToArray());
+        RenderSenseContent(content, group.Representative, evidence, group.Variants.Where(v => v.Id != group.Representative.Id).ToArray(), group.IncludesUsageVariants);
         return new Border { Child = content, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(0,index == 0 ? 0 : 1,0,0), Padding = new(0,index == 0 ? 0 : 10,0,8) };
     }
 
-    private void RenderSenseContent(Panel parent, SenseCandidate candidate, OnlineEntry? evidence, SenseCandidate[]? alternatives = null)
+    private void RenderSenseContent(Panel parent, SenseCandidate candidate, OnlineEntry? evidence, SenseCandidate[]? alternatives = null, bool usageVariants = false)
     {
         var sense = candidate.Sense;
         var key = SenseKey(candidate);
@@ -94,7 +94,7 @@ public partial class MainWindow
         // If the user was reading the faster model before merging, keep that
         // expanded detail accessible when it moves under the primary wording.
         var retainReading = alternatives.Any(v => senseDetails.Any(s => s.Value && s.Key.StartsWith(SenseKey(v) + ":", StringComparison.Ordinal)));
-        AddDisclosure(controls, details, key + ":alternatives", $"其他表述 · {alternatives.Length}", originals, retainReading);
+        AddDisclosure(controls, details, key + ":alternatives", $"{(usageVariants ? "用法细分" : "其他表述")} · {alternatives.Length}", originals, retainReading);
     }
 
     private void AddDisclosure(Panel controls, Panel details, string key, string label, FrameworkElement content, bool initiallyOpen = false)
