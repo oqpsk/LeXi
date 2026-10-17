@@ -17,6 +17,7 @@
     <Content Include="../Lexi.Core/translation.schema.json" Link="assets/translation.schema.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../Lexi.Core/dictionary.instructions.txt" Link="assets/dictionary.instructions.txt" CopyToOutputDirectory="PreserveNewest" />
     <Resource Include="Assets/Lexi.ico" />
+    <Content Include="Assets/Lexi.ico" Link="assets/Lexi.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../Lexi.Core/sense-merge.schema.json" Link="assets/sense-merge.schema.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../Lexi.Core/sense-merge.instructions.txt" Link="assets/sense-merge.instructions.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

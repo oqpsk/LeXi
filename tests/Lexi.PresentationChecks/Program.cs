@@ -52,6 +52,7 @@ internal static partial class Program
         CheckHistory(main);
         CheckWindowNavigation(main, settings);
         CheckWindowMemory();
+        CheckNativeWindowMemory();
         CheckPaletteAndSavedView(app, main, settings);
         CheckNativeFrame();
     }

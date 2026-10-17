@@ -19,3 +19,5 @@ LeXi 使用一个仓库维护 Windows 与未来的 macOS 版本，共享词典�
 ## 升级兼容
 
 公开品牌为 **LeXi / ξ**。既有 `Lexi.exe` 文件名、项目/程序集标识、IPC 和 AppUserModelID 暂时保留，保护现有任务栏入口与运行数据。品牌调整不迁移或清空词库、设置、历史缓存及官方客户端登录。
+
+升级后可运行 `scripts/Refresh-TaskbarIcon.ps1 -Executable <安装目录>/Lexi.exe` 刷新已固定的 LeXi 图标。脚本只修改目标程序路径匹配的任务栏快捷方式，将图标指向按内容命名的独立资源，保留启动参数与工作目录。可用 `-RecoveryDirectory` 保留旧快捷方式；不会重启 Explorer 或清空系统图标缓存。

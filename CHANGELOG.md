@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.9.8
+
+- Restore saved window bounds after initial WPF/chrome layout, preserving the startup snapshot until restoration succeeds. Keep early startup geometry from overwriting the saved position.
+- Theme the tray menu with the application's dark surface, readable text, rounded hover states and pale-pink selection text.
+- Make scrollbars visible on acrylic using neutral-gray grips, with brighter hover/drag states and a wider hit area.
+- Refresh matching LeXi taskbar shortcuts with a content-addressed packaged icon, avoiding stale executable-icon caches without resetting Explorer or unrelated shortcuts.
+
 ## 0.9.7
 
 - Remember main-window size and position automatically, including the normal bounds behind minimization/maximization. Persist separately from preferences and recover safely from missing or invalid state.

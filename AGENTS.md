@@ -34,4 +34,4 @@
 
 - Restore completed query views without network or automatic age/settings refresh. Only explicit regeneration replaces saved results. Preserve original model/source provenance across setting changes, separate translation identities, and never replace a good saved view with failed regeneration or streaming previews. Use one pale-pink base color for all pink UI states, with opacity variants for backgrounds and dark text on solid pink fills.
 
-- Remember the main window's normal placement independently of query settings. Debounce movement/resizing writes, flush on close/minimize, restore visible normal/maximized state, and let the native placement API account for monitor changes. Keep corrupt state harmless.
+- Remember the main window's normal placement independently of query settings. Debounce movement/resizing writes, flush on close/minimize, restore visible normal/maximized state, and let the native placement API account for monitor changes. Keep the startup snapshot immutable and defer writes until layout/chrome restoration completes. Keep corrupt state harmless.

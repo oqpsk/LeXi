@@ -16,6 +16,7 @@ try {
     }
     if ($LASTEXITCODE) { throw 'Publish failed' }
     Copy-Item README.md, THIRD_PARTY_NOTICES.md, CONTRIBUTING.md -Destination $output -Force
+    Copy-Item scripts/Refresh-TaskbarIcon.ps1 -Destination $output -Force
     Copy-Item docs -Destination $output -Recurse -Force
     if (Test-Path LICENSE) { Copy-Item LICENSE -Destination $output -Force }
     Write-Host "Build complete: $output"

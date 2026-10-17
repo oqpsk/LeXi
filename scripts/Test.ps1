@@ -29,4 +29,5 @@ try {
     if ($LASTEXITCODE) { throw 'Pronunciation and speech checks failed' }
     & dotnet run --project tests/Lexi.PresentationChecks -c Release
     if ($LASTEXITCODE) { throw 'WPF resource construction checks failed' }
+    & ./scripts/Test-ShellIcon.ps1
 } finally { Pop-Location }
