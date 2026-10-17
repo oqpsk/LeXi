@@ -127,7 +127,30 @@ internal static class ParallelChecks
         var judgeFailure = new DictionaryCoordinator(new Cache(Path.Combine(work, "judge-failed")), (m, q, e, s, t, p) => Task.FromResult(m == primary ? Entry(slang) : Entry(reworded)),
             (r, s, t) => Task.FromException<SenseMergePlan>(new TimeoutException("synthetic timeout")));
         var retained = await judgeFailure.LookupAsync("chad", null, settings, false, CancellationToken.None);
-        Check(retained.Groups.Length == 2 && retained.MergeFailed && retained.MergeNote.Contains("保留全部"), "judge timeout preserves every original definition and reports an explicit incomplete merge");
+        Check(retained.Groups.Length == 2 && retained.MergeFailed && retained.MergeFailure==MergeFailureKind.Timeout &&
+            retained.MergeNote.Contains("响应超时") && retained.MergeNote.Contains("保留全部"), "judge timeout preserves every original definition and reports an explicit incomplete merge");
+        foreach (var (error, expectedFailure) in new (Exception, MergeFailureKind)[]
+        {
+            (new InvalidDataException("private response content"), MergeFailureKind.InvalidResponse),
+            (new JsonException("private response content"), MergeFailureKind.InvalidResponse),
+            (new ModelAccessException(ModelAccessFailure.SignInRequired), MergeFailureKind.SignInRequired),
+            (new ModelAccessException(ModelAccessFailure.ClientMissing), MergeFailureKind.ClientUnavailable),
+            (new ModelAccessException(ModelAccessFailure.Unavailable), MergeFailureKind.ServiceUnavailable),
+            (new IOException("private local path"), MergeFailureKind.LocalAccess),
+            (new InvalidOperationException("private provider content"), MergeFailureKind.ServiceUnavailable),
+            (new OperationCanceledException("private timeout"), MergeFailureKind.Timeout)
+        })
+        {
+            var failedJudge = new DictionaryCoordinator(new Cache(Path.Combine(work, "diagnostic-" + Guid.NewGuid().ToString("N"))),
+                (m,q,e,s,t,p)=>Task.FromResult(m==primary?Entry(slang):Entry(reworded)),
+                (r,s,t)=>Task.FromException<SenseMergePlan>(error));
+            var preserved = await failedJudge.LookupAsync("chad",null,settings,false,CancellationToken.None);
+            Check(preserved.MergeFailure==expectedFailure && preserved.MergeFailed && preserved.Groups.Length==2 &&
+                preserved.Answers.All(a=>a.Phase==ModelPhase.Complete) && !preserved.MergeNote.Contains("private"),
+                "merge failure keeps complete model answers and records only a safe category: " + expectedFailure);
+            var reloaded=JsonSerializer.Deserialize<LookupSnapshot>(JsonSerializer.Serialize(preserved,Json.Options),Json.Options)!;
+            Check(reloaded.MergeFailure==expectedFailure, "merge failure category survives saved-view serialization");
+        }
         using var cancellation = new CancellationTokenSource();
         var previewed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelCache = new Cache(Path.Combine(work, "cancel"));

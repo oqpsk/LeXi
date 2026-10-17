@@ -95,7 +95,7 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
     private async Task<string> RunAsync(string prompt, string schemaFile, AppSettings settings, CancellationToken token,
         string instructionsFile = "dictionary.instructions.txt", int timeoutSeconds = 70)
     {
-        var exe = FindExecutable(settings.CodexPath) ?? throw new InvalidOperationException("未找到 Codex。请在设置中指定 codex.exe。");
+        var exe = FindExecutable(settings.CodexPath) ?? throw new ModelAccessException(ModelAccessFailure.ClientMissing);
         var dir = Path.Combine(userRoot, "codex-work");
         Directory.CreateDirectory(dir);
         var info = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true,
@@ -145,8 +145,8 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
             timeout.Token.ThrowIfCancellationRequested();
             if (process.ExitCode != 0 || failure != null)
             {
-                if (error.Contains("401") || error.Contains("not logged", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Codex 登录已失效，请在 Codex 中重新登录。");
-                throw new InvalidOperationException(failure ?? "Codex 暂未完成查询。请检查登录、网络或模型名称。");
+                if (error.Contains("401") || error.Contains("not logged", StringComparison.OrdinalIgnoreCase)) throw new ModelAccessException(ModelAccessFailure.SignInRequired);
+                throw new ModelAccessException(ModelAccessFailure.Unavailable);
             }
             return final ?? throw new InvalidDataException("Codex 未返回可读取的结果。");
         }

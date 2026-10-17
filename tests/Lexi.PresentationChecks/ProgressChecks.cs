@@ -52,11 +52,15 @@ internal static partial class Program
         Check(view.Current is { Busy: false, Translation: true, MergeEnabled: false }, "translation has its own generating-to-complete lifecycle");
         next = view.Begin(QueryProgressState.Translating()); view.Update(next, QueryProgressState.Translated(true));
         Check(view.Current is { Busy: false } && view.Current.Detail.Contains("完整缓存"), "a complete cached translation settles immediately");
-        var failedMerge = six with { MergeFailed = true, MergeNote = "同义项判断未完成，已保留全部释义" };
+        var failedMerge = six with { MergeFailed = true, MergeNote = "整理模型响应超时；已保留全部释义", MergeFailure = MergeFailureKind.Timeout };
         next = view.Begin(QueryProgressState.Dictionary(true, true));
         main.RenderAnswers(failedMerge, null); view.Update(next, QueryProgressState.Finished(failedMerge, true));
         Check(view.Current is { Busy: false, Warning: true } && view.Current.Detail.Contains("保留 6 条") &&
-            CardLabels().Contains(failedMerge.MergeNote), "judge failure ends loading without presenting an unmerged list as successfully merged");
+            CardLabels().Contains(failedMerge.MergeNote) && view.Current.Detail.Contains("响应超时") &&
+            view.Current.Detail.Contains("重新生成") && AutomationProperties.GetName(view).Contains("合并：未完成") &&
+            AutomationProperties.GetName(view).Contains("完成：部分完成"), "judge failure ends loading without presenting an unmerged list as successfully merged");
+        Check(QueryProgressState.Finished(failedMerge with { MergeFailure=null },true).Detail.Contains("未记录具体失败原因"),
+            "legacy failed views do not invent a timeout or account diagnosis");
         var oneFailed = new LookupSnapshot([complete[0], new(secondary, ModelPhase.Failed)], SenseMerging.Group([complete[0]]));
         var allFailed = new LookupSnapshot([new(primary, ModelPhase.Failed), new(secondary, ModelPhase.Failed)], []);
         Check(QueryProgressState.Finished(oneFailed, true) is { Busy: false, Outcome: QueryOutcome.Partial } &&

@@ -12,7 +12,7 @@
             <Button x:Name="ForwardButton" Style="{StaticResource IconButton}" Click="Forward_Click" IsEnabled="False" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="前进"><Path Data="{StaticResource ForwardIcon}" Style="{StaticResource IconPath}"/></Button>
           </StackPanel>
           <Border x:Name="WindowDragArea" Grid.Column="1" Background="Transparent" Cursor="SizeAll" ToolTip="拖动此处移动窗口" Margin="8,0">
-            <TextBlock Text="LeXi" FontSize="12" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <TextBlock x:Name="WindowTitle" Text="LeXi" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Border>
           <StackPanel Grid.Column="2" Orientation="Horizontal">
             <Button x:Name="SettingsButton" Style="{StaticResource IconButton}" Click="Settings_Click" Margin="0,0,4,0" ToolTip="设置 · Ctrl+," AutomationProperties.Name="设置"><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource IconPath}"/></Button>
@@ -50,10 +50,15 @@
             <TextBlock x:Name="EntryHeading" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"><Run x:Name="Headword" FontSize="30" FontWeight="SemiBold"/><Run Text="&#160;&#160;"/><Run x:Name="Phonetic" Foreground="{StaticResource Muted}"/><Run x:Name="PhoneticLabel" FontSize="12" Foreground="{StaticResource Muted}"/><InlineUIContainer BaselineAlignment="TextBottom"><Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button></InlineUIContainer><InlineUIContainer BaselineAlignment="TextBottom"><ToggleButton x:Name="EtymologyButton" Style="{StaticResource LexicalIconToggle}" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="语源 · 词的来历" AutomationProperties.Name="展开或收起语源"><Path Data="{StaticResource RosettaIcon}" Style="{StaticResource IconPath}"/></ToggleButton></InlineUIContainer></TextBlock>
             <StackPanel x:Name="FormsPanel"/>
             <Border x:Name="QuickReadCard" Visibility="Collapsed" Background="{StaticResource AccentSoft}" BorderThickness="0" CornerRadius="7" Padding="12,9,12,10" Margin="0,2,0,14">
-              <StackPanel>
-                <TextBlock x:Name="QuickReadLabel" Foreground="{StaticResource Accent}" FontSize="12" Margin="0,0,0,3"/>
-                <TextBox x:Name="QuickReadText" Style="{StaticResource Selectable}" FontSize="19" TextBlock.LineHeight="28" TextBlock.LineStackingStrategy="BlockLineHeight"/>
-              </StackPanel>
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <Border x:Name="QuickReadGuide" Width="26" Height="28" VerticalAlignment="Top" Margin="0,0,10,0" Background="Transparent">
+                  <TextBlock x:Name="QuickReadGlyph" Text="TL&#10;DR" Foreground="{StaticResource Accent}" FontSize="10.5" FontWeight="SemiBold"
+                      LineHeight="11" LineStackingStrategy="BlockLineHeight" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <TextBox x:Name="QuickReadText" Grid.Column="1" Style="{StaticResource Selectable}" FontSize="19" TextBlock.LineHeight="28" TextBlock.LineStackingStrategy="BlockLineHeight"/>
+                <TextBlock x:Name="QuickReadState" Grid.Column="2" Visibility="Collapsed" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Top" Margin="10,5,0,0"/>
+              </Grid>
             </Border>
             <StackPanel x:Name="AiPanel"/>
             <StackPanel x:Name="LocalPanel"/>

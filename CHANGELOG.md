@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.9
+
+- Increase the title's size and use the main text color for clearer contrast on acrylic.
+- Put the quick-read guide beside the first line of the summary: a stacked TL/DR mark for selected core meanings, or an excerpt label for unranked results. Keep provisional/partial state visible inline and move the full explanation into its tooltip and accessible name.
+- Preserve safe failure categories for sense merging and show the cause, retained results and retry action in progress details. Mark the failed stage explicitly instead of marking every stage as ended. Legacy failed views remain readable without inventing a cause; no new model calls or automatic cache refresh.
+
 ## 0.9.8
 
 - Restore saved window bounds after initial WPF/chrome layout, preserving the startup snapshot until restoration succeeds. Keep early startup geometry from overwriting the saved position.
