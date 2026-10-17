@@ -91,7 +91,11 @@ pwsh ./scripts/Build.ps1 -SelfContained
 - [OpenAI TTS](https://developers.openai.com/api/docs/guides/text-to-speech)：支持 GPT-4o mini TTS、TTS-1、TTS-1 HD，声线选项随模型变化。每次最多 4096 字符。
 - [Grok TTS](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech)：模型由服务管理，可选 Eve、Ara、Leo、Rex、Sal 声线；应用每次最多朗读 5000 字符。
 
-这两项在线语音服务使用单独的 API Key 和 API 计费，不使用查词的 Codex/Claude 订阅登录。密钥在“在线语音连接”中填写，保存后通过 Windows 当前用户加密；留空保留已有密钥，勾选清除可删除。也支持 `OPENAI_API_KEY` 或 `XAI_API_KEY` 环境变量。自动检查只验证协议和合成响应，真实服务需使用者自己的 API 额度。
+- [ElevenLabs](https://elevenlabs.io/docs/overview/models)：提供 Flash v2.5、Multilingual v2、Eleven v3、Eleven v4 与 Eleven v4 Turbo。选择模型后，在“在线语音连接”填写 API Key，点击“加载我的声线”，选择账号声线后试听；也可直接用 George 或在“指定其他声线”填写 Voice ID。应用每次最多朗读 5000 字符。
+
+当前 Windows 默认发音使用本机 SAPI，和调用 Edge 在线朗读服务的 `edge-tts` 不同。
+
+在线语音服务使用各自的 API Key，不使用查词的 Codex/Claude 订阅登录。ElevenLabs 的网页生成和 API 使用账号内的共享额度；ElevenReader 是另一套套餐。密钥在“在线语音连接”中填写，保存后通过 Windows 当前用户加密；留空保留已有密钥，勾选清除可删除。也支持 `OPENAI_API_KEY`、`XAI_API_KEY` 或 `ELEVENLABS_API_KEY` 环境变量。自动检查只验证协议和合成响应，真实服务需使用者自己的 API 额度。
 
 发音仅在点击时生成，不会随查询自动播放或切换服务。音频按文字、模型、声线分别缓存；离线模式可使用本地声线和已缓存音频。所有发音均为合成语音。
 

@@ -92,6 +92,7 @@ public sealed class AppSettings
     public string SpeechProvider { get; set; } = "windows";
     public string SpeechModel { get; set; } = "sapi";
     public string SpeechVoice { get; set; } = "auto";
+    public string SpeechVoiceName { get; set; } = "";
     public AppSettings ForModel(LookupModel model)
     {
         var copy = (AppSettings)MemberwiseClone();

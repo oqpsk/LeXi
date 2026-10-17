@@ -17,12 +17,23 @@ internal static partial class Program
         tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(t => (string)t.Header == "发音");
         Measure((FrameworkElement)settings.Content, 538, 478);
         var selectors = Descendants((DependencyObject)settings.Content).OfType<ComboBox>().ToArray();
-        Check(selectors.Length == 2 && selectors[0].Items.Count == 5, "speech settings expose a model selector and a voice selector");
+        Check(selectors.Length == 2 && selectors[0].Items.Count == SpeechCatalog.Models.Length, "speech settings expose a model selector and a voice selector");
         selectors[0].SelectedItem = selectors[0].Items.OfType<SpeechModel>().Single(m => m.Id == "gpt-4o-mini-tts");
         Check(selectors[1].Items.Count == 13 && selectors[1].SelectedItem != null, "changing the speech model refreshes compatible voices");
         selectors[0].SelectedItem = selectors[0].Items.OfType<SpeechModel>().Single(m => m.Provider == "xai");
-        Check(selectors[1].Items.OfType<SpeechVoice>().Any(v => v.Id == "eve") && Contents(settings).OfType<PasswordBox>().Count() == 2,
+        Check(selectors[1].Items.OfType<SpeechVoice>().Any(v => v.Id == "eve") && Contents(settings).OfType<PasswordBox>().Count() == 3,
             "Grok voices and masked API key fields are available in settings");
+        selectors[0].SelectedItem = selectors[0].Items.OfType<SpeechModel>().Single(m => m.Id == "eleven_flash_v2_5");
+        Check(selectors[1].Items.OfType<SpeechVoice>().Any(v => v.Name == "George") &&
+            Contents(settings).OfType<Button>().Any(b => AutomationProperties.GetName(b) == "加载 ElevenLabs 账号声线"),
+            "ElevenLabs offers an initial voice and explicitly triggered account voice loading");
+        var savedVoice = new SpeechVoice("synthetic_private_voice", "Synthetic private voice");
+        Check(SpeechVoiceChoices.Eleven([], savedVoice).Any(v => v == savedVoice) &&
+            SpeechVoiceChoices.Eleven([savedVoice], savedVoice).Length == 1,
+            "saved custom voices survive without an account lookup and do not duplicate loaded choices");
+        Check(SpeechVoiceChoices.Pick("elevenlabs", savedVoice, " other_voice ")?.Id == "other_voice" &&
+            SpeechVoiceChoices.Pick("openai", savedVoice, "ignored") == savedVoice,
+            "a manual Voice ID applies only to ElevenLabs and remains independent of the voice name");
         var speech = (Button)main.FindName("SpeechButton");
         Check(!Theme.CanDragFrom(speech) && AutomationProperties.GetName(speech).Contains("合成"), "pronunciation button is accessible and never drags the window");
         foreach (var name in new[] { "SpeakerIcon", "StopIcon" })
@@ -42,6 +53,11 @@ internal static partial class Program
         var bytes = File.ReadAllBytes(Path.Combine(work, "speech-keys", "openai.bin"));
         Check(keys.Read("openai") == synthetic && !Encoding.UTF8.GetString(bytes).Contains(synthetic), "speech keys round-trip through current-user Windows encryption, never plaintext settings");
         keys.Save("openai", ""); Check(!keys.HasSaved("openai"), "clearing a saved speech key removes only its own encrypted file");
+        keys.Save("elevenlabs", synthetic);
+        Check(keys.Read("elevenlabs") == synthetic && !Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(work,"speech-keys","elevenlabs.bin"))).Contains(synthetic),
+            "ElevenLabs keys use isolated current-user encryption");
+        keys.Save("elevenlabs", "");
+        Check(!keys.HasSaved("elevenlabs") && !keys.HasSaved("openai"), "removing an ElevenLabs key does not recreate or change another provider key");
         var voices = LocalSpeech.Voices();
         if (voices.Length > 1)
         {

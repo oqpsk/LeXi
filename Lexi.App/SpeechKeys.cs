@@ -10,7 +10,7 @@ namespace Lexi;
 // subscription credentials are never inspected or copied.
 internal sealed class SpeechKeys(string root)
 {
-    private string FileFor(string provider) => provider is "openai" or "xai" ? Path.Combine(root, "speech-keys", provider + ".bin")
+    private string FileFor(string provider) => provider is "openai" or "xai" or "elevenlabs" ? Path.Combine(root, "speech-keys", provider + ".bin")
         : throw new ArgumentException("Unknown speech provider.");
     public bool HasSaved(string provider) => File.Exists(FileFor(provider));
     public string Read(string provider)
@@ -21,7 +21,7 @@ internal sealed class SpeechKeys(string root)
             var clear = Protect(File.ReadAllBytes(file), false);
             try { return Encoding.UTF8.GetString(clear); } finally { CryptographicOperations.ZeroMemory(clear); }
         }
-        return Environment.GetEnvironmentVariable(provider == "openai" ? "OPENAI_API_KEY" : "XAI_API_KEY") ?? "";
+        return Environment.GetEnvironmentVariable(provider switch { "openai" => "OPENAI_API_KEY", "xai" => "XAI_API_KEY", _ => "ELEVENLABS_API_KEY" }) ?? "";
     }
     public void Save(string provider, string value)
     {

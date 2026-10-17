@@ -18,26 +18,36 @@ public sealed record SpeechOptions(string Provider, string Model, string Voice)
 public static class SpeechCatalog
 {
     public static SpeechModel[] Models => [new("windows", "sapi", "Windows 本地发音"), new("openai", "gpt-4o-mini-tts", "OpenAI · GPT-4o mini TTS"),
-        new("openai", "tts-1", "OpenAI · TTS-1"), new("openai", "tts-1-hd", "OpenAI · TTS-1 HD"), new("xai", "grok-tts", "Grok · TTS")];
+        new("openai", "tts-1", "OpenAI · TTS-1"), new("openai", "tts-1-hd", "OpenAI · TTS-1 HD"), new("xai", "grok-tts", "Grok · TTS"),
+        new("elevenlabs", "eleven_flash_v2_5", "ElevenLabs · Flash v2.5 · 快速"),
+        new("elevenlabs", "eleven_multilingual_v2", "ElevenLabs · Multilingual v2"),
+        new("elevenlabs", "eleven_v3", "ElevenLabs · Eleven v3"),
+        new("elevenlabs", "eleven_v4", "ElevenLabs · Eleven v4"),
+        new("elevenlabs", "eleven_v4_turbo", "ElevenLabs · Eleven v4 Turbo")];
     public static SpeechVoice[] Voices(string provider, string model)
     {
+        if (provider == "elevenlabs") return [new("JBFqnCBsd6RMkjVDRZzb", "George")];
         var ids = provider == "xai" ? new[] { "eve", "ara", "leo", "rex", "sal" } :
             model == "gpt-4o-mini-tts" ? ["coral", "alloy", "ash", "ballad", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"] :
             new[] { "alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer" };
         return ids.Select(id => new SpeechVoice(id, char.ToUpperInvariant(id[0]) + id[1..])).ToArray();
     }
+    public static bool ValidElevenVoice(string id) => !string.IsNullOrWhiteSpace(id) && id.Length <= 128 &&
+        id.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-');
     public static void Validate(string text, SpeechOptions options)
     {
         if (string.IsNullOrWhiteSpace(text)) throw new InvalidOperationException("没有可朗读的文字。");
         var max = options.Provider == "openai" ? 4096 : 5000;
         if (text.Length > max) throw new InvalidOperationException($"此发音服务每次最多朗读 {max} 个字符。");
         if (!Models.Any(m => m.Provider == options.Provider && m.Id == options.Model)) throw new InvalidOperationException("请在设置中重新选择发声模型。");
-        if (options.Provider != "windows" && !Voices(options.Provider, options.Model).Any(v => v.Id == options.Voice))
+        if (options.Provider == "elevenlabs" && !ValidElevenVoice(options.Voice))
+            throw new InvalidOperationException("请选择 ElevenLabs 声线，或填写有效的 Voice ID。");
+        if (options.Provider is not ("windows" or "elevenlabs") && !Voices(options.Provider, options.Model).Any(v => v.Id == options.Voice))
             throw new InvalidOperationException("请在设置中选择这个模型支持的声线。");
     }
 }
 
-public sealed class SpeechClient : IDisposable
+public sealed partial class SpeechClient : IDisposable
 {
     private readonly HttpClient client;
     public SpeechClient(HttpMessageHandler? handler = null)
@@ -45,15 +55,21 @@ public sealed class SpeechClient : IDisposable
     public static HttpRequestMessage Request(string text, SpeechOptions options, string apiKey)
     {
         SpeechCatalog.Validate(text, options);
-        if (options.Provider is not ("openai" or "xai")) throw new InvalidOperationException("此模型不使用在线语音接口。");
-        if (string.IsNullOrWhiteSpace(apiKey)) throw new InvalidOperationException("请在设置 → 发音中填写所选服务的 API Key。");
-        if (apiKey.Trim().Any(char.IsWhiteSpace) || apiKey.Length > 2048) throw new InvalidOperationException("API Key 格式无效，请检查是否包含换行或空格。");
+        if (options.Provider is not ("openai" or "xai" or "elevenlabs")) throw new InvalidOperationException("此模型不使用在线语音接口。");
+        ValidateKey(apiKey);
+        if (options.Provider == "elevenlabs") return ElevenRequest(text, options, apiKey);
         object body = options.Provider == "openai" ? new { model = options.Model, voice = options.Voice, input = text, response_format = "mp3" } :
             new { text, voice_id = options.Voice, language = "auto", output_format = new { codec = "mp3", sample_rate = 24000, bit_rate = 128000 } };
         var request = new HttpRequestMessage(HttpMethod.Post, options.Provider == "openai" ? "https://api.openai.com/v1/audio/speech" : "https://api.x.ai/v1/tts");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
         request.Content = new StringContent(JsonSerializer.Serialize(body, Json.Options), Encoding.UTF8, "application/json");
         return request;
+    }
+    private static void ValidateKey(string apiKey)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey)) throw new InvalidOperationException("请在设置 → 发音的在线语音连接中填写所选服务的 API Key。");
+        if (apiKey.Trim().Any(c => char.IsWhiteSpace(c) || char.IsControl(c)) || apiKey.Length > 2048)
+            throw new InvalidOperationException("API Key 格式无效，请检查是否包含换行或空格。");
     }
     public async Task<byte[]> GenerateAsync(string text, SpeechOptions options, string apiKey, CancellationToken token)
     {
@@ -66,6 +82,7 @@ public sealed class SpeechClient : IDisposable
     {
         using var request = Request(text, options, apiKey);
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+        if (!response.IsSuccessStatusCode && options.Provider == "elevenlabs") throw await ElevenFailureAsync(response, token);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException(response.StatusCode switch
             {

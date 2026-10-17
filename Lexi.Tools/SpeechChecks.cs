@@ -85,6 +85,7 @@ internal static class SpeechChecks
         }
         Check(new AppSettings().SpeechProvider == "windows" && SpeechCatalog.Voices("openai", "gpt-4o-mini-tts").Length == 13,
             "speech defaults to local synthesis and exposes documented OpenAI voices");
+        await ElevenSpeechChecks.Run();
         Console.WriteLine($"{count} pronunciation and speech checks passed");
     }
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler

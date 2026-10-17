@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.9.14
+
+- Add ElevenLabs speech using its official API, explicit model/voice selection, on-demand paginated account voice loading and an optional manual Voice ID. Keep saved voice names, provide the API-key dashboard link, mask and encrypt keys locally, and preserve provider/model/voice audio cache separation.
+- Keep Windows local SAPI selected on upgrade. Clarify provider access and credits in speech settings, show only the selected provider's key panel, and sanitize ElevenLabs authentication, quota and voice errors. Voice lookup and synthesis happen only on explicit clicks; no account credentials are imported.
+
 ## 0.9.13
 
 - Move the quick-read text up by 2 DIP to center its visible letterforms beside the TL/DR badge. Preserve the existing 19-DIP type, 28-DIP line spacing, selectable text, badge size and equal horizontal gaps; the correction applies to single-line and wrapped summaries.
