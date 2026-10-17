@@ -56,7 +56,10 @@
                   <Path x:Name="QuickReadGlyph" Data="{StaticResource QuickReadMark}" Fill="{StaticResource Canvas}" Width="14" Height="14" Stretch="Uniform"
                         HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Border>
-                <TextBox x:Name="QuickReadText" Grid.Column="1" Style="{StaticResource Selectable}" FontSize="19" VerticalAlignment="Center" TextBlock.LineHeight="28" TextBlock.LineStackingStrategy="BlockLineHeight"/>
+                <TextBox x:Name="QuickReadText" Grid.Column="1" Style="{StaticResource Selectable}" FontSize="19" VerticalAlignment="Center" TextBlock.LineHeight="28" TextBlock.LineStackingStrategy="BlockLineHeight">
+                  <!-- Center the visible UI-font ink, which sits below the line-box center. -->
+                  <TextBox.RenderTransform><TranslateTransform Y="-2"/></TextBox.RenderTransform>
+                </TextBox>
                 <TextBlock x:Name="QuickReadState" Grid.Column="2" Visibility="Collapsed" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"/>
               </Grid>
             </Border>
