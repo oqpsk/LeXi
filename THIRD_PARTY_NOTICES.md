@@ -30,9 +30,11 @@ Lexi preserves every original nonempty row field, original headword, definition 
 
 ## National Academy for Educational Research terminology
 
-國家教育研究院 2026《海事學術名詞》及《造船工程學術名詞》，2026-10 下載快照。此開放資料依政府資料開放授權條款（Open Government Data License）進行公眾釋出，使用者於遵守本條款各項規定之前提下，得利用之。
+國家教育研究院 2026《海事學術名詞》、《造船工程學術名詞》、《電子計算機學術名詞》、《兩岸對照名詞-計算機學術名詞》、《電機工程學術名詞》、《物理學學術名詞》及《數學學術名詞》，2026-10 下載快照。此開放資料依政府資料開放授權條款（Open Government Data License）進行公眾釋出，使用者於遵守本條款各項規定之前提下，得利用之。
 
 Sources: [maritime terms](https://data.gov.tw/dataset/15339), [shipbuilding terms](https://data.gov.tw/dataset/15399), [official terminology service](https://terms.naer.edu.tw/). License: [Open Government Data License v1.0](https://data.gov.tw/license). Lexi retains the original English/Chinese pairs and adds alias and simplified lookup keys. These are terminology correspondences, not full explanatory dictionary definitions. AI explanations remain separately labeled. The source files and checksums are recorded in `dictionaries/catalog.json`.
+
+Additional science and technology sources: [computer science](https://data.gov.tw/dataset/15416), [cross-strait computing terms](https://data.gov.tw/dataset/15275), [electrical engineering](https://data.gov.tw/dataset/15418), [physics](https://data.gov.tw/dataset/15317), [mathematics](https://data.gov.tw/dataset/15443). The same license applies. Cross-strait entries retain both regional translations with separate labels, and both are indexed for lookup. No source terminology is silently replaced by another region's equivalent.
 
 ## Model clients and generated output
 

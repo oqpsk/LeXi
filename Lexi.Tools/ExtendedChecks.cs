@@ -59,6 +59,16 @@ internal static class ExtendedChecks
             settings.OfflineEnabled = false;
             Check(library.Lookup("车钟", settings).Length == 0 && library.Suggest("engine", settings).Length == 0, "offline master switch applies to lookup and suggestions");
         }
+        var regionalSource = Path.Combine(work, "regional-terms.csv");
+        File.WriteAllText(regionalSource, "序號,英文名稱,中文名稱,中國大陸譯名,來源網站\n1,synthetic cache; test buffer,測試快取,测试缓存；测试缓冲区,https://example.org/terms\n2,empty regional field,測試術語,,https://example.org/terms\n", Encoding.UTF8);
+        var regionalFolder = Path.Combine(work, "regional");
+        CorpusBuilder.Build("naer", regionalSource, regionalFolder, metadata with { Id = "naer-regional-test" });
+        using (var dictionary = new OfflineDictionary(regionalFolder))
+        {
+            Check(new[] { "synthetic cache", "test buffer", "測試快取", "测试快取", "测试缓存", "测试缓冲区" }.All(term => dictionary.Lookup(term)?.Word == "synthetic cache; test buffer"), "regional science terms resolve through English, traditional and simplified aliases");
+            Check(dictionary.Lookup("测试缓存")?.Chinese == "臺灣：測試快取\n中國大陸：测试缓存；测试缓冲区", "regional translations retain original wording and separate regional labels");
+            Check(dictionary.Lookup("empty regional field")?.Chinese == "測試術語", "missing regional translation leaves the regular term unchanged");
+        }
         var cedict = Path.Combine(work, "cedict.gz");
         using (var gz = new GZipStream(File.Create(cedict), CompressionLevel.Fastest))
         using (var writer = new StreamWriter(gz)) writer.Write("# synthetic fixture\n繁體 繁体 [fan2 ti3] /traditional script/\n");

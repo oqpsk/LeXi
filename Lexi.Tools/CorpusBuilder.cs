@@ -45,14 +45,16 @@ internal static class CorpusBuilder
         {
             using var csv = new TextFieldParser(source, Encoding.UTF8) { TextFieldType = FieldType.Delimited, HasFieldsEnclosedInQuotes = true };
             csv.SetDelimiters(","); var header = csv.ReadFields() ?? [];
-            int en = Array.IndexOf(header, "英文名稱"), zh = Array.IndexOf(header, "中文名稱");
+            int en = Array.IndexOf(header, "英文名稱"), zh = Array.IndexOf(header, "中文名稱"), mainland = Array.IndexOf(header, "中國大陸譯名");
             if (en < 0 || zh < 0) throw new InvalidDataException("Unrecognized NAER columns");
             while (!csv.EndOfData)
             {
                 var row = csv.ReadFields()!;
                 if (row.Length <= Math.Max(en, zh)) continue;
-                var entry = new LocalEntry(row[en], "", row[en], row[zh], "", 0);
-                foreach (var term in new[] { row[en], row[zh] }.SelectMany(t => t.Split([';', '；', '、'], StringSplitOptions.RemoveEmptyEntries)).Select(t => t.Trim()).Distinct()) Add(term, entry);
+                var mainlandTerm = mainland >= 0 && mainland < row.Length ? row[mainland] : "";
+                var chinese = mainlandTerm.Length == 0 ? row[zh] : $"臺灣：{row[zh]}\n中國大陸：{mainlandTerm}";
+                var entry = new LocalEntry(row[en], "", row[en], chinese, "", 0);
+                foreach (var term in new[] { row[en], row[zh], mainlandTerm }.SelectMany(t => t.Split([';', '；', '、'], StringSplitOptions.RemoveEmptyEntries)).Select(t => t.Trim()).Distinct()) Add(term, entry);
             }
         }
         else if (format == "wordnet")
