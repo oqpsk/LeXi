@@ -2,11 +2,14 @@
 param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+# WPF builds and runs only on Windows; macOS and Linux build and check the shared projects.
+$windows = $PSVersionTable.PSEdition -eq 'Desktop' -or $IsWindows
+$solution = if ($windows) { 'Lexi.sln' } else { 'Lexi.Shared.slnf' }
 Push-Location $root
 try {
-    & dotnet restore Lexi.sln --configfile NuGet.Config
+    & dotnet restore $solution --configfile NuGet.Config
     if ($LASTEXITCODE) { throw 'Restore failed' }
-    & dotnet build Lexi.sln -c Release --no-restore
+    & dotnet build $solution -c Release --no-restore
     if ($LASTEXITCODE) { throw 'Build failed' }
     $fixture = Join-Path $root '.cache/test-dictionary'
     New-Item -ItemType Directory -Force $fixture | Out-Null
@@ -27,7 +30,13 @@ try {
     if ($LASTEXITCODE) { throw 'Lexical coverage checks failed' }
     & dotnet $runner speech-check
     if ($LASTEXITCODE) { throw 'Pronunciation and speech checks failed' }
-    & dotnet run --project tests/Lexi.PresentationChecks -c Release
-    if ($LASTEXITCODE) { throw 'WPF resource construction checks failed' }
-    & ./scripts/Test-ShellIcon.ps1
+    & dotnet $runner platform-check (Join-Path $root '.cache/platform-checks')
+    if ($LASTEXITCODE) { throw 'Platform path, client discovery and Chinese variant checks failed' }
+    & dotnet $runner session-check $fixture (Join-Path $root '.cache/session-checks')
+    if ($LASTEXITCODE) { throw 'Shared query session checks failed' }
+    if ($windows) {
+        & dotnet run --project tests/Lexi.PresentationChecks -c Release
+        if ($LASTEXITCODE) { throw 'WPF resource construction checks failed' }
+        & ./scripts/Test-ShellIcon.ps1
+    }
 } finally { Pop-Location }

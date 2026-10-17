@@ -7,18 +7,17 @@ namespace Lexi;
 
 public partial class MainWindow
 {
-    private readonly QueryHistory history = new(App.UserRoot);
+    private QueryHistory history => session.History;
     private void HistoryHome_Click(object sender, RoutedEventArgs e) => ShowHistory();
     internal void ShowHistory(bool clearInput = true, bool trackVisit = true)
     {
-        if (trackVisit) RecordVisit("");
-        lookup?.Cancel(); StopSpeech(); current = "";
-        ResetSenseDetails(); ResetLexicalDetails(); QueryProgress.Reset();
+        StopSpeech(); ResetSenseDetails(); ResetLexicalPopup();
+        session.ShowHome(trackVisit, ResultsScroll.VerticalOffset);
         Suggestions.Visibility = Visibility.Collapsed;
         if (clearInput) SetQuery("");
         EntryPanel.Visibility = Visibility.Collapsed; Welcome.Visibility = Visibility.Visible;
         RefreshButton.Visibility = Visibility.Collapsed; ResultsScroll.ScrollToTop();
-        RenderHistory(history.Entries); LookupStatus.Text = "准备就绪"; UpdateReadyStatus();
+        RenderHistory(history.Entries);
         SearchBox.Focus();
     }
     internal void RenderHistory(IReadOnlyList<HistoryEntry> entries)
@@ -47,7 +46,7 @@ public partial class MainWindow
             AutomationProperties.SetName(remove,"删除历史：" + entry.Preview);
             remove.Click += (_, _) =>
             {
-                history.Remove(entry); RenderHistory(history.Entries);
+                session.RemoveHistory(entry); RenderHistory(history.Entries);
                 if (HistoryList.Children.OfType<Grid>().FirstOrDefault()?.Children.OfType<Button>().FirstOrDefault() is { } next) next.Focus();
                 else SearchBox.Focus();
             };

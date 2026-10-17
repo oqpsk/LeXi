@@ -8,7 +8,7 @@ public enum ModelAccessFailure { ClientMissing, SignInRequired, Unavailable }
 // Carry only an application-defined category; never expose provider stderr or credentials.
 public sealed class ModelAccessException(ModelAccessFailure failure) : InvalidOperationException(failure switch
 {
-    ModelAccessFailure.ClientMissing => "未找到 Codex。请在设置中指定 codex.exe。",
+    ModelAccessFailure.ClientMissing => "未找到 Codex。请安装官方客户端，或在设置中指定 Codex 程序路径。",
     ModelAccessFailure.SignInRequired => "Codex 登录已失效，请在 Codex 中重新登录。",
     _ => "Codex 暂未完成查询。请检查登录、网络、额度或模型名称。"
 })

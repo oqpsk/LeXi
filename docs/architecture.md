@@ -1,20 +1,24 @@
 # 平台与仓库
 
-LeXi 使用一个仓库维护 Windows 与未来的 macOS 版本，共享词典格式、查询与缓存规则、模型协议和回归用例。
+LeXi 使用一个仓库维护 Windows 与 macOS 版本，共享词典格式、查询与缓存规则、模型协议和回归用例。两端的功能和行为一致，外观各自遵循平台规范；对照见 [FEATURES.md](../FEATURES.md)。
 
-## 目前的边界
+## 分层
 
-- `Lexi.Core`：离线索引、来源数据、模型协调、词形解析、翻译、缓存与会话前进／后退记录。主体是 .NET 类库；简繁转换及客户端发现仍包含 Windows 分支，不能直接宣称已完成跨平台兼容。
-- `Lexi.App`：Windows 的 WPF 界面、窗口材质、任务栏和托盘行为、本地发音与密钥保护。托盘使用 Windows Desktop 自带的 NotifyIcon；未来 macOS 前端需要独立适配菜单栏与窗口关闭语义。
-- `Lexi.Tools`：词库导入与非交互检查。
+- `Lexi.Core`：唯一的逻辑实现。包括离线索引、来源数据、模型协调、词形解析、翻译、缓存、保存的结果、历史与前进／后退记录，以及查询流程本身。`QuerySession` 执行一次查询的全部步骤，每一步发布完整的 `QueryView`：进度阶段、状态文字、义项行、来源、词形、音标、词源、TL;DR 与翻译。界面只负责渲染这些值。
+- `Lexi.App`：Windows 的 WPF 界面。负责布局、焦点、滚动、展开状态、窗口材质、任务栏和托盘、本地发音（SAPI）与密钥保护（当前用户加密）。WPF 仍保留原有的内部入口，检查程序通过它们驱动 Core 的展示模型。
+- `Lexi.Tools`：词库导入与非交互检查，包括共享查询流程（`session-check`）和平台服务（`platform-check`）。
+- `Lexi.Host`（计划）：以 JSON lines 暴露 Core 的查询、翻译、建议、历史与设置，支持流式更新和取消。
+- `apple/`（计划）：macOS 的 SwiftUI 应用，最低 macOS 26，内置单文件发布的 `Lexi.Host`。
 
-[WPF 仅支持 Windows](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/overview/)。C# 和 .NET 类库可以复用；Windows 界面及系统服务需要独立适配。
+[WPF 仅支持 Windows](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/overview/)。macOS 不用 Swift 重写逻辑，而是通过 `Lexi.Host` 调用同一份 Core。
 
-## macOS 的后续方向
+## Core 中的平台服务
 
-在同一仓库新增 macOS 前端项目，引用共享核心。优先评估可直接引用 .NET 的跨平台界面方案，再根据原生交互要求确定实现。当前不引入新的界面依赖，也不创建占位的 macOS 应用。
+- 数据目录（`LexiPaths`）：Windows 保留程序目录下的 `userdata` 与 `data`；macOS 使用 `~/Library/Application Support/LeXi`，词库位于其中的 `data`；其他系统遵循 XDG。
+- 官方客户端发现（`ToolLocator`）：从访达打开的应用拿不到 shell 的 PATH，因此除 PATH 外还检查 `~/.local/bin`、`/opt/homebrew/bin`、`/usr/local/bin`、npm 全局目录及 nvm、fnm、Volta 等目录；都没有时，使用 ChatGPT 桌面应用内置的 Codex 和 Claude 桌面应用下载并校验过的 Claude Code。npm 安装的入口脚本通过同一前缀下的 `node` 启动，并把找到的目录加入子进程 PATH。Windows 仍查找 `codex.exe`、Codex 应用目录、`claude.exe` 与 npm 的 `cli.js`。
+- 简繁检索键（`ChineseVariants`）：内置 OpenCC 字表，各平台生成相同的检索键，不再依赖 Windows 的 `LCMapStringEx`。一个简体字对应多个繁体字时，旧词库会依次尝试有限数量的组合。
 
-先分离客户端发现、账户登录启动、简繁转换、语音播放、凭据保护、应用数据位置等平台接口；macOS 分别适配自己的路径、系统语音与 Keychain。再在真实 Mac 上验证窗口、快捷切换、字体、发音、签名及分发。公开 README 只标明 Windows 可用。
+发音播放与密钥存储属于各自界面：Windows 使用 SAPI 与当前用户加密，macOS 使用系统声线与钥匙串。
 
 ## 升级兼容
 

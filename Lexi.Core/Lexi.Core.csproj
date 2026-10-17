@@ -1,3 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup><EmbeddedResource Include="specialist-references.json" /></ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="specialist-references.json" />
+    <EmbeddedResource Include="ChineseVariants/opencc-st-characters.txt" LogicalName="Lexi.Core.ChineseVariants.opencc-st-characters.txt" />
+    <EmbeddedResource Include="ChineseVariants/opencc-ts-characters.txt" LogicalName="Lexi.Core.ChineseVariants.opencc-ts-characters.txt" />
+  </ItemGroup>
 </Project>

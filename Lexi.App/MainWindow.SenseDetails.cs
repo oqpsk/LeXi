@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -11,13 +10,9 @@ namespace Lexi;
 
 public partial class MainWindow
 {
+    // Disclosure state belongs to this window and this lookup, never to the user's disk cache.
     private readonly Dictionary<string, bool> senseDetails = new(StringComparer.Ordinal);
     internal void ResetSenseDetails() => senseDetails.Clear();
-
-    // Content identity survives streaming, reordered senses and the final merge.
-    // Keep expansion only for this lookup, never in the user's disk cache.
-    private static string SenseKey(SenseCandidate candidate) => Cache.Hash(JsonSerializer.Serialize(new
-    { candidate.Model, candidate.Sense.Chinese, candidate.Sense.English }, Json.Options));
 
     private TextBlock CompactHint(string text, bool warning = false) => new()
     { Text = text, Foreground = warning ? Theme.Brush("Warning") : muted, FontSize = 14, Margin = new(0,2,0,6), TextWrapping = TextWrapping.Wrap };
@@ -37,46 +32,38 @@ public partial class MainWindow
         return block;
     }
 
-    private static string Provenance(SenseCandidate candidate) => candidate.Provisional ? "释义仍在生成，来源信息尚未完整。" :
-        candidate.EvidenceStatus == "source_based" ? "模型参考下列资料整理；释义与例句由模型生成。" :
-        "这条解释由模型补充，现有词典原文不足以核对全部内容；这不表示释义错误。";
-
-    private TextBlock SenseHeading(SenseCandidate candidate, string prefix)
+    private TextBlock SenseHeading(SenseHeadingView heading)
     {
         var label = CompactHint(""); label.Margin = new(0,0,0,3);
-        label.ToolTip = candidate.Sense.PartOfSpeech + " · " + candidate.Sense.Register;
-        label.Inlines.Add(new Run(prefix + "  ") { Foreground = accentBrush });
-        label.Inlines.Add(new Run(LexicalLabels.PartOfSpeech(candidate.Sense.PartOfSpeech))
+        label.ToolTip = heading.Tooltip;
+        label.Inlines.Add(new Run(heading.Prefix + "  ") { Foreground = accentBrush });
+        label.Inlines.Add(new Run(heading.PartOfSpeech)
             { Foreground = Theme.Brush("Warning"), FontFamily = (FontFamily)FindResource("LexicalFont"), FontStyle = FontStyles.Italic, FontSize = 18 });
-        var form = LexicalLabels.Form(candidate.Sense.PartOfSpeech);
-        if (form.Length > 0) label.Inlines.Add(new Run("  " + form) { FontFamily = (FontFamily)FindResource("LexicalFont"), FontStyle = FontStyles.Italic, FontSize = 16 });
-        var usage = LexicalLabels.Usage(candidate.Sense.Register);
-        if (usage.Length > 0) label.Inlines.Add(new Run("  " + usage));
-        if (LexicalCoverage.Abbreviation(candidate.Sense) && !usage.Contains("缩写")) label.Inlines.Add(new Run("  缩写"));
-        if (candidate.Provisional) label.Inlines.Add(new Run(" · 生成中"));
+        if (heading.Form.Length > 0) label.Inlines.Add(new Run("  " + heading.Form) { FontFamily = (FontFamily)FindResource("LexicalFont"), FontStyle = FontStyles.Italic, FontSize = 16 });
+        if (heading.Usage.Length > 0) label.Inlines.Add(new Run("  " + heading.Usage));
+        if (heading.Abbreviation) label.Inlines.Add(new Run("  缩写"));
+        if (heading.Provisional) label.Inlines.Add(new Run(" · 生成中"));
         return label;
     }
 
-    private Border SenseRow(SenseGroup group, int index, OnlineEntry? evidence)
+    private Border SenseRow(SenseView sense, int index)
     {
         var content = new StackPanel();
-        content.Children.Add(SenseHeading(group.Representative, $"{index + 1:00}"));
-        RenderSenseContent(content, group.Representative, evidence, group.Variants.Where(v => v.Id != group.Representative.Id).ToArray(), group.IncludesUsageVariants);
+        content.Children.Add(SenseHeading(sense.Heading));
+        RenderSenseContent(content, sense);
         return new Border { Child = content, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(0,index == 0 ? 0 : 1,0,0), Padding = new(0,index == 0 ? 0 : 10,0,8) };
     }
 
-    private void RenderSenseContent(Panel parent, SenseCandidate candidate, OnlineEntry? evidence, SenseCandidate[]? alternatives = null, bool usageVariants = false)
+    private void RenderSenseContent(Panel parent, SenseView sense)
     {
-        var sense = candidate.Sense;
-        var key = SenseKey(candidate);
-        if (LexicalCoverage.Abbreviation(sense) && sense.Expansion.Length > 0)
+        if (sense.Expansion.Length > 0)
         {
             var fullForm = CompactText(sense.Expansion, 17);
             fullForm.FontFamily = (FontFamily)FindResource("LexicalFont");
             fullForm.Foreground = accentBrush; fullForm.ToolTip = "英文全称";
             parent.Children.Add(fullForm);
         }
-        parent.Children.Add(CompactText(QuickRead.ChineseDefinition(sense), 20));
+        parent.Children.Add(CompactText(sense.Chinese, 20));
         parent.Children.Add(CompactText(sense.English, 18));
         var controls = new WrapPanel { Margin = new(0,2,0,0) }; var details = new StackPanel();
         parent.Children.Add(controls); parent.Children.Add(details);
@@ -85,48 +72,43 @@ public partial class MainWindow
             var examples = new StackPanel();
             if (!string.IsNullOrWhiteSpace(sense.Example)) examples.Children.Add(ExampleText(sense.Example));
             if (!string.IsNullOrWhiteSpace(sense.ExampleChinese)) examples.Children.Add(ExampleText(sense.ExampleChinese, true));
-            AddDisclosure(controls, details, key + ":examples", "例句", examples);
+            AddDisclosure(controls, details, sense.Key + ":examples", "例句", examples);
         }
 
         var sources = new StackPanel();
-        sources.Children.Add(CompactHint(candidate.Model.Name + " · " + Provenance(candidate)));
-        sources.Children.Add(CompactHint("原始用法标签：" + candidate.Sense.PartOfSpeech + " · " + candidate.Sense.Register));
-        var numbers = candidate.Provisional || evidence == null ? [] : new[] { candidate }.Concat(alternatives ?? [])
-            .Where(v => !v.Provisional).SelectMany(v => v.Sense.Evidence).Distinct().Where(n => n >= 1 && n <= evidence.Senses.Length).ToArray();
+        sources.Children.Add(CompactHint(sense.Provenance));
+        sources.Children.Add(CompactHint(sense.OriginalLabels));
         var links = new WrapPanel(); sources.Children.Add(links);
-        foreach (var number in numbers)
+        foreach (var citation in sense.Citations)
         {
-            var cited = evidence!.Senses[number - 1];
-            var link = new Button { Content = $"[{number}] {cited.SourceName} ↗", FontSize = 14, Foreground = muted, Padding = new(0,3,12,3), ToolTip = cited.Definition };
-            link.Click += (_, _) => OpenSource(string.IsNullOrEmpty(cited.SourceUrl) ? evidence.Url : cited.SourceUrl);
+            var link = new Button { Content = citation.Label + " ↗", FontSize = 14, Foreground = muted, Padding = new(0,3,12,3), ToolTip = citation.Definition };
+            link.Click += (_, _) => OpenSource(citation.Url);
             links.Children.Add(link);
-            foreach (var brief in SpecialistReferences.Cited(cited))
-            {
-                sources.Children.Add(CompactHint(brief.SourceName + " · LeXi 参考摘要"));
-                sources.Children.Add(CompactText(brief.Chinese, 16));
-                sources.Children.Add(CompactText(brief.English, 16));
-            }
         }
-        if (numbers.Length == 0 && !candidate.Provisional) sources.Children.Add(CompactHint("当前解释来自模型知识，未附可直接核对的资料。"));
-        if (alternatives?.Length > 0) sources.Children.Add(CompactHint("资料链接包含同义项的其他表述所引用的内容。"));
-        var sourceLabel = numbers.Length > 0 ? $"参考资料 · {numbers.Length}" : "参考资料";
-        var keepReferenceOpen = numbers.Any(n => SpecialistReferences.Cited(evidence!.Senses[n - 1])
-            .Any(brief => senseDetails.GetValueOrDefault("reference:" + brief.Word)));
-        AddDisclosure(controls, details, key + ":sources", sourceLabel, sources, keepReferenceOpen);
+        foreach (var brief in sense.Briefs)
+        {
+            sources.Children.Add(CompactHint(brief.Caption));
+            sources.Children.Add(CompactText(brief.Chinese, 16));
+            sources.Children.Add(CompactText(brief.English, 16));
+        }
+        if (sense.SourceNote.Length > 0) sources.Children.Add(CompactHint(sense.SourceNote));
+        if (sense.AlternativesNote.Length > 0) sources.Children.Add(CompactHint(sense.AlternativesNote));
+        var keepReferenceOpen = sense.ReferenceKeys.Any(key => senseDetails.GetValueOrDefault(key));
+        AddDisclosure(controls, details, sense.Key + ":sources", sense.SourceLabel, sources, keepReferenceOpen);
 
-        if (alternatives is not { Length: > 0 }) return;
+        if (sense.Alternatives.Length == 0) return;
         var originals = new StackPanel();
-        foreach (var variant in alternatives)
+        foreach (var variant in sense.Alternatives)
         {
             var section = new StackPanel { Margin = new(0,2,0,6) };
-            section.Children.Add(SenseHeading(variant, variant.Model.Name));
-            RenderSenseContent(section, variant, evidence);
+            section.Children.Add(SenseHeading(variant.Heading));
+            RenderSenseContent(section, variant);
             originals.Children.Add(section);
         }
         // If the user was reading the faster model before merging, keep that
         // expanded detail accessible when it moves under the primary wording.
-        var retainReading = alternatives.Any(v => senseDetails.Any(s => s.Value && s.Key.StartsWith(SenseKey(v) + ":", StringComparison.Ordinal)));
-        AddDisclosure(controls, details, key + ":alternatives", $"{(usageVariants ? "用法细分" : "其他表述")} · {alternatives.Length}", originals, retainReading);
+        var retainReading = sense.Alternatives.Any(v => senseDetails.Any(s => s.Value && s.Key.StartsWith(v.Key + ":", StringComparison.Ordinal)));
+        AddDisclosure(controls, details, sense.Key + ":alternatives", sense.AlternativesLabel, originals, retainReading);
     }
 
     private void AddDisclosure(Panel controls, Panel details, string key, string label, FrameworkElement content, bool initiallyOpen = false)

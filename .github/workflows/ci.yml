@@ -1,4 +1,4 @@
-name: Windows checks
+name: Checks
 
 on:
   push:
@@ -33,3 +33,19 @@ jobs:
       - name: Publish smoke check
         shell: pwsh
         run: ./scripts/Build.ps1
+
+  # Shared core, client discovery, data paths and Chinese variants on macOS.
+  # The WPF front end is validated only by the Windows job.
+  macos:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build and offline regression checks
+        shell: pwsh
+        run: ./scripts/Test.ps1

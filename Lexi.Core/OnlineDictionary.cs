@@ -11,7 +11,7 @@ public sealed partial class OnlineDictionary : IDisposable
     {
         client = handler == null ? new HttpClient() : new HttpClient(handler);
         client.Timeout = TimeSpan.FromSeconds(12);
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("LexiDictionary/0.1 (Windows personal dictionary; Wiktionary reader)");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("LexiDictionary/0.1 (personal desktop dictionary; Wiktionary reader)");
     }
     public async Task<OnlineEntry?> LookupAsync(string query, CancellationToken token)
     {

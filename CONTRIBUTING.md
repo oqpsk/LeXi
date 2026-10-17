@@ -4,7 +4,7 @@ LeXi 保持独立、简洁、快速的词典定位。新增功能应服务于查
 
 ## 开发流程
 
-1. 从最新 `main` 建立 `feat/…` 或 `fix/…` 分支。
+1. 从最新 `main` 建立 `feat/…` 或 `fix/…` 分支。PR 说明影响的平台；改变用户可见的功能或行为时同步更新 [FEATURES.md](FEATURES.md)。
 2. 保持修改范围集中，修复与功能分开提交。
 3. 执行 `scripts/Test.ps1` 和 `scripts/Check-Privacy.ps1`。
 4. 更新 `CHANGELOG.md` 的 Unreleased 部分，提交 PR，说明问题、变化、验证结果和仍存在的限制。
@@ -14,7 +14,9 @@ LeXi 保持独立、简洁、快速的词典定位。新增功能应服务于查
 
 ## 验证
 
-`scripts/Test.ps1` 构建全部项目，通过合成词库检查离线读取、查询规范化、短语、在线来源解析、来源编号和流式 JSON 边界。它不依赖完整词库或模型账号。
+`scripts/Test.ps1` 构建全部项目，通过合成词库检查离线读取、查询规范化、短语、在线来源解析、来源编号和流式 JSON 边界。它不依赖完整词库或模型账号。在 macOS 和 Linux 上，它构建 `Lexi.Shared.slnf` 中的共享项目并运行相同的非界面检查；WPF 检查只在 Windows 运行。没有 PowerShell 时，可直接执行脚本中的 `dotnet` 命令。
+
+`session-check <词库目录> <临时目录>` 用合成模型和不联网的请求检查共享查询流程：路由、来源、流式预览、合并、保存的结果、翻译、历史、前进／后退、取消与设置变化。`platform-check <临时目录>` 检查各平台的数据目录、官方客户端发现（模拟从访达启动时的 PATH）和简繁检索键。
 
 完整 ECDICT 安装后可以运行 `Lexi.Tools check <data目录>`；该命令另行检查完整词条数量。`live`、`bench-claude`、`cancel-check`、`parallel-live` 是手动集成检查，会使用本机的在线服务或订阅，不能放入常规 CI。
 

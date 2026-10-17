@@ -6,19 +6,6 @@ namespace Lexi.Core;
 
 public sealed class CodexDictionary(string assetFolder, string userRoot)
 {
-    public static string? FindExecutable(string configured = "")
-    {
-        if (!string.IsNullOrWhiteSpace(configured)) return File.Exists(configured) ? configured : null;
-        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
-        {
-            var path = Path.Combine(directory.Trim('"'), "codex.exe");
-            if (File.Exists(path)) return path;
-        }
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenAI", "Codex", "bin");
-        if (!Directory.Exists(root)) return null;
-        return Directory.EnumerateDirectories(root).OrderByDescending(Directory.GetLastWriteTimeUtc)
-            .Select(x => Path.Combine(x, "codex.exe")).FirstOrDefault(File.Exists);
-    }
     public static string EvidenceText(OnlineEntry? online) => online == null ? "No external evidence. Use reliable knowledge and mark it unverified." :
         string.Join("\n", online.Senses.Take(20).Select((s, i) => $"[{i + 1}] {s.SourceName} [{s.Headword}] {s.PartOfSpeech}: {s.Definition}"));
     public static string EvidenceHash(OnlineEntry? online) => Cache.Hash("bilingual-v4-specialist-case\n" + EvidenceText(online));
@@ -95,12 +82,13 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
     private async Task<string> RunAsync(string prompt, string schemaFile, AppSettings settings, CancellationToken token,
         string instructionsFile = "dictionary.instructions.txt", int timeoutSeconds = 70)
     {
-        var exe = FindExecutable(settings.CodexPath) ?? throw new ModelAccessException(ModelAccessFailure.ClientMissing);
+        var tool = ToolLocator.Codex(settings.CodexPath) ?? throw new ModelAccessException(ModelAccessFailure.ClientMissing);
         var dir = Path.Combine(userRoot, "codex-work");
         Directory.CreateDirectory(dir);
-        var info = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true,
-            RedirectStandardOutput = true, RedirectStandardError = true, StandardInputEncoding = new UTF8Encoding(false),
-            StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = dir };
+        var info = tool.StartInfo();
+        info.UseShellExecute = false; info.CreateNoWindow = true; info.RedirectStandardInput = true;
+        info.RedirectStandardOutput = true; info.RedirectStandardError = true; info.StandardInputEncoding = new UTF8Encoding(false);
+        info.StandardOutputEncoding = Encoding.UTF8; info.StandardErrorEncoding = Encoding.UTF8; info.WorkingDirectory = dir;
         foreach (var arg in new[] { "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "--json",
             "--color", "never", "--output-schema", Path.Combine(assetFolder, schemaFile) }) info.ArgumentList.Add(arg);
         foreach (var config in new[] { "approval_policy=\"never\"", "web_search=\"disabled\"", "project_doc_max_bytes=0", "model_reasoning_effort=" + JsonSerializer.Serialize(settings.ReasoningEffort),

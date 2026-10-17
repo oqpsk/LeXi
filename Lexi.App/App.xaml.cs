@@ -13,7 +13,8 @@ public partial class App : Application
     private TrayIcon? tray;
     private readonly CancellationTokenSource lifetime = new();
     public static string Root => AppContext.BaseDirectory;
-    public static string UserRoot => Path.Combine(Root, "userdata");
+    public static Lexi.Core.LexiPaths Paths { get; } = Lexi.Core.LexiPaths.Current;
+    public static string UserRoot => Paths.UserRoot;
     private const string Pipe = "Lexi.Dictionary.v1";
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)] private static extern int SetCurrentProcessExplicitAppUserModelID(string appID);
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(int processId);

@@ -28,8 +28,8 @@ public partial class MainWindow
         // Real edits start a fresh candidate list; previews keep the original list intact.
         DismissSuggestions();
         if (string.IsNullOrWhiteSpace(SearchBox.Text) && current.Length > 0) ShowHistory(false);
-        if (!settings.OfflineEnabled || dictionaryTask?.IsCompletedSuccessfully != true) return;
-        var suggestions = dictionaryTask.Result.Suggest(SearchBox.Text, settings);
+        if (!settings.OfflineEnabled || !session.Library.IsCompletedSuccessfully) return;
+        var suggestions = session.Suggest(SearchBox.Text);
         Suggestions.ItemsSource = suggestions;
         Suggestions.Visibility = suggestions.Length > 0 && SearchBox.IsKeyboardFocused ? Visibility.Visible : Visibility.Collapsed;
     }
