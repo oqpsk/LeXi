@@ -113,7 +113,7 @@ struct BlockText: NSViewRepresentable {
         view.drawsBackground = false
         view.textContainerInset = .zero
         view.textContainer?.lineFragmentPadding = 0
-        view.textContainer?.widthTracksTextView = true
+        view.textContainer?.widthTracksTextView = false
         view.isVerticallyResizable = false
         view.isHorizontallyResizable = false
         return view
@@ -125,18 +125,12 @@ struct BlockText: NSViewRepresentable {
         view.read = read
     }
 
-    // The height the text needs at the proposed width, laid out by the view's own layout manager.
+    // The size the text needs at the proposed width. SwiftUI asks with several trial widths, so this
+    // lays out a separate copy of the text and never touches the view's own container.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: BlockTextView, context: Context) -> CGSize? {
-        view.show(text, look)
-        guard let container = view.textContainer, let layout = view.layoutManager else { return nil }
-        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 10_000
-        let tracking = container.widthTracksTextView
-        container.widthTracksTextView = false
-        container.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
-        layout.ensureLayout(for: container)
-        let used = layout.usedRect(for: container)
-        container.widthTracksTextView = tracking
-        return CGSize(width: proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? ceil(used.width), height: ceil(used.height))
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        let used = BlockTextView.measure(NSAttributedString(string: text, attributes: look.attributes), width: width ?? 10_000)
+        return CGSize(width: width ?? ceil(used.width), height: ceil(used.height))
     }
 }
 
@@ -144,6 +138,24 @@ final class BlockTextView: NSTextView {
     var menuTitle: (Bool) -> String = { _ in "朗读" }
     var read: (String) -> Void = { _ in }
     private var shown: (String, NSFont, NSColor, CGFloat)?
+
+    // The text always wraps at the width SwiftUI gives the view, including when that width is
+    // unchanged from an earlier layout.
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        textContainer?.containerSize = NSSize(width: newSize.width, height: .greatestFiniteMagnitude)
+    }
+
+    static func measure(_ text: NSAttributedString, width: CGFloat) -> CGSize {
+        let storage = NSTextStorage(attributedString: text)
+        let container = NSTextContainer(size: NSSize(width: width, height: .greatestFiniteMagnitude))
+        container.lineFragmentPadding = 0
+        let layout = NSLayoutManager()
+        layout.addTextContainer(container)
+        storage.addLayoutManager(layout)
+        layout.ensureLayout(for: container)
+        return layout.usedRect(for: container).size
+    }
 
     func show(_ text: String, _ look: TextLook) {
         guard shown.map({ $0 != (text, look.font, look.color, look.lineSpacing) }) ?? true else { return }
