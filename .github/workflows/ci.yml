@@ -34,11 +34,11 @@ jobs:
         shell: pwsh
         run: ./scripts/Build.ps1
 
-  # Shared core, client discovery, data paths and Chinese variants on macOS.
-  # The WPF front end is validated only by the Windows job.
+  # Shared core, client discovery, data paths and Chinese variants on macOS, plus the
+  # SwiftUI app. The WPF front end is validated only by the Windows job.
   macos:
     runs-on: macos-26
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,3 +57,11 @@ jobs:
             -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:DebugType=none \
             --source https://api.nuget.org/v3/index.json -o .cache/host-publish
           dotnet Lexi.Tools/bin/Release/net10.0/Lexi.Tools.dll host-check .cache/test-dictionary .cache/host-published .cache/host-publish/lexi-host
+      - name: Swift tests against the published host
+        shell: bash
+        run: LEXI_HOST="$PWD/.cache/host-publish/lexi-host" swift test --package-path apple
+      - name: Build the app bundle
+        shell: bash
+        run: |
+          apple/scripts/build-app.sh "$RUNNER_TEMP/macos"
+          codesign --verify --deep --strict "$RUNNER_TEMP/macos/LeXi.app"
