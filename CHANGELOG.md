@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Read definitions and examples aloud on Windows and macOS. Pointing at a Chinese or English definition, an example or its translation shows a speaker in the card's left margin, which becomes a stop button while that block plays; the block is tinted pale gold while it is read. The context menu starts with 朗读, or 朗读所选文字 to read only the selected words. Speech uses the voice chosen in settings with the same cache and limits as the headword, and each speaker now stops only its own item. On macOS these blocks are AppKit text views so 朗读 joins the system text menu; VoiceOver offers it as an action.
 - Rewrite README.md as a product overview covering both platforms: lookup and translation, offline dictionaries, AI definitions and merging, subscriptions, speech, saved results, navigation and privacy.
 
 - Add LeXi for macOS (`apple/`): a SwiftUI app for macOS 26+ that bundles the self-contained `Lexi.Host` and renders its views. It supports lookup, translation, suggestions, history, back/forward navigation, regeneration, the online switch, settings with the shared validation, dictionary management, official-client status and sign-in in Terminal, and system-voice speech. Liquid Glass is limited to the toolbar, search bar, footer controls and popovers; results use the normal background with pink as an accent. Keys are left to the input method while it composes text.
