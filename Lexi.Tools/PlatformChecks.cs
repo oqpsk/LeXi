@@ -38,35 +38,55 @@ internal static class PlatformChecks
             mac.With(user: Path.Combine(work, "override")).UserRoot == Path.Combine(work, "override") && mac.With().DataRoot == mac.DataRoot,
             "other systems follow XDG and explicit host overrides replace only the named folder");
 
-        // A Finder-launched app sees only the system PATH.
+        // A Finder-launched app's PATH holds only system folders without these clients. System
+        // locations (/opt/homebrew, /usr/local, /Applications) live under a synthetic root.
         var home = Path.Combine(work, "home");
-        var unix = new ToolEnvironment(false, home, "/usr/bin:/bin:/usr/sbin:/sbin", "", "", Path.Combine(work, "npm"));
-        var native = Touch(Path.Combine(home, ".local", "bin", "claude"), "Ïúíþ binary");
+        var system = Path.Combine(work, "system");
+        var unix = new ToolEnvironment(false, home, "", "", "", Path.Combine(work, "npm"), system);
+        var native = Touch(Path.Combine(home, ".local", "bin", "claude"), "\u00cf\u00fa\u00ed\u00fe binary");
         Check(ToolLocator.Claude(unix) is { Script: null } claude && claude.FileName == native &&
             claude.StartInfo().Environment["PATH"]!.Split(Path.PathSeparator).Contains(Path.Combine(home, ".local", "bin")),
             "native Claude in ~/.local/bin is found without a login-shell PATH and its folder joins the child PATH");
         File.Delete(native);
-        // Real clients in shared system folders take precedence over the synthetic npm prefix.
-        var installed = new[] { "/opt/homebrew/bin", "/usr/local/bin" }.Any(d => File.Exists(Path.Combine(d, "claude")) || File.Exists(Path.Combine(d, "codex")));
         var npmBin = Path.Combine(work, "npm", "bin");
         var cli = Touch(Path.Combine(work, "npm", "lib", "node_modules", "@anthropic-ai", "claude-code", "cli.js"), "#!/usr/bin/env node\n");
         var node = Touch(Path.Combine(npmBin, "node"), "binary");
-        // Another node earlier in the search order (as Homebrew's is on many Macs) must not win.
-        var otherNode = Touch(Path.Combine(home, ".local", "bin", "node"), "binary");
-        Check(installed || ToolLocator.Claude(unix) is { } npmClaude && npmClaude.FileName == node && npmClaude.Script == cli,
+        // Homebrew's node comes earlier in the search order but belongs to another prefix.
+        Touch(Path.Combine(system, "opt", "homebrew", "bin", "node"), "binary");
+        Check(ToolLocator.Claude(unix) is { } npmClaude && npmClaude.FileName == node && npmClaude.Script == cli,
             "an npm-global Claude runs through node from the same prefix instead of relying on the shebang PATH");
-        File.Delete(otherNode);
         var shim = Touch(Path.Combine(npmBin, "codex"), "#!/usr/bin/env node\nimport('../lib/codex.js');\n");
         var login = ProviderConnection.Command("codex", shim, true)!;
-        Check((installed || ToolLocator.Codex("", unix) is { } found && found.FileName == node && found.Script == shim) &&
+        Check(ToolLocator.Codex("", unix) is { } found && found.FileName == node && found.Script == shim &&
             (OperatingSystem.IsWindows() ? login.FileName == shim && login.ArgumentList.SequenceEqual(["login"]) :
                 login.FileName == node && login.ArgumentList.SequenceEqual([shim, "login"])),
             "an npm Codex shim is launched through node for queries and the explicit login command");
         var nvm = Path.Combine(home, ".nvm", "versions", "node", "v24.0.0", "bin");
         var nvmCodex = Touch(Path.Combine(nvm, "codex-native"), "binary");
-        Check(ToolLocator.SearchDirectories(unix).Contains(nvm) && ToolLocator.SearchDirectories(unix).Contains("/opt/homebrew/bin") &&
+        Check(ToolLocator.SearchDirectories(unix).Contains(nvm) && ToolLocator.SearchDirectories(unix).Contains(Path.Combine(system, "opt", "homebrew", "bin")) &&
             ToolLocator.SearchDirectories(unix).Contains(Path.Combine(home, ".local", "bin")) && ToolLocator.Codex(nvmCodex, unix)?.Script == null,
             "Homebrew, ~/.local/bin, nvm and npm global folders are searched; configured native paths run directly");
+
+        // Clients that ship inside the ChatGPT and Claude desktop apps.
+        var desktopHome = Path.Combine(work, "desktop-home");
+        var desktop = unix with { Home = desktopHome, NpmPrefix = "" };
+        Check(ToolLocator.Codex("", desktop) == null && ToolLocator.Claude(desktop) == null, "without any install the clients stay recoverably missing");
+        var chatgpt = Touch(Path.Combine(system, "Applications", "ChatGPT.app", "Contents", "Resources", "codex-cli", "bin", "codex"), "#!/bin/sh\nexec true\n");
+        var claudeData = Path.Combine(desktopHome, "Library", "Application Support", "Claude");
+        string Build(string version, string build, bool verified)
+        {
+            var app = Touch(Path.Combine(claudeData, "claude-code", version, build, "claude.app", "Contents", "MacOS", "claude"), "binary");
+            if (verified) Touch(Path.Combine(claudeData, "claude-code", version, build, ".verified"), "");
+            return app;
+        }
+        Build("2.1.9", "older", true);
+        var current = Build("2.1.10", "current", true);
+        Build("2.1.11", "downloading", false);
+        Touch(Path.Combine(claudeData, "claude-code-vm", "2.1.11", "claude"), "\u007fELF linux build");
+        Check(ToolLocator.Codex("", desktop) is { Script: null } desktopCodex && desktopCodex.FileName == chatgpt && ToolLocator.Claude(desktop)?.FileName == current,
+            "the ChatGPT app's Codex and the Claude app's newest verified macOS Claude Code are used when nothing else is installed");
+        var preferred = Touch(Path.Combine(desktopHome, ".local", "bin", "claude"), "binary");
+        Check(ToolLocator.Claude(desktop)?.FileName == preferred, "a command-line install still takes precedence over a desktop app's copy");
 
         var appData = Path.Combine(work, "AppData", "Roaming"); var localAppData = Path.Combine(work, "AppData", "Local");
         var winPath = Path.Combine(work, "WinPath");
