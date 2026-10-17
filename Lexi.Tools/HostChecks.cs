@@ -34,10 +34,23 @@ internal static class HostChecks
                 preview.Report(entry with { Paragraphs = ["船已就绪。"] }); await Task.Yield(); return entry;
             });
         var user = Path.Combine(work, "in-process");
+        // Synthetic speech services: the key decides the answer, and every request is recorded.
+        const string speechKey = "synthetic-host-speech-key";
+        var speechRequests = new ConcurrentQueue<HttpRequestMessage>();
+        var syntheticAudio = new byte[32]; Encoding.ASCII.GetBytes("ID3").CopyTo(syntheticAudio, 0);
+        using var speechClient = new SpeechClient(new SpeechHandler(request =>
+        {
+            speechRequests.Enqueue(request);
+            var key = request.Headers.Authorization?.Parameter ?? request.Headers.GetValues("xi-api-key").Single();
+            if (key != speechKey) return new(HttpStatusCode.Unauthorized) { Content = new StringContent("private-provider-response") };
+            return request.RequestUri!.AbsolutePath == "/v2/voices"
+                ? new(HttpStatusCode.OK) { Content = new StringContent("{\"voices\":[{\"voice_id\":\"voice_b\",\"name\":\"Beta\"},{\"voice_id\":\"voice_a\",\"name\":\"Alpha\"}],\"has_more\":false}") }
+                : new(HttpStatusCode.OK) { Content = new ByteArrayContent(syntheticAudio) };
+        }));
         using (var session = new QuerySession(new(Path.Combine(work, "assets"), Path.GetFullPath(fixture), user), providers: providers, network: new NoNetwork()))
         {
             var client = new Client();
-            var server = new HostServer(session, client.Input, client.Output).RunAsync();
+            var server = new HostServer(session, client.Input, client.Output, speechClient).RunAsync();
             var init = await client.Call("initialize");
             Check(init.GetProperty("result") is var ready && ready.GetProperty("protocol").GetInt32() == HostServer.Protocol &&
                 ready.GetProperty("view").GetProperty("kind").GetString() == "home" &&
@@ -101,9 +114,16 @@ internal static class HostChecks
             var updated = (await client.Call("settings.update", new { settings = new { mergeSenses = false, reasoningEffort = "high" } })).GetProperty("result").GetProperty("settings");
             Check(!updated.GetProperty("mergeSenses").GetBoolean() && updated.GetProperty("reasoningEffort").GetString() == "low" &&
                 !AppSettings.Load(user).MergeSenses, "valid settings are saved with the fixed Codex options");
+            await CheckSpeech(client, user, speechKey, syntheticAudio, speechRequests, Check);
             var offline = (await client.Call("settings.setOnline", new { online = false })).GetProperty("result");
             Check(offline.GetProperty("controls").GetProperty("onlineLabel").GetString() == "离线查询" && !AppSettings.Load(user).Online &&
                 client.Latest().GetProperty("status").GetString()!.StartsWith("查询模式已更改"), "the online switch saves and keeps the current result");
+            var replay = new { text = "US", provider = "openai", model = "gpt-4o-mini-tts", voice = "coral" };
+            var requestsBefore = speechRequests.Count;
+            Check((await client.Call("speech.synthesize", replay)).GetProperty("result").GetProperty("path").GetString()!.EndsWith(".mp3") &&
+                SpeechError(await client.Call("speech.synthesize", replay with { text = "uncached" })) == "离线模式下没有此声线的缓存发音。" &&
+                SpeechError(await client.Call("speech.elevenVoices", new { key = speechKey })) == "请先开启在线补充，再读取声线列表。" &&
+                speechRequests.Count == requestsBefore, "offline speech replays cached audio and reports missing audio without contacting a service");
 
             var login = (await client.Call("connection.loginCommand", new { provider = "codex", codexPath = Environment.ProcessPath })).GetProperty("result");
             Check(login.GetProperty("fileName").GetString() == Environment.ProcessPath && login.GetProperty("arguments").EnumerateArray().Select(a => a.GetString()).SequenceEqual(["login"]) &&
@@ -126,18 +146,87 @@ internal static class HostChecks
         Directory.CreateDirectory(host);
         File.WriteAllText(Path.Combine(host, "settings.json"), "{\"online\":false}");
         var (exit, lines, errors) = await RunHost(hostAssembly, ["--data", Path.GetFullPath(fixture), "--user", host],
-            ["{\"id\":1,\"method\":\"initialize\"}", "{\"id\":2,\"method\":\"query.submit\",\"params\":{\"text\":\"walked\"}}", "{\"id\":3,\"method\":\"shutdown\"}"]);
+            ["{\"id\":1,\"method\":\"initialize\"}", "{\"id\":2,\"method\":\"query.submit\",\"params\":{\"text\":\"walked\"}}",
+             "{\"id\":3,\"method\":\"speech.models\"}",
+             "{\"id\":4,\"method\":\"speech.synthesize\",\"params\":{\"text\":\"walked\",\"provider\":\"xai\",\"model\":\"grok-tts\",\"voice\":\"eve\",\"key\":\"" + speechKey + "\"}}",
+             "{\"id\":5,\"method\":\"shutdown\"}"]);
         var messages = lines.Select(l => JsonDocument.Parse(l).RootElement).ToArray();
         var last = messages.Where(m => m.TryGetProperty("event", out _)).Last().GetProperty("data");
         Check(exit == 0 && errors.Length == 0 && last.GetProperty("local")[0].GetProperty("chinese").GetString() == "步行" &&
             last.GetProperty("wordForms")[0].GetProperty("cells")[0].GetProperty("spelling").GetString() == "walked → walk" &&
-            messages.Last().GetProperty("id").GetInt32() == 3, "the host process answers on stdout only and exits after shutdown");
+            messages.Last().GetProperty("id").GetInt32() == 5, "the host process answers on stdout only and exits after shutdown");
+        JsonElement Answer(int id) => messages.Single(m => m.TryGetProperty("id", out var value) && value.ValueKind == JsonValueKind.Number && value.GetInt32() == id);
+        Check(Answer(3).GetProperty("result").GetProperty("models")[0].GetProperty("name").GetString() == SpeechCatalog.Local.Name &&
+            SpeechError(Answer(4)) == "离线模式下没有此声线的缓存发音。" && !lines.Any(l => l.Contains(speechKey)) && !errors.Contains(speechKey),
+            "the built host lists speech models and refuses offline generation without echoing the key");
         (exit, lines, _) = await RunHost(hostAssembly, ["--user", host, "--data", Path.GetFullPath(fixture)], ["{\"id\":1,\"method\":\"query.view\"}"]);
         Check(exit == 0 && lines.Length == 1, "closing standard input ends the host without a shutdown request");
         (exit, _, errors) = await RunHost(hostAssembly, ["--unknown"], []);
         Check(exit == 2 && errors.Contains("usage"), "unknown arguments are rejected before any protocol output");
         Console.WriteLine($"{count} host protocol checks passed");
     }
+
+    // Speech through the protocol with synthetic services; the session is online.
+    private static async Task CheckSpeech(Client client, string user, string key, byte[] audio, ConcurrentQueue<HttpRequestMessage> requests, Action<bool, string> check)
+    {
+        var models = (await client.Call("speech.models")).GetProperty("result").GetProperty("models").EnumerateArray().ToArray();
+        check(models.Length == SpeechCatalog.Models.Length && models[0].GetProperty("local").GetBoolean() &&
+            models[0].GetProperty("name").GetString() == SpeechCatalog.Local.Name && models.Skip(1).All(m => !m.GetProperty("local").GetBoolean()) &&
+            models.Count(m => m.GetProperty("provider").GetString() == "elevenlabs") == 5,
+            "speech models come from the shared catalog with this platform's local voices first");
+        int Voices(string provider, string model) =>
+            client.Call("speech.voices", new { provider, model }).Result.GetProperty("result").GetProperty("voices").GetArrayLength();
+        check(Voices("openai", "gpt-4o-mini-tts") == 13 && Voices("xai", "grok-tts") == 5 && Voices("elevenlabs", "eleven_v3") == 1 &&
+            Voices(SpeechCatalog.Local.Provider, SpeechCatalog.Local.Id) == 0, "catalog voices follow the model; system voices are listed by the front end");
+
+        var account = (await client.Call("speech.elevenVoices", new { key })).GetProperty("result").GetProperty("voices");
+        check(account.EnumerateArray().Select(v => v.GetProperty("id").GetString() + "=" + v.GetProperty("name").GetString()).SequenceEqual(["voice_a=Alpha", "voice_b=Beta"]) &&
+            requests.Last().RequestUri!.AbsolutePath == "/v2/voices", "ElevenLabs account voices load with the key supplied for this call");
+        check(SpeechError(await client.Call("speech.elevenVoices")) == "请在设置 → 发音的在线语音连接中填写所选服务的 API Key。" &&
+            SpeechError(await client.Call("speech.elevenVoices", new { key = "wrong-key" })) is { } rejected && rejected.Contains("API Key") && !rejected.Contains("private"),
+            "voice loading without a key or with a rejected key reports Core's sanitized wording");
+
+        var choice = new { text = "US", provider = "openai", model = "gpt-4o-mini-tts", voice = "coral" };
+        var probe = (await client.Call("speech.cached", choice)).GetProperty("result");
+        check(probe.GetProperty("path").ValueKind == JsonValueKind.Null && !probe.GetProperty("local").GetBoolean() &&
+            (await client.Call("speech.cached", new { text = "US", provider = SpeechCatalog.Local.Provider, model = SpeechCatalog.Local.Id, voice = "auto" }))
+                .GetProperty("result").GetProperty("local").GetBoolean(), "the cache probe reports missing audio and marks local voices for the front end");
+        var before = requests.Count;
+        var path = (await client.Call("speech.synthesize", new { choice.text, choice.provider, choice.model, choice.voice, key })).GetProperty("result").GetProperty("path").GetString()!;
+        check(path == Path.Combine(user, "speech-cache", new SpeechOptions(choice.provider, choice.model, choice.voice).CacheKey(choice.text) + ".mp3") &&
+            File.ReadAllBytes(path).SequenceEqual(audio) && requests.Count == before + 1 && requests.Last().Headers.Authorization?.Parameter == key,
+            "synthesis writes the shared provider/model/voice cache file and returns its path");
+        check((await client.Call("speech.synthesize", choice)).GetProperty("result").GetProperty("path").GetString() == path &&
+            (await client.Call("speech.cached", choice)).GetProperty("result").GetProperty("path").GetString() == path && requests.Count == before + 1,
+            "cached audio is returned without a key or another request");
+        var lower = (await client.Call("speech.synthesize", new { text = "us", choice.provider, choice.model, choice.voice, key })).GetProperty("result").GetProperty("path").GetString();
+        var alloy = (await client.Call("speech.synthesize", new { choice.text, choice.provider, choice.model, voice = "alloy", key })).GetProperty("result").GetProperty("path").GetString();
+        check(new[] { path, lower, alloy }.Distinct().Count() == 3 && requests.Count == before + 3, "case and voice keep separate audio files");
+
+        check(SpeechError(await client.Call("speech.synthesize", new { text = "new", choice.provider, choice.model, choice.voice })) == "请在设置 → 发音的在线语音连接中填写所选服务的 API Key。" &&
+            SpeechError(await client.Call("speech.synthesize", new { text = "new", choice.provider, model = "tts-1", voice = "marin", key })) == "请在设置中选择这个模型支持的声线。" &&
+            SpeechError(await client.Call("speech.synthesize", new { text = "new", provider = SpeechCatalog.Local.Provider, model = SpeechCatalog.Local.Id, voice = "auto", key })) == "此模型不使用在线语音接口。" &&
+            SpeechError(await client.Call("speech.synthesize", new { text = "new", provider = "elevenlabs", model = "eleven_v3", voice = "../voice", key })) == "请选择 ElevenLabs 声线，或填写有效的 Voice ID。",
+            "missing keys, unsupported voices and local voices fail with the Windows wording before any request");
+        var refused = SpeechError(await client.Call("speech.synthesize", new { text = "new", choice.provider, choice.model, choice.voice, key = "wrong-key" }));
+        check(refused == "语音服务拒绝认证，请检查 API Key 和接口权限。" && (await client.Call("speech.cached", new { text = "new", choice.provider, choice.model, choice.voice }))
+            .GetProperty("result").GetProperty("path").ValueKind == JsonValueKind.Null, "rejected keys report Core's message and leave nothing in the cache");
+        check((await client.Call("speech.synthesize", new { choice.provider, choice.model, choice.voice })).GetProperty("error").GetProperty("code").GetString() == "invalid_params",
+            "speech requests without text are protocol errors");
+
+        var invalid = await client.Call("settings.update", new { settings = new { speechProvider = "openai", speechModel = "tts-1", speechVoice = "marin" } });
+        check(invalid.GetProperty("error").GetProperty("code").GetString() == "invalid_settings" &&
+            invalid.GetProperty("error").GetProperty("message").GetString() == "请在设置中选择这个模型支持的声线。", "speech settings use the Windows dialog's validation");
+        var saved = (await client.Call("settings.update", new { settings = new { speechProvider = "elevenlabs", speechModel = "eleven_v3", speechVoice = "custom_voice", speechVoiceName = "自定义声线" } }))
+            .GetProperty("result").GetProperty("settings");
+        check(saved.GetProperty("speechVoice").GetString() == "custom_voice" && AppSettings.Load(user) is { SpeechProvider: "elevenlabs", SpeechVoiceName: "自定义声线" },
+            "a manual ElevenLabs Voice ID is saved with its display name");
+        check(!client.Echoed(key) && !Directory.EnumerateFiles(user, "*", SearchOption.AllDirectories).Any(f => File.ReadAllText(f).Contains(key)),
+            "speech keys are never returned, published or written to the user folder");
+    }
+
+    private static string? SpeechError(JsonElement response) =>
+        response.TryGetProperty("error", out var error) && error.GetProperty("code").GetString() == "speech_failed" ? error.GetProperty("message").GetString() : null;
 
     private static async Task<(int Exit, string[] Lines, string Errors)> RunHost(string assembly, string[] arguments, string[] requests)
     {
@@ -162,6 +251,7 @@ internal static class HostChecks
         private readonly Channel<string?> requests = Channel.CreateUnbounded<string?>();
         private readonly ConcurrentDictionary<int, TaskCompletionSource<JsonElement>> waiting = new();
         private readonly List<JsonElement> views = [];
+        private readonly ConcurrentQueue<string> lines = new();
         private int next;
         public LineReader Input { get; }
         public LineWriter Output { get; }
@@ -190,8 +280,11 @@ internal static class HostChecks
             throw new TimeoutException("FAIL: expected host view was not published");
         }
 
+        public bool Echoed(string value) => lines.Any(l => l.Contains(value));
+
         private void Receive(string line)
         {
+            lines.Enqueue(line);
             var message = JsonDocument.Parse(line).RootElement.Clone();
             if (message.TryGetProperty("event", out _)) { lock (views) views.Add(message.GetProperty("data")); return; }
             if (message.GetProperty("id").ValueKind != JsonValueKind.Number) { lock (Orphans) Orphans.Add(message); return; }
@@ -225,6 +318,11 @@ internal static class HostChecks
         public override Task WriteAsync(string? value) { Write(value); return Task.CompletedTask; }
         public override Task WriteAsync(char value) { Write(value); return Task.CompletedTask; }
         public override Task FlushAsync() => Task.CompletedTask;
+    }
+
+    private sealed class SpeechHandler(Func<HttpRequestMessage, HttpResponseMessage> send) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) => Task.FromResult(send(request));
     }
 
     private sealed class NoNetwork : HttpMessageHandler

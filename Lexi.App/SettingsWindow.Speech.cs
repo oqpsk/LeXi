@@ -59,6 +59,7 @@ public sealed partial class SettingsWindow
         AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
         var playback = new SpeechPlayback(App.UserRoot);
         var metadata = speechMetadata ?? new SpeechClient();
+        var accountVoices = new SpeechAudio(App.UserRoot, metadata);
         CancellationTokenSource? voiceRequest = null;
         bool playing = false, closed = false, updating = false;
         int generation = 0, voiceGeneration = 0;
@@ -139,15 +140,14 @@ public sealed partial class SettingsWindow
             loadingVoices = true; load.IsEnabled = false; voiceStatus.Text = "正在读取可用声线…";
             try
             {
-                if (!settings.Online) throw new InvalidOperationException("请先开启在线补充，再读取声线列表。");
-                var loaded = await metadata.ElevenVoicesAsync(SuppliedKey("elevenlabs") ?? secrets.Read("elevenlabs"), token);
+                var loaded = await accountVoices.ElevenVoicesAsync(settings.Online, SuppliedKey("elevenlabs") ?? secrets.Read("elevenlabs"), token);
                 if (closed || request != voiceGeneration || token.IsCancellationRequested) return;
                 elevenVoices = loaded; UpdateElevenChoices();
                 voiceStatus.Text = loaded.Length > 0 ? $"已读取 {loaded.Length} 条可用声线，请选择后试听。" : "账号未返回可用声线，可手动填写 Voice ID。";
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or HttpRequestException or TimeoutException or System.ComponentModel.Win32Exception)
-            { if (!closed && request == voiceGeneration) voiceStatus.Text = ex is HttpRequestException ? "无法连接 ElevenLabs，请检查网络后重试。" : ex.Message; }
+            { if (!closed && request == voiceGeneration) voiceStatus.Text = ex.Message; }
             finally { if (!closed && request == voiceGeneration) { loadingVoices = false; load.IsEnabled = true; } }
         }
         voice.Discover = LoadVoicesAsync;

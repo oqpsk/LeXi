@@ -155,8 +155,44 @@ public final class LexiStore {
         return try? await client.callOptional("connection.loginCommand", ["provider": provider], as: LoginCommand.self)
     }
 
+    // ---- Speech ----
+    public var speechSelection: SpeechSelection {
+        let settings = settings?.settings
+        return SpeechSelection(provider: settings?.speechProvider ?? "", model: settings?.speechModel ?? "", voice: settings?.speechVoice ?? "")
+    }
+    public func speechModels() async -> [SpeechModel] {
+        (try? await client?.call("speech.models") as SpeechModels?)?.models ?? []
+    }
+    public func speechVoices(provider: String, model: String) async -> [SpeechVoice] {
+        (try? await client?.call("speech.voices", ["provider": provider, "model": model]) as SpeechVoices?)?.voices ?? []
+    }
+    // The key is the one typed in settings or read from the Keychain; the host does not keep it.
+    public func elevenVoices(key: String) async throws -> [SpeechVoice] {
+        guard let client else { throw HostError.exited }
+        return try await client.call("speech.elevenVoices", ["key": key], as: SpeechVoices.self).voices
+    }
+    public func cachedSpeech(_ text: String, _ selection: SpeechSelection) async throws -> SpeechCache {
+        guard let client else { throw HostError.exited }
+        return try await client.call("speech.cached", SpeechRequest(text: text, selection, key: nil))
+    }
+    public func synthesize(_ text: String, _ selection: SpeechSelection, key: String) async throws -> String {
+        guard let client else { throw HostError.exited }
+        return try await client.call("speech.synthesize", SpeechRequest(text: text, selection, key: key), as: SpeechFile.self).path
+    }
+
     private struct Submit: Encodable, Sendable { let text: String; let force: Bool; let scroll: Double }
     private struct Navigate: Encodable, Sendable { let direction: Int; let scroll: Double }
     private struct Scroll: Encodable, Sendable { let scroll: Double }
     private struct RemoveHistory: Encodable, Sendable { let query: String; let translation: Bool }
+    private struct SpeechModels: Decodable, Sendable { let models: [SpeechModel] }
+    private struct SpeechVoices: Decodable, Sendable { let voices: [SpeechVoice] }
+    private struct SpeechFile: Decodable, Sendable { let path: String }
+    private struct SpeechRequest: Encodable, Sendable {
+        let text: String, provider: String, model: String, voice: String, key: String?
+        init(text: String, _ selection: SpeechSelection, key: String?) {
+            self.text = text; provider = selection.provider; model = selection.model; voice = selection.voice; self.key = key
+        }
+    }
 }
+
+extension LexiStore: SpeechService {}

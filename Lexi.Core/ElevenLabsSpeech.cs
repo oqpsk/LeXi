@@ -6,6 +6,7 @@ namespace Lexi.Core;
 
 public sealed partial class SpeechClient
 {
+    private const string ElevenUnreachable = "无法连接 ElevenLabs，请检查网络后重试。";
     // Official speech and voice-list endpoints; keys never appear in URLs.
     private static HttpRequestMessage ElevenRequest(string text, SpeechOptions options, string apiKey)
     {
@@ -25,6 +26,7 @@ public sealed partial class SpeechClient
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         { throw new TimeoutException("读取 ElevenLabs 声线超时，请重试。"); }
         catch (JsonException) { throw new InvalidDataException("ElevenLabs 声线列表格式不完整，请重试。"); }
+        catch (Exception e) when (e is HttpRequestException or IOException) { throw new InvalidOperationException(ElevenUnreachable, e); }
     }
 
     private async Task<SpeechVoice[]> ReadElevenVoicesAsync(string apiKey, CancellationToken token)

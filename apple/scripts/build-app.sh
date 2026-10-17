@@ -36,9 +36,12 @@ cp "$root/LICENSE" "$root/THIRD_PARTY_NOTICES.md" "$app/Contents/Resources/"
 cp -R "$root/licenses" "$app/Contents/Resources/licenses"
 
 # Ad-hoc signature for running on this Mac. Distribution needs a Developer ID signature,
-# the hardened runtime and notarization (apple/README.md).
-codesign --force --sign - "$app/Contents/Helpers/lexi-host"
-codesign --force --sign - "$app"
+# the hardened runtime and notarization (apple/README.md). The keychain treats every ad-hoc build
+# as a new app, so speech keys must be saved again after a rebuild; LEXI_SIGN_IDENTITY (for example
+# an "Apple Development" certificate) keeps one identity across rebuilds.
+identity=${LEXI_SIGN_IDENTITY:--}
+codesign --force --sign "$identity" "$app/Contents/Helpers/lexi-host"
+codesign --force --sign "$identity" "$app"
 # A bundle rebuilt at the same path can keep a stale LaunchServices record, so `open` would not start it.
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$app"
 echo "Built $app ($version, $arch)"

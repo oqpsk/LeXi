@@ -1,6 +1,6 @@
 # Lexi.Host 协议
 
-`lexi-host` 把 `Lexi.Core` 的查询、翻译、建议、历史与设置提供给原生前端（目前是 macOS 应用）。前端不重新实现查询逻辑，只渲染 Host 发来的视图。
+`lexi-host` 把 `Lexi.Core` 的查询、翻译、建议、历史、设置与在线发音提供给原生前端（目前是 macOS 应用）。前端不重新实现查询逻辑，只渲染 Host 发来的视图。
 
 ## 启动
 
@@ -27,7 +27,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 {"id": 8, "error": {"code": "invalid_settings", "message": "请选择两个不同的查询模型。"}}
 ```
 
-错误代码：`parse_error`、`invalid_request`、`method_not_found`、`invalid_params`、`invalid_settings`（`message` 可直接显示）、`cancelled`、`internal_error`（只包含错误类别）。无法确定 `id` 的错误使用 `"id": null`。
+错误代码：`parse_error`、`invalid_request`、`method_not_found`、`invalid_params`、`invalid_settings` 与 `speech_failed`（`message` 是 Core 的中文提示，可直接显示）、`cancelled`、`internal_error`（只包含错误类别）。无法确定 `id` 的错误使用 `"id": null`。
 
 查询状态通过事件推送，每次 Core 发布新视图时发送一条：
 
@@ -52,13 +52,24 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `history.list` | — | `{entries: [{query, translation, queriedAt, preview, kind}], error}` |
 | `history.remove` | `query`、`translation` | `{removed, history}` |
 | `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |
-| `settings.update` | `settings`（只含要修改的字段） | 与 Windows 设置相同的校验，保存后返回 `settings.get` 的内容 |
+| `settings.update` | `settings`（只含要修改的字段） | 与 Windows 设置相同的校验（修改 `speech*` 字段时也校验发声模型与声线），保存后返回 `settings.get` 的内容 |
 | `settings.setOnline` | `online` | 切换在线补充并返回设置 |
 | `dictionaries.list` | — | `{dictionaries, folder}` |
 | `connection.status` | `provider`（`codex` 或 `claude`），可选 `codexPath` | `{installed, signedIn, message}`，只含经过清理的摘要 |
 | `connection.loginCommand` | `provider`，可选 `codexPath` | `{fileName, arguments, path, clearEnvironment}` 或 `null`。前端仅在用户点击后在终端中运行，并清除 `clearEnvironment` 中的变量 |
+| `speech.models` | — | `{models: [{provider, id, name, local}]}`；第一项是本机系统声线（`local` 为 `true`），其余为在线模型 |
+| `speech.voices` | `provider`、`model` | `{voices: [{id, name}]}`：该模型的在线声线；本机声线由前端从系统读取，这里为空 |
+| `speech.elevenVoices` | 可选 `key` | `{voices}`：ElevenLabs 账号可用声线。离线模式下不发请求 |
+| `speech.cached` | `text`、`provider`、`model`、`voice` | 按 Windows 规则校验文字与声线，返回 `{path, local}`：已缓存的音频文件路径或 `null`。`local` 为 `true` 时由前端用系统声线朗读。不生成音频 |
+| `speech.synthesize` | `text`、`provider`、`model`、`voice`，可选 `key` | `{path}`：缓存中的 MP3 路径，缺失时用在线服务生成。已缓存时不需要 `key`；离线模式下缺失则返回“离线模式下没有此声线的缓存发音。” |
 | `cancel` | `id` | 取消仍在运行的请求，`{cancelled}` |
 | `shutdown` | — | 等待其余请求结束后最后响应，然后退出 |
+
+## 发音
+
+发音只在用户点击后请求。音频保存在用户数据目录的 `speech-cache`，每段文字、服务、模型和声线各有一个文件（`SpeechOptions.CacheKey`），写完整后才出现，与 Windows 共用同一份 `SpeechAudio`。前端播放返回的文件；本机系统声线由前端直接朗读，不经过缓存。
+
+在线服务的 API Key 由前端从系统的安全存储读取，只随需要它的那一次请求传入。Host 不保存、不记录、不在响应或事件中返回密钥，`speech_failed` 的提示也不包含密钥或服务返回的原文。
 
 ## 兼容
 

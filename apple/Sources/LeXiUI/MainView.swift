@@ -1,3 +1,4 @@
+import AppKit
 import LeXiKit
 import SwiftUI
 
@@ -15,9 +16,11 @@ public struct MainView: View {
     @State private var speech = SpeechController()
     @State private var text = ""
     @State private var programmatic = false
+    @State private var cursor = SuggestionCursor()
     @State private var position = ScrollPosition(edge: .top)
     @State private var offset: CGFloat = 0
     @FocusState private var searchFocused: Bool
+    @Environment(\.appearsActive) private var appearsActive
 
     public init(store: LexiStore) { self.store = store }
 
@@ -25,13 +28,22 @@ public struct MainView: View {
         // Apple's layering: results are the content; the query capsule, the bottom controls and
         // the toolbar are Liquid Glass floating above them, with soft scroll edges.
         ScrollView {
-            content.padding(.horizontal, 24).padding(.vertical, 12)
+            // Full width even when the page is narrow (an empty history), so the scroll area and
+            // the suggestion list line up with the query bar.
+            content.padding(.horizontal, 24).padding(.vertical, 12).frame(maxWidth: .infinity)
         }
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, value in offset = value }
         .scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
+        // Within the safe area, so it starts just below the query bar and floats over the results.
+        .overlay(alignment: .topLeading) {
+            if searchFocused && !store.suggestions.isEmpty {
+                SuggestionList(words: store.suggestions, selection: cursor.selection, pick: pickSuggestion)
+                    .padding(.leading, 20).offset(y: -4)
+            }
+        }
         .safeAreaBar(edge: .top) {
-            SearchBar(store: store, text: $text, programmatic: $programmatic, focused: $searchFocused, submit: submit)
+            SearchBar(store: store, text: $text, programmatic: $programmatic, cursor: $cursor, focused: $searchFocused, submit: submit)
                 .padding(.horizontal, 20).padding(.top, 2).padding(.bottom, 10)
         }
         .safeAreaBar(edge: .bottom) { bottomBar }
@@ -40,10 +52,12 @@ public struct MainView: View {
         .navigationTitle("LeXi")
         .frame(minWidth: 540, minHeight: 420)
         .onChange(of: store.view.request) { _, _ in pageChanged() }
+        .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
         .focusedSceneValue(\.lexiActions, LexiActions(back: { navigate(-1) }, forward: { navigate(1) }, home: goHome,
-            regenerate: regenerate, focusSearch: { searchFocused = true },
+            regenerate: regenerate, focusSearch: focusSearch,
             canBack: store.view.navigation.canBack, canForward: store.view.navigation.canForward, canRegenerate: canRegenerate))
-        .onAppear { searchFocused = true }
+        .defaultFocus($searchFocused, true)
+        .onChange(of: appearsActive, initial: true) { _, active in if active { focusSearch() } }
     }
 
     @ViewBuilder private var content: some View {
@@ -64,14 +78,17 @@ public struct MainView: View {
     private var online: Bool { store.settings?.settings.online ?? true }
     private var canRegenerate: Bool { store.view.kind != .home && store.view.canRegenerate && online }
 
+    // Speech messages share the status line with the query, as in the Windows status bar; the newer one shows.
+    private var status: String { speech.status.isEmpty ? store.view.status : speech.status }
+
     // Status on the leading side; regeneration and the online mode as grouped glass controls.
     private var bottomBar: some View {
         HStack(spacing: 12) {
-            Text(store.view.status)
+            Text(status)
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)
-                .help(store.view.status)
-                .accessibilityLabel("查询状态：" + store.view.status)
+                .help(status)
+                .accessibilityLabel("查询状态：" + status)
             Spacer(minLength: 8)
             GlassEffectContainer(spacing: 8) {
                 HStack(spacing: 8) {
@@ -112,6 +129,21 @@ public struct MainView: View {
     }
 
     private func setText(_ value: String) { if text != value { programmatic = true; text = value } }
+
+    // As on Windows, the query is ready whenever the window comes forward or ⌘L is pressed: the
+    // cursor is in it with the last query selected, so the next word simply replaces it.
+    private func focusSearch() {
+        searchFocused = true
+        DispatchQueue.main.async { (NSApp.keyWindow?.firstResponder as? NSTextView)?.selectAll(nil) }
+    }
+
+    private func pickSuggestion(_ index: Int) {
+        guard index < store.suggestions.count else { return }
+        cursor = SuggestionCursor()
+        setText(store.suggestions[index])
+        store.clearSuggestions()
+        searchFocused = true
+    }
 
     private func submit(_ value: String) {
         guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

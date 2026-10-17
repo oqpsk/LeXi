@@ -27,11 +27,13 @@ swift build --package-path apple               # 只编译 Swift
 LEXI_HOST="$PWD/.cache/host-publish/lexi-host" swift test --package-path apple
 ```
 
-- `LeXiKit`：协议模型、`HostClient`（启动 Host、按 id 匹配响应、按顺序转交视图、取消请求）与 `LexiStore`（丢弃旧版本视图，保存每次查询的展开状态）。
+- `LeXiKit`：协议模型、`HostClient`（启动 Host、按 id 匹配响应、按顺序转交视图、取消请求）、`LexiStore`（丢弃旧版本视图，保存每次查询的展开状态）与发音接口（`speech.*` 调用、钥匙串中的语音密钥）。
 - `LeXiUI`：SwiftUI 界面，采用 Apple 设计语言：Liquid Glass 查询胶囊、工具栏与底部控件浮在结果之上，结果位于连续圆角的分组区域；颜色使用系统颜色与强调色，粉色只用于 TL;DR。设置窗口沿用系统设置的分组表单。
 - `LeXi`：应用入口、菜单命令与设置窗口。
 
-测试使用 `host-check` 生成的真实 Host 输出（`Tests/LeXiKitTests/Fixtures/views.json`），并在提供 `LEXI_HOST` 或已存在 `.cache/host-publish/lexi-host` 时，用离线测试词库启动真实 Host。界面检查只在内存中布局结果视图，不显示窗口、不模拟输入、不截屏。Core 的视图字段变化后，用下面的命令重新生成样例：
+`SpeechController` 负责发音：先请 Core 校验文字与声线并查找缓存，本机声线直接用 `AVSpeechSynthesizer` 朗读，在线声线播放 Host 返回的 MP3（`AVAudioPlayer`），缺失时才从钥匙串读取密钥并请求生成。
+
+测试使用 `host-check` 生成的真实 Host 输出（`Tests/LeXiKitTests/Fixtures/views.json`），并在提供 `LEXI_HOST` 或已存在 `.cache/host-publish/lexi-host` 时，用离线测试词库启动真实 Host。界面检查只在内存中布局结果视图，不显示窗口、不模拟输入、不截屏。发音检查使用合成的 Host 与密钥存储，不播放声音、不访问在线服务；写入登录钥匙串的往返检查默认跳过，可用 `LEXI_KEYCHAIN_TESTS=1` 开启，它只写入并删除带随机名称的虚构条目。Core 的视图字段变化后，用下面的命令重新生成样例：
 
 ```bash
 dotnet Lexi.Tools/bin/Release/net10.0/Lexi.Tools.dll host-check .cache/test-dictionary .cache/host-checks Lexi.Host/bin/Release/net10.0/lexi-host.dll apple/Tests/LeXiKitTests/Fixtures/views.json
@@ -41,4 +43,4 @@ dotnet Lexi.Tools/bin/Release/net10.0/Lexi.Tools.dll host-check .cache/test-dict
 
 ## 数据与权限
 
-用户数据、缓存和词库位于 `~/Library/Application Support/LeXi`（词库在其中的 `data`）。应用不使用沙盒：它需要启动本机已安装的官方 Codex / Claude Code 客户端，这些客户端自行管理登录。登录在“终端”中运行官方命令，LeXi 不读取令牌或一次性验证码。
+用户数据、缓存和词库位于 `~/Library/Application Support/LeXi`（词库在其中的 `data`，在线发音缓存在 `speech-cache`）。OpenAI、Grok 与 ElevenLabs 的 API Key 由用户在“设置 → 发音”中填写，存入当前用户登录钥匙串的通用密码（服务名 `io.github.oqpsk.lexi.speech`）；新条目的访问控制只信任 LeXi，不同步到 iCloud。钥匙串把每次重新构建的临时签名应用当作新应用，可能不再允许它读取之前保存的密钥；这时在“设置 → 发音”重新粘贴并保存一次即可，保存会替换旧条目。若要在重新构建后继续使用已保存的密钥，用固定的签名身份构建，例如 `LEXI_SIGN_IDENTITY="Apple Development" apple/scripts/build-app.sh`（`security find-identity -v -p codesigning` 列出可用身份）。应用不使用沙盒：它需要启动本机已安装的官方 Codex / Claude Code 客户端，这些客户端自行管理登录。登录在“终端”中运行官方命令，LeXi 不读取令牌或一次性验证码。

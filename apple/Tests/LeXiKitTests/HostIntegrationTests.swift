@@ -34,6 +34,38 @@ struct HostIntegration {
         await store.stop()
     }
 
+    // Offline, so no request can leave the machine: every online speech answer comes from Core's rules.
+    @Test func speechThroughTheHost() async throws {
+        let (store, user) = try launch()
+        await store.start(executable: Fixture.host!, arguments: ["--data", Fixture.dictionary!.path, "--user", user.path])
+        let models = await store.speechModels()
+        #expect(models.first == SpeechModel(provider: "macos", id: "avspeech", name: "macOS 本地发音", local: true))
+        #expect(models.filter { $0.provider == "elevenlabs" }.count == 5 && models.dropFirst().allSatisfy { !$0.local })
+        #expect(store.speechSelection == SpeechSelection(provider: "macos", model: "avspeech", voice: "auto"))
+        #expect(await store.speechVoices(provider: "openai", model: "gpt-4o-mini-tts").count == 13)
+        #expect(await store.speechVoices(provider: "macos", model: "avspeech").isEmpty)
+        #expect(try await store.cachedSpeech("你好", store.speechSelection) == SpeechCache(path: nil, local: true))
+
+        let coral = SpeechSelection(provider: "openai", model: "gpt-4o-mini-tts", voice: "coral")
+        #expect(try await store.cachedSpeech("word", coral) == SpeechCache(path: nil, local: false))
+        await #expect(throws: HostError(code: "speech_failed", message: "离线模式下没有此声线的缓存发音。")) {
+            _ = try await store.synthesize("word", coral, key: "synthetic")
+        }
+        await #expect(throws: HostError(code: "speech_failed", message: "请先开启在线补充，再读取声线列表。")) {
+            _ = try await store.elevenVoices(key: "synthetic")
+        }
+        await #expect(throws: HostError(code: "speech_failed", message: "请在设置中选择这个模型支持的声线。")) {
+            _ = try await store.cachedSpeech("word", SpeechSelection(provider: "openai", model: "tts-1", voice: "marin"))
+        }
+        #expect(await store.update(["speechProvider": .string("openai"), "speechModel": .string("tts-1"), "speechVoice": .string("marin")])
+            == "请在设置中选择这个模型支持的声线。")
+        #expect(await store.update(["speechProvider": .string("elevenlabs"), "speechModel": .string("eleven_v3"),
+                                    "speechVoice": .string("custom_voice"), "speechVoiceName": .string("自定义声线")]) == nil)
+        #expect(store.speechSelection == SpeechSelection(provider: "elevenlabs", model: "eleven_v3", voice: "custom_voice"))
+        #expect(store.settings?.settings.speechVoiceName == "自定义声线")
+        await store.stop()
+    }
+
     @Test func reportsProtocolErrorsAndCancellation() async throws {
         let (_, user) = try launch()
         let client = HostClient(executable: Fixture.host!, arguments: ["--data", Fixture.dictionary!.path, "--user", user.path]) { _ in }

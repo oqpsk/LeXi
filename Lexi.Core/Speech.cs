@@ -17,16 +17,21 @@ public sealed record SpeechOptions(string Provider, string Model, string Voice)
 
 public static class SpeechCatalog
 {
-    public static SpeechModel[] Models => [new("windows", "sapi", "Windows 本地发音"), new("openai", "gpt-4o-mini-tts", "OpenAI · GPT-4o mini TTS"),
+    // Local synthesis belongs to each front end: Windows SAPI voices or macOS system voices.
+    public static SpeechModel Local { get; } = OperatingSystem.IsMacOS() ? new("macos", "avspeech", "macOS 本地发音") : new("windows", "sapi", "Windows 本地发音");
+    public static bool IsLocal(string provider) => provider == Local.Provider;
+    public static SpeechModel[] Models => [Local, new("openai", "gpt-4o-mini-tts", "OpenAI · GPT-4o mini TTS"),
         new("openai", "tts-1", "OpenAI · TTS-1"), new("openai", "tts-1-hd", "OpenAI · TTS-1 HD"), new("xai", "grok-tts", "Grok · TTS"),
         new("elevenlabs", "eleven_flash_v2_5", "ElevenLabs · Flash v2.5 · 快速"),
         new("elevenlabs", "eleven_multilingual_v2", "ElevenLabs · Multilingual v2"),
         new("elevenlabs", "eleven_v3", "ElevenLabs · Eleven v3"),
         new("elevenlabs", "eleven_v4", "ElevenLabs · Eleven v4"),
         new("elevenlabs", "eleven_v4_turbo", "ElevenLabs · Eleven v4 Turbo")];
+    // Online catalog voices. Local voices come from the operating system.
     public static SpeechVoice[] Voices(string provider, string model)
     {
         if (provider == "elevenlabs") return [new("JBFqnCBsd6RMkjVDRZzb", "George")];
+        if (provider is not ("openai" or "xai")) return [];
         var ids = provider == "xai" ? new[] { "eve", "ara", "leo", "rex", "sal" } :
             model == "gpt-4o-mini-tts" ? ["coral", "alloy", "ash", "ballad", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "marin", "cedar"] :
             new[] { "alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer" };
@@ -42,8 +47,14 @@ public static class SpeechCatalog
         if (!Models.Any(m => m.Provider == options.Provider && m.Id == options.Model)) throw new InvalidOperationException("请在设置中重新选择发声模型。");
         if (options.Provider == "elevenlabs" && !ValidElevenVoice(options.Voice))
             throw new InvalidOperationException("请选择 ElevenLabs 声线，或填写有效的 Voice ID。");
-        if (options.Provider is not ("windows" or "elevenlabs") && !Voices(options.Provider, options.Model).Any(v => v.Id == options.Voice))
+        if (!IsLocal(options.Provider) && options.Provider != "elevenlabs" && !Voices(options.Provider, options.Model).Any(v => v.Id == options.Voice))
             throw new InvalidOperationException("请在设置中选择这个模型支持的声线。");
+    }
+    // Local synthesis saved on the other platform stays local here; its voice IDs belong to that system.
+    public static void AdoptLocal(AppSettings settings)
+    {
+        if (settings.SpeechProvider is not ("windows" or "macos") || IsLocal(settings.SpeechProvider)) return;
+        settings.SpeechProvider = Local.Provider; settings.SpeechModel = Local.Id; settings.SpeechVoice = "auto"; settings.SpeechVoiceName = "";
     }
 }
 
@@ -77,6 +88,9 @@ public sealed partial class SpeechClient : IDisposable
         timeout.CancelAfter(TimeSpan.FromSeconds(35));
         try { return await ReceiveAsync(text, options, apiKey, timeout.Token); }
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { throw new TimeoutException("语音生成超时，请重试。"); }
+        // Transport messages are platform-localized and may name hosts; every front end shows the same wording.
+        catch (Exception e) when (e is HttpRequestException or IOException)
+        { throw new InvalidOperationException(options.Provider == "elevenlabs" ? ElevenUnreachable : "无法连接语音服务，请检查网络后重试。", e); }
     }
     private async Task<byte[]> ReceiveAsync(string text, SpeechOptions options, string apiKey, CancellationToken token)
     {

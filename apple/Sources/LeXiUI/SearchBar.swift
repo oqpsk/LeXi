@@ -2,6 +2,13 @@ import AppKit
 import LeXiKit
 import SwiftUI
 
+// The suggestion the arrow keys are previewing, and what was typed before the preview started.
+public struct SuggestionCursor: Equatable {
+    var selection: Int?
+    var draft: String?
+    public init() {}
+}
+
 // One multi-line input for words, phrases and text; Lexi.Core decides lookup or translation.
 // Return searches, Shift-Return (or the standard Option-Return) adds a line. Arrow keys preview suggestions without searching,
 // Tab or a click accepts one for editing, Escape restores what was typed.
@@ -10,13 +17,13 @@ public struct SearchBar: View {
     @Binding var text: String
     // Set before changing the text from outside (a new page's query) so it is not treated as typing.
     @Binding var programmatic: Bool
+    @Binding var cursor: SuggestionCursor
     var focused: FocusState<Bool>.Binding
     let submit: (String) -> Void
-    @State private var selection: Int?
-    @State private var draft: String?
 
-    public init(store: LexiStore, text: Binding<String>, programmatic: Binding<Bool>, focused: FocusState<Bool>.Binding, submit: @escaping (String) -> Void) {
-        self.store = store; self._text = text; self._programmatic = programmatic; self.focused = focused; self.submit = submit
+    public init(store: LexiStore, text: Binding<String>, programmatic: Binding<Bool>, cursor: Binding<SuggestionCursor>,
+                focused: FocusState<Bool>.Binding, submit: @escaping (String) -> Void) {
+        self.store = store; self._text = text; self._programmatic = programmatic; self._cursor = cursor; self.focused = focused; self.submit = submit
     }
 
     public var body: some View {
@@ -52,23 +59,72 @@ public struct SearchBar: View {
         .padding(.horizontal, 18).padding(.vertical, 12)
         // A Spotlight-like capsule that grows into a rounded rectangle for multi-line text.
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24, style: .continuous))
-        .overlay(alignment: .bottomLeading) {
-            // Hangs below the bar however many lines the input has; only while typing in it.
-            if focused.wrappedValue && !store.suggestions.isEmpty {
-                suggestionList.alignmentGuide(.bottom) { $0[.top] }.offset(y: 6)
-            }
-        }
-        .zIndex(1)
     }
 
     private static var composing: Bool {
         (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
     }
 
-    private var suggestionList: some View {
+    // Real edits start a fresh candidate list; previews keep the original list intact.
+    private func edited(_ value: String) {
+        if programmatic { programmatic = false; return }
+        cursor = SuggestionCursor()
+        if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            store.clearSuggestions()
+            if store.view.kind != .home { Task { await store.home() } }
+            return
+        }
+        Task { await store.suggest(value) }
+    }
+
+    private func setText(_ value: String) { if text != value { programmatic = true; text = value } }
+
+    private func move(_ direction: Int) -> Bool {
+        guard !store.suggestions.isEmpty else { return false }
+        let next = (cursor.selection ?? -1) + direction
+        if next < 0 {
+            if let draft = cursor.draft { setText(draft) }
+            cursor = SuggestionCursor()
+        } else {
+            if cursor.draft == nil { cursor.draft = text }
+            let selection = min(next, store.suggestions.count - 1)
+            cursor.selection = selection
+            setText(store.suggestions[selection])
+        }
+        return true
+    }
+
+    @discardableResult private func accept() -> Bool {
+        guard let selection = cursor.selection, selection < store.suggestions.count else { return false }
+        setText(store.suggestions[selection])
+        dismiss(restore: false)
+        return true
+    }
+
+    @discardableResult private func dismiss(restore: Bool) -> Bool {
+        guard !store.suggestions.isEmpty else { return false }
+        if restore, let draft = cursor.draft { setText(draft) }
+        cursor = SuggestionCursor()
+        store.clearSuggestions()
+        return true
+    }
+}
+
+// The candidates under the query bar while typing in it. The page places it in the content area
+// just below the bar, outside the bar's own layout, so it always hangs down over the results.
+public struct SuggestionList: View {
+    let words: [String]
+    let selection: Int?
+    let pick: (Int) -> Void
+
+    public init(words: [String], selection: Int?, pick: @escaping (Int) -> Void) {
+        self.words = words; self.selection = selection; self.pick = pick
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(store.suggestions.enumerated()), id: \.offset) { index, word in
-                Button { selection = index; accept(); focused.wrappedValue = true } label: {
+            ForEach(Array(words.enumerated()), id: \.offset) { index, word in
+                Button { pick(index) } label: {
                     Text(word).font(LexiTheme.lexical(16)).frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(selection == index ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 10, style: .continuous))
@@ -83,50 +139,6 @@ public struct SearchBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("输入建议")
         .accessibilityHint("上下方向键预览，Tab 选用，Return 查询，Escape 还原")
-    }
-
-    // Real edits start a fresh candidate list; previews keep the original list intact.
-    private func edited(_ value: String) {
-        if programmatic { programmatic = false; return }
-        selection = nil; draft = nil
-        if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            store.clearSuggestions()
-            if store.view.kind != .home { Task { await store.home() } }
-            return
-        }
-        Task { await store.suggest(value) }
-    }
-
-    private func setText(_ value: String) { if text != value { programmatic = true; text = value } }
-
-    private func move(_ direction: Int) -> Bool {
-        guard !store.suggestions.isEmpty else { return false }
-        let next = (selection ?? -1) + direction
-        if next < 0 {
-            selection = nil
-            if let draft { setText(draft) }
-            draft = nil
-        } else {
-            if draft == nil { draft = text }
-            selection = min(next, store.suggestions.count - 1)
-            setText(store.suggestions[selection!])
-        }
-        return true
-    }
-
-    @discardableResult private func accept() -> Bool {
-        guard let selection, selection < store.suggestions.count else { return false }
-        setText(store.suggestions[selection])
-        dismiss(restore: false)
-        return true
-    }
-
-    @discardableResult private func dismiss(restore: Bool) -> Bool {
-        guard !store.suggestions.isEmpty else { return false }
-        if restore, let draft { setText(draft) }
-        selection = nil; draft = nil
-        store.clearSuggestions()
-        return true
     }
 }
 

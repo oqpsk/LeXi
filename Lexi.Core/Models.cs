@@ -79,8 +79,8 @@ public sealed class AppSettings
     public string SecondaryModel { get; set; } = "";
     public bool MergeSenses { get; set; } = true;
     public string JudgeModel { get; set; } = "gpt-6-luna";
-    public string SpeechProvider { get; set; } = "windows";
-    public string SpeechModel { get; set; } = "sapi";
+    public string SpeechProvider { get; set; } = SpeechCatalog.Local.Provider;
+    public string SpeechModel { get; set; } = SpeechCatalog.Local.Id;
     public string SpeechVoice { get; set; } = "auto";
     public string SpeechVoiceName { get; set; } = "";
     public AppSettings ForModel(LookupModel model)
@@ -92,7 +92,12 @@ public sealed class AppSettings
     }
     public static AppSettings Load(string root)
     {
-        try { return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(Path.Combine(root, "settings.json")), Json.Options) ?? new(); }
+        try
+        {
+            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(Path.Combine(root, "settings.json")), Json.Options) ?? new();
+            SpeechCatalog.AdoptLocal(settings);
+            return settings;
+        }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return new(); }
     }
     public void Save(string root)

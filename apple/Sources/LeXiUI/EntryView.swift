@@ -12,7 +12,7 @@ public struct EntryView: View {
         let view = store.view
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 10) {
-                HeadingRow(view: view, speech: speech)
+                HeadingRow(view: view, store: store, speech: speech)
                 if !view.wordForms.isEmpty { WordFormsView(rows: view.wordForms) }
             }
             if view.quickRead.visible { QuickReadCard(quickRead: view.quickRead) }
@@ -31,6 +31,7 @@ public struct EntryView: View {
 // The headword in the serif style of Apple's Dictionary, with pronunciation and actions beside it.
 struct HeadingRow: View {
     let view: QueryView
+    let store: LexiStore
     var speech: SpeechController
     @State private var showEtymology = false
 
@@ -56,7 +57,7 @@ struct HeadingRow: View {
             }
             HStack(spacing: 2) {
                 if !view.speechText.isEmpty {
-                    Button { speech.toggle(view.speechText) } label: {
+                    Button { speech.toggle(view.speechText, using: store) } label: {
                         Image(systemName: speech.speaking ? "stop.fill" : "speaker.wave.2.fill")
                     }
                     .help(speech.speaking ? "停止播放" : "播放合成发音")

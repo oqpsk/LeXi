@@ -15,7 +15,8 @@ public sealed class HostException(string code, string message) : Exception(messa
 
 // One JSON object per line in each direction (docs/host-protocol.md). Every request id gets
 // exactly one response; "view" events stream each QueryView the session publishes, in order.
-public sealed class HostServer(QuerySession session, TextReader input, TextWriter output)
+// speechClient replaces the online speech transport in offline checks.
+public sealed class HostServer(QuerySession session, TextReader input, TextWriter output, SpeechClient? speechClient = null)
 {
     public const int Protocol = 1;
     public const int MaxLine = 1 << 20;
@@ -29,6 +30,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
     private static readonly JsonElement NoParameters = JsonDocument.Parse("{}").RootElement.Clone();
     private readonly Channel<string> outgoing = Channel.CreateUnbounded<string>(new() { SingleReader = true });
     private readonly ConcurrentDictionary<string, CancellationTokenSource> running = new();
+    private readonly SpeechAudio speech = new(session.Paths.UserRoot, speechClient);
 
     public async Task RunAsync(CancellationToken token = default)
     {
@@ -57,6 +59,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             foreach (var request in running.Values) request.Cancel();
             await Task.WhenAll(handlers);
             session.Changed -= Publish;
+            speech.Dispose();
             if (shutdown != null) Reply(shutdown, new { });
             outgoing.Writer.TryComplete();
             await writer;
@@ -166,6 +169,23 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
                     path = info.Environment.TryGetValue("PATH", out var path) ? path ?? "" : "",
                     clearEnvironment = provider == "claude" ? ProviderConnection.ClaudeClearedVariables : [] };
             }
+            case "speech.models":
+                return new { models = SpeechCatalog.Models.Select(m => new { m.Provider, m.Id, m.Name, local = SpeechCatalog.IsLocal(m.Provider) }) };
+            case "speech.voices": return new { voices = SpeechCatalog.Voices(Text(p, "provider"), Text(p, "model")) };
+            // Keys arrive with each call from the front end's secure storage. The host never keeps,
+            // logs or returns them, and speech errors carry only Core's wording.
+            case "speech.elevenVoices":
+                return new { voices = await Speech(() => speech.ElevenVoicesAsync(session.Settings.Online, Text(p, "key", ""), token)) };
+            case "speech.cached":
+            {
+                var options = SpeechRequest(p);
+                return new { path = await Speech(() => Task.FromResult(speech.Cached(Text(p, "text"), options))), local = SpeechCatalog.IsLocal(options.Provider) };
+            }
+            case "speech.synthesize":
+            {
+                var key = Text(p, "key", "");
+                return new { path = await Speech(() => speech.OnlineAsync(Text(p, "text"), SpeechRequest(p), session.Settings.Online, () => key, null, token)) };
+            }
             case "cancel":
             {
                 if (!p.TryGetProperty("id", out var target) || target.ValueKind is not (JsonValueKind.Number or JsonValueKind.String))
@@ -198,6 +218,15 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
         };
     }
 
+    private static SpeechOptions SpeechRequest(JsonElement p) => new(Text(p, "provider"), Text(p, "model"), Text(p, "voice"));
+    private static async Task<T> Speech<T>(Func<Task<T>> run)
+    {
+        try { return await run(); }
+        catch (Exception e) when (e is InvalidOperationException or InvalidDataException or TimeoutException) { throw new HostException("speech_failed", e.Message); }
+        // File-system messages can contain local paths.
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { throw new HostException("speech_failed", SpeechAudio.StorageFailure); }
+    }
+
     // Applies only the named settings, validates the result as the Windows dialog does, then saves.
     private object UpdateSettings(JsonElement p)
     {
@@ -212,6 +241,12 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
         var candidate = merged.Deserialize<AppSettings>(Options) ?? throw new HostException("invalid_params", "settings must be an object.");
         candidate.DisabledDictionaries ??= [];
         if (ModelCatalog.Validate(candidate) is { } error) throw new HostException("invalid_settings", error);
+        // A speech choice is checked as the Windows dialog checks it before saving; other changes keep it as saved.
+        if (changes.EnumerateObject().Any(c => c.Name.StartsWith("speech", StringComparison.Ordinal)))
+        {
+            try { SpeechCatalog.Validate("test", SpeechOptions.From(candidate)); }
+            catch (InvalidOperationException e) { throw new HostException("invalid_settings", e.Message); }
+        }
         var previous = session.QuerySettingsIdentity();
         foreach (var property in typeof(AppSettings).GetProperties().Where(x => x.CanRead && x.CanWrite))
             property.SetValue(session.Settings, property.GetValue(candidate));
