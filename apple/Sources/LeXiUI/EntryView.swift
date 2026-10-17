@@ -55,7 +55,7 @@ struct HeadingRow: View {
                         .accessibilityLabel(view.pronunciation.labelAttribution)
                 }
             }
-            HStack(spacing: 2) {
+            HStack(spacing: 8) {
                 if !view.speechText.isEmpty {
                     Button { speech.toggle(view.speechText, using: store) } label: {
                         Image(systemName: speech.speaking ? "stop.fill" : "speaker.wave.2.fill")
