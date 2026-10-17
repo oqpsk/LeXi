@@ -89,11 +89,17 @@ public sealed partial class SpeechClient
             var bytes = await ReadMetadataAsync(response.Content, 32768, token);
             using var json = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 16 });
             if (json.RootElement.ValueKind == JsonValueKind.Object && json.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.Object)
+            {
                 code = ReadString(detail, "status");
+                if (code.Length == 0) code = ReadString(detail, "code");
+            }
         }
         catch (Exception e) when (e is JsonException or InvalidDataException) { }
         var message = code switch
         {
+            "api_key_id_used_as_api_key" => "填入的是 API Key ID。请在 ElevenLabs 创建密钥时复制完整的 Secret Key，替换此处内容后重试。",
+            "invalid_api_key" => "ElevenLabs API Key 无效，请复制完整密钥后重试。",
+            "model_not_supported" or "model_not_available" => "此 ElevenLabs 模型当前不可用，请选择账号支持的模型后重试。",
             "quota_exceeded" or "insufficient_credits" => "ElevenLabs 账号额度不足，请检查订阅中的可用额度。",
             "voice_not_found" or "voice_does_not_exist" => "此声线不可用，请重新加载声线或检查 Voice ID。",
             "model_not_found" or "invalid_model_id" => "此 ElevenLabs 模型暂不可用，请在设置中选择账号可用的模型。",
@@ -103,6 +109,7 @@ public sealed partial class SpeechClient
                 HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => "ElevenLabs 连接未通过，请检查 API Key、接口权限和账号访问资格。",
                 HttpStatusCode.NotFound => "ElevenLabs 模型或声线不可用，请检查模型和 Voice ID。",
                 HttpStatusCode.TooManyRequests => "ElevenLabs 请求过多或额度不足，请稍后重试。",
+                HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity => "ElevenLabs 拒绝了请求，请检查完整的 API Key、模型和声线是否可用（HTTP " + (int)response.StatusCode + "）。",
                 _ => $"ElevenLabs 暂不可用（HTTP {(int)response.StatusCode}）。"
             }
         };

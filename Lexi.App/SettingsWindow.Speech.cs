@@ -9,7 +9,7 @@ namespace Lexi;
 
 public sealed partial class SettingsWindow
 {
-    private Func<bool> AddSpeechTab(TabControl tabs, AppSettings settings)
+    private Func<bool> AddSpeechTab(TabControl tabs, AppSettings settings, SpeechClient? speechMetadata)
     {
         var panel = new StackPanel { Margin = new(2,4,8,10) };
         var tab = new TabItem { Header = "发音", Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = panel } };
@@ -17,11 +17,14 @@ public sealed partial class SettingsWindow
         panel.Children.Add(Text("发声模型", 18));
         var model = new ComboBox { ItemsSource = SpeechCatalog.Models, Margin = new(0,0,0,16) };
         panel.Children.Add(model); panel.Children.Add(Text("声线"));
-        var voice = new ComboBox { Margin = new(0,0,0,14) }; panel.Children.Add(voice);
+        var voice = new SpeechVoicePicker { Style = (Style)FindResource(typeof(ComboBox)), Margin = new(0,0,0,8) }; panel.Children.Add(voice);
+        var voiceStatus = Text("", 13, Muted); panel.Children.Add(voiceStatus);
+        AutomationProperties.SetName(voiceStatus, "声线连接状态");
+        AutomationProperties.SetLiveSetting(voiceStatus, AutomationLiveSetting.Polite);
         var eleven = new StackPanel { Visibility = Visibility.Collapsed };
         var buttons = new WrapPanel();
-        var load = ConnectionButton("加载我的声线");
-        AutomationProperties.SetName(load, "加载 ElevenLabs 账号声线");
+        var load = ConnectionButton("刷新声线列表");
+        AutomationProperties.SetName(load, "刷新 ElevenLabs 可用声线列表");
         var apiPage = ConnectionButton("获取 API Key ↗");
         apiPage.Click += (_, _) => Open("https://elevenlabs.io/app/developers/api-keys");
         buttons.Children.Add(load); buttons.Children.Add(apiPage); eleven.Children.Add(buttons);
@@ -42,6 +45,7 @@ public sealed partial class SettingsWindow
                 BorderBrush = Theme.Brush("Stroke"), Padding = new(10,8,10,8), Margin = new(0,0,0,7),
                 ToolTip = "留空保留已有密钥；新密钥只在本机加密保存。" };
             group.Children.Add(input);
+            if (provider == "elevenlabs") group.Children.Add(Text("粘贴创建时复制的完整 Secret Key；API Key ID 无法用于连接。", 13, Muted));
             group.Children.Add(Text(secrets.HasSaved(provider) ? "已在本机保存密钥，留空保留。" : "尚未保存密钥，也可使用对应的 API Key 环境变量。", 13, Muted));
             var remove = new CheckBox { Content = "清除已保存的密钥", Margin = new(0,0,0,18) }; group.Children.Add(remove);
             fields.Add(provider, (input, remove));
@@ -54,12 +58,13 @@ public sealed partial class SettingsWindow
         var status = Text("", 14, Muted); status.Margin = new(0,10,0,0); panel.Children.Add(status);
         AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
         var playback = new SpeechPlayback(App.UserRoot);
-        var metadata = new SpeechClient();
+        var metadata = speechMetadata ?? new SpeechClient();
         CancellationTokenSource? voiceRequest = null;
         bool playing = false, closed = false, updating = false;
         int generation = 0, voiceGeneration = 0;
         string previousProvider = "";
-        SpeechVoice[] elevenVoices = [];
+        SpeechVoice[]? elevenVoices = null;
+        bool loadingVoices = false;
         SpeechVoice? lastEleven = settings.SpeechProvider == "elevenlabs" && SpeechCatalog.ValidElevenVoice(settings.SpeechVoice)
             ? new(settings.SpeechVoice, string.IsNullOrWhiteSpace(settings.SpeechVoiceName) ? "已保存的声线" : settings.SpeechVoiceName) : null;
         string? SuppliedKey(string provider) => fields[provider].Remove.IsChecked == true ? "" :
@@ -68,18 +73,19 @@ public sealed partial class SettingsWindow
         {
             if (model.SelectedItem is not SpeechModel selected) return;
             if (previousProvider == "elevenlabs") lastEleven = SpeechVoiceChoices.Pick("elevenlabs", voice.SelectedItem as SpeechVoice, "") ?? lastEleven;
-            voiceGeneration++; voiceRequest?.Cancel(); load.IsEnabled = true;
+            if (selected.Provider != previousProvider)
+            { voiceGeneration++; voiceRequest?.Cancel(); loadingVoices = false; load.IsEnabled = true; }
             generation++; playing = false; playback.Stop(); preview.Content = "试听";
             var available = selected.Provider == "windows" ? LocalSpeech.Voices() : selected.Provider == "elevenlabs"
                 ? SpeechVoiceChoices.Eleven(elevenVoices, lastEleven) : SpeechCatalog.Voices(selected.Provider, selected.Id);
-            if (available.Length == 0) available = [new("auto", "本机没有可用声线")];
+            if (available.Length == 0 && selected.Provider == "windows") available = [new("auto", "本机没有可用声线")];
             var preferred = selected.Provider == "elevenlabs" ? lastEleven?.Id :
                 selected.Provider == settings.SpeechProvider && selected.Id == settings.SpeechModel ? settings.SpeechVoice : null;
             updating = true;
             try
             {
                 voice.ItemsSource = available;
-                voice.SelectedItem = available.FirstOrDefault(v => v.Id == preferred) ?? available.First();
+                voice.SelectedItem = available.FirstOrDefault(v => v.Id == preferred) ?? available.FirstOrDefault();
                 if (previousProvider != selected.Provider) manual.Clear();
             }
             finally { updating = false; }
@@ -88,11 +94,15 @@ public sealed partial class SettingsWindow
             online.Visibility = selected.Provider == "windows" ? Visibility.Collapsed : Visibility.Visible;
             foreach (var (provider, group) in credentialPanels) group.Visibility = provider == selected.Provider ? Visibility.Visible : Visibility.Collapsed;
             if (selected.Provider == "elevenlabs") online.IsExpanded = true;
+            voiceStatus.Visibility = selected.Provider == "elevenlabs" ? Visibility.Visible : Visibility.Collapsed;
+            if (selected.Provider == "elevenlabs") voiceStatus.Text = elevenVoices == null
+                ? "展开列表即可读取账号可用声线；首次使用请先填好 API Key。"
+                : elevenVoices.Length > 0 ? $"已读取 {elevenVoices.Length} 条可用声线。" : "账号未返回可用声线，可手动填写 Voice ID。";
             info.Text = selected.Provider switch
             {
                 "windows" => "使用本机已安装的 Windows 声线，可离线生成；当前采用 SAPI 本地发音。",
                 "xai" => "Grok TTS 的模型由服务管理，可选择声线；使用单独的 API Key 与 API 额度。",
-                "elevenlabs" => "使用 ElevenLabs 账号额度。填好 API Key 后可加载账号声线；也可直接使用 George 试听。ElevenReader 套餐与此分开。",
+                "elevenlabs" => "使用 ElevenLabs 账号额度。展开声线列表可读取预置及已添加的声线，刷新列表不会生成音频。ElevenReader 套餐与此分开。",
                 _ => "使用 OpenAI 官方语音接口，声线随模型切换；API 额度与查词订阅分开。"
             };
         }
@@ -100,32 +110,48 @@ public sealed partial class SettingsWindow
         void InvalidateVoices()
         {
             if (closed) return;
-            voiceGeneration++; voiceRequest?.Cancel(); load.IsEnabled = true; elevenVoices = [];
-            if (model.SelectedItem is SpeechModel { Provider: "elevenlabs" }) { Choices(); status.Text = "连接信息已更改，请重新加载声线。"; }
+            voiceGeneration++; voiceRequest?.Cancel(); loadingVoices = false; load.IsEnabled = true; elevenVoices = null;
+            if (model.SelectedItem is SpeechModel { Provider: "elevenlabs" })
+            { Choices(); voiceStatus.Text = "连接信息已更改，展开列表可重新读取声线。"; }
         }
         fields["elevenlabs"].Input.PasswordChanged += (_, _) => InvalidateVoices();
         fields["elevenlabs"].Remove.Checked += (_, _) => InvalidateVoices();
         fields["elevenlabs"].Remove.Unchecked += (_, _) => InvalidateVoices();
         model.SelectionChanged += (_, _) => Choices();
         model.SelectedItem = ((SpeechModel[])model.ItemsSource).FirstOrDefault(m => m.Provider == settings.SpeechProvider && m.Id == settings.SpeechModel) ?? ((SpeechModel[])model.ItemsSource)[0];
-        load.Click += async (_, _) =>
+        void UpdateElevenChoices()
         {
-            if (model.SelectedItem is not SpeechModel { Provider: "elevenlabs" }) return;
-            voiceRequest?.Cancel(); voiceRequest?.Dispose(); voiceRequest = new();
-            var token = voiceRequest.Token; var request = ++voiceGeneration; load.IsEnabled = false; status.Text = "正在加载 ElevenLabs 声线…";
+            var preferred = (voice.SelectedItem as SpeechVoice)?.Id ?? lastEleven?.Id;
+            var available = SpeechVoiceChoices.Eleven(elevenVoices, lastEleven);
+            updating = true;
             try
             {
-                if (!settings.Online) throw new InvalidOperationException("请先开启在线补充，再加载账号声线。");
+                voice.ItemsSource = available;
+                voice.SelectedItem = available.FirstOrDefault(v => v.Id == preferred) ?? available.FirstOrDefault();
+            }
+            finally { updating = false; }
+        }
+        async Task LoadVoicesAsync(bool refresh)
+        {
+            if (closed || model.SelectedItem is not SpeechModel { Provider: "elevenlabs" } || loadingVoices || (!refresh && elevenVoices != null)) return;
+            voiceRequest?.Cancel(); voiceRequest?.Dispose(); voiceRequest = new();
+            var token = voiceRequest.Token; var request = ++voiceGeneration;
+            loadingVoices = true; load.IsEnabled = false; voiceStatus.Text = "正在读取可用声线…";
+            try
+            {
+                if (!settings.Online) throw new InvalidOperationException("请先开启在线补充，再读取声线列表。");
                 var loaded = await metadata.ElevenVoicesAsync(SuppliedKey("elevenlabs") ?? secrets.Read("elevenlabs"), token);
                 if (closed || request != voiceGeneration || token.IsCancellationRequested) return;
-                elevenVoices = loaded; Choices();
-                status.Text = loaded.Length > 0 ? $"已加载 {loaded.Length} 条可用声线，请选择后试听。" : "账号中暂无声线，可用 George 试听或手动填写 Voice ID。";
+                elevenVoices = loaded; UpdateElevenChoices();
+                voiceStatus.Text = loaded.Length > 0 ? $"已读取 {loaded.Length} 条可用声线，请选择后试听。" : "账号未返回可用声线，可手动填写 Voice ID。";
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or HttpRequestException or TimeoutException or System.ComponentModel.Win32Exception)
-            { if (!closed && request == voiceGeneration) status.Text = ex is HttpRequestException ? "无法连接 ElevenLabs，请检查网络后重试。" : ex.Message; }
-            finally { if (!closed && request == voiceGeneration) load.IsEnabled = true; }
-        };
+            { if (!closed && request == voiceGeneration) voiceStatus.Text = ex is HttpRequestException ? "无法连接 ElevenLabs，请检查网络后重试。" : ex.Message; }
+            finally { if (!closed && request == voiceGeneration) { loadingVoices = false; load.IsEnabled = true; } }
+        }
+        voice.Discover = LoadVoicesAsync;
+        load.Click += async (_, _) => await voice.DiscoverAsync(true);
         preview.Click += async (_, _) =>
         {
             if (playing) { generation++; playback.Stop(); playing = false; preview.Content = "试听"; status.Text = "已停止"; return; }

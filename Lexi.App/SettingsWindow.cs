@@ -12,7 +12,8 @@ public sealed partial class SettingsWindow : Window
     private static Brush Accent => Theme.Brush("Accent");
     private static TextBlock Text(string text, double size = 15, Brush? color = null) => new() { Text = text, FontSize = size, Foreground = color ?? Theme.Brush("Ink"), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,10) };
     private sealed record ModelChoice(string Label, string Id, string Provider = "codex") { public override string ToString() => Label; }
-    public SettingsWindow(AppSettings settings, InstalledDictionary[] installed)
+    public SettingsWindow(AppSettings settings, InstalledDictionary[] installed) : this(settings, installed, null) { }
+    internal SettingsWindow(AppSettings settings, InstalledDictionary[] installed, SpeechClient? speechMetadata)
     {
         Title = "LeXi 设置"; Width = 620; Height = 665; MinWidth = 540; MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -99,7 +100,7 @@ public sealed partial class SettingsWindow : Window
         }
         dictionaries.Children.Add(Text("取消勾选并保存即可停用，词库文件会保留。", 14,Muted));
         dictionaries.Children.Add(Text("Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。", 14,Muted));
-        var saveSpeech = AddSpeechTab(tabs, settings);
+        var saveSpeech = AddSpeechTab(tabs, settings, speechMetadata);
         var windowOptions = new StackPanel { Margin = new(2,4,8,10) };
         tabs.Items.Add(new TabItem { Header = "窗口", Padding = new(14,9,14,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = windowOptions } });
         windowOptions.Children.Add(Text("点击窗口的 X 时", 18));

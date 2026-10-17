@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.9.15
+
+- Read ElevenLabs account voices on the first dropdown expansion, reuse that list within the settings dialog, and provide an explicit “刷新声线列表” action. Keep loading and connection errors beside the voice selector; invalidate results on key edits, reject stale responses, and preserve saved/custom choices without inventing voices for empty accounts.
+- Explain Secret Key versus API Key ID beside the masked input and report the provider's `api_key_id_used_as_api_key` error for both voice discovery and synthesis. Classify known service codes without displaying raw provider messages, credentials or account details.
+
 ## 0.9.14
 
 - Add ElevenLabs speech using its official API, explicit model/voice selection, on-demand paginated account voice loading and an optional manual Voice ID. Keep saved voice names, provide the API-key dashboard link, mask and encrypt keys locally, and preserve provider/model/voice audio cache separation.
