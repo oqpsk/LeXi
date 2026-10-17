@@ -52,8 +52,8 @@
             <Border x:Name="QuickReadCard" Visibility="Collapsed" Background="{StaticResource AccentSoft}" BorderThickness="0" CornerRadius="7" Padding="12,9,12,10" Margin="0,2,0,14">
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border x:Name="QuickReadGuide" Width="28" Height="28" VerticalAlignment="Center" Margin="0,0,12,0" Background="{StaticResource Accent}" CornerRadius="2">
-                  <Path x:Name="QuickReadGlyph" Data="{StaticResource QuickReadMark}" Fill="{StaticResource Canvas}" Width="20" Height="20" Stretch="Uniform"
+                <Border x:Name="QuickReadGuide" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,10,0" Background="{StaticResource Accent}" CornerRadius="2">
+                  <Path x:Name="QuickReadGlyph" Data="{StaticResource QuickReadMark}" Fill="{StaticResource Canvas}" Width="14" Height="14" Stretch="Uniform"
                         HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Border>
                 <TextBox x:Name="QuickReadText" Grid.Column="1" Style="{StaticResource Selectable}" FontSize="19" VerticalAlignment="Center" TextBlock.LineHeight="28" TextBlock.LineStackingStrategy="BlockLineHeight"/>

@@ -63,11 +63,15 @@ internal static partial class Program
         foreach (var width in new[] {558,718,1078})
         {
             Measure((FrameworkElement)main.Content,width,618);
+            var textStart = summary.GetRectFromCharacterIndex(0);
+            var leftGap = guide.TranslatePoint(new Point(),card).X;
+            var rightGap = summary.TranslatePoint(new Point(textStart.Left,0),card).X -
+                guide.TranslatePoint(new Point(guide.ActualWidth,0),card).X;
             Check(card.DesiredSize.Height<=70 && summary.FontSize>=19 && summary.IsReadOnly && state.Visibility==Visibility.Collapsed &&
-                guide.ActualHeight==28 && glyph.ActualWidth==20 && glyph.ActualHeight==20 &&
+                guide.ActualHeight==20 && glyph.ActualWidth==14 && glyph.ActualHeight==14 && Math.Abs(leftGap-rightGap)<0.1 &&
                 Math.Abs(guide.TranslatePoint(new Point(0,guide.ActualHeight/2),card).Y-summary.TranslatePoint(new Point(0,summary.ActualHeight/2),card).Y)<0.1 &&
                 guide.TranslatePoint(new Point(guide.ActualWidth,0),card).X<summary.TranslatePoint(new Point(),card).X,
-                $"compact selectable overview stays readable at {width+2} DIP");
+                $"compact selectable overview has equal visible badge gaps and stays readable at {width+2} DIP");
         }
         summary.Text = "这是用来检查换行与居中的较长摘要。" + string.Concat(Enumerable.Repeat("完整释义可以换行阅读，固定标记与正文整体中心对齐。", 3));
         Measure((FrameworkElement)main.Content,558,618);

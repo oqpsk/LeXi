@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.9.12
+
+- Reduce the TL/DR badge from 28 to 20 DIP to sit closer to the summary's 19-DIP type size, with proportionally smaller vector letterforms. Account for the text box's internal leading inset so the visible gaps on either side of the badge are both 12 DIP; keep vertical centering and the existing summary text size.
+
 ## 0.9.11
 
 - Keep the TL/DR mark consistent for local excerpts, model previews and final summaries. Replace font-rendered labels with a compact two-by-two vector badge using the shared pale pink and dark letterforms; center it vertically beside single-line and wrapped summary text. Keep provisional and partial-result status separate, with source/core-selection explanations in the tooltip and accessible caption.
