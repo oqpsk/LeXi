@@ -35,6 +35,7 @@ public struct MainView: View {
                 .padding(.horizontal, 20).padding(.top, 2).padding(.bottom, 10)
         }
         .safeAreaBar(edge: .bottom) { bottomBar }
+        .containerBackground(LexiTheme.windowBackground, for: .window)
         .toolbar { toolbar }
         .navigationTitle("LeXi")
         .frame(minWidth: 540, minHeight: 420)
