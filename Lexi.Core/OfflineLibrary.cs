@@ -23,8 +23,9 @@ public sealed class OfflineLibrary : IDisposable
         loaded.Where(d => settings.OfflineEnabled && !(settings.DisabledDictionaries ?? []).Contains(d.Info.Id));
     public LocalHit[] Lookup(string query, AppSettings settings)
     {
-        var traditional = Queries.TraditionalKey(query);
-        return Enabled(settings).Select(d => (d.Info, Entry: d.Data.Lookup(query) ?? (traditional != query ? d.Data.Lookup(traditional) : null)))
+        // Current indexes carry simplified aliases; older traditional-only indexes need each candidate spelling.
+        var traditional = Queries.TraditionalKeys(query).Where(key => key != query).ToArray();
+        return Enabled(settings).Select(d => (d.Info, Entry: d.Data.Lookup(query) ?? traditional.Select(d.Data.Lookup).FirstOrDefault(e => e != null)))
             .Where(d => d.Entry != null).Select(d => new LocalHit(d.Info, d.Entry!)).ToArray();
     }
     public string[] Suggest(string query, AppSettings settings) => Queries.IsText(query) ? [] :

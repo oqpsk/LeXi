@@ -1,7 +1,6 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Runtime.InteropServices;
 
 namespace Lexi.Core;
 
@@ -41,19 +40,10 @@ public static partial class Queries
     [GeneratedRegex(@"^(?:请|請).{2,}|^(?:我|你|您|他|她|它|我们|我們|他们|他們)(?:想|要|需要|喜欢|喜歡|觉得|覺得|知道|希望|已经|已經|正在|会|會|能|可以|不|没|沒|是|在|有).+")]
     private static partial Regex ChineseSentence();
     // Convert only the user's search key. Original dictionary text stays unchanged.
-    public static string TraditionalKey(string text)
-        => ChineseKey(text, 0x04000000);
-    public static string SimplifiedKey(string text)
-        => ChineseKey(text, 0x02000000);
-    private static string ChineseKey(string text, uint flags)
-    {
-        if (!OperatingSystem.IsWindows() || !HasChinese(text)) return text;
-        var output = new StringBuilder(text.Length * 2 + 1);
-        return LCMapStringEx("zh-CN", flags, text, -1, output, output.Capacity, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero) > 0 ? output.ToString() : text;
-    }
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
-    private static extern int LCMapStringEx(string locale, uint flags, string source, int sourceLength,
-        StringBuilder destination, int destinationLength, IntPtr version, IntPtr reserved, IntPtr sortHandle);
+    // The same embedded table applies on every platform, so indexes and lookups agree.
+    public static string TraditionalKey(string text) => HasChinese(text) ? ChineseVariants.Traditional(text) : text;
+    public static string SimplifiedKey(string text) => HasChinese(text) ? ChineseVariants.Simplified(text) : text;
+    public static string[] TraditionalKeys(string text) => HasChinese(text) ? ChineseVariants.TraditionalCandidates(text) : [text];
     [GeneratedRegex(@"\s+")] private static partial Regex Whitespace();
 }
 

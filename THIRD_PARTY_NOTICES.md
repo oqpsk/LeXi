@@ -8,6 +8,10 @@ The dictionary installer uses revision `bc015ed2e24a7abef49fc6dbbb7fe32c1dadaf8b
 
 ECDICT is distributed under its upstream MIT license, reproduced in [licenses/ECDICT-LICENSE.txt](licenses/ECDICT-LICENSE.txt). The full CSV and generated dictionaries are downloaded or built locally and are not tracked in this repository. A package containing ECDICT-derived data must include its license and attribution.
 
+## OpenCC character tables
+
+`Lexi.Core/ChineseVariants/opencc-st-characters.txt` and `opencc-ts-characters.txt` are the character-level simplified/traditional tables from [OpenCC](https://github.com/BYVoid/OpenCC) release `ver.1.1.9`, by Carbo Kuo and contributors, used unchanged. They are distributed under the Apache License 2.0, reproduced in [licenses/OpenCC-LICENSE.txt](licenses/OpenCC-LICENSE.txt). LeXi uses them only to derive search keys; displayed dictionary text is never converted.
+
 ## Wiktionary
 
 English and Chinese entries, including English IPA pronunciation and expanded headword inflections, are retrieved from [English Wiktionary](https://en.wiktionary.org/). Displayed entries retain the originating page link; pronunciation and word-form attribution is available in their tooltips. Wiktionary text is generally provided under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), subject to the source page's terms and attribution requirements. Cached source text remains third-party content; it is not relicensed as LeXi code.
