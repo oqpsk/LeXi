@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rewrite README.md in a plainer, more human voice: lead with the second between meeting a word and deciding to look it up, and describe lookup, translation, the offline dictionaries, AI definitions with their sources, subscriptions, speech, saved results, navigation, Windows keys and privacy with concrete examples.
+
 ## 0.9.16
 
 - Focus the search input immediately on startup, taskbar activation and explicit restore, with an input-priority retry after WPF layout and focus restoration. Declare the input as the window's logical focus target and align native keyboard focus only while the main window is already foreground and enabled.
