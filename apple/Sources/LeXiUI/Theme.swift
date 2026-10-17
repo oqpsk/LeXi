@@ -3,18 +3,27 @@ import SwiftUI
 
 // LeXi for macOS follows Apple's design language rather than the Windows look: system colors that
 // adapt to light, dark and the user's accent, continuous corners, Liquid Glass for the floating
-// controls, and content on quiet grouped surfaces. Pink appears only as the brand TL;DR mark.
+// controls, and content on quiet grouped surfaces. Pink appears only as the brand TL;DR mark;
+// parts of speech are pale gold, as on Windows.
 public enum LexiTheme {
     // The one brand pink (#FFADD2). Solid pink fills always carry dark text.
     public static let pink = Color(nsColor: NSColor(srgbRed: 1, green: 0xAD / 255.0, blue: 0xD2 / 255.0, alpha: 1))
+    // The Windows highlight gold (#DDBD82) on dark glass; light glass gets a deeper gold of the same
+    // hue (#7D5A1A) so a part of speech stays readable.
+    static let goldColor = NSColor(name: "LexiGold") { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0xDD / 255.0, green: 0xBD / 255.0, blue: 0x82 / 255.0, alpha: 1)
+            : NSColor(srgbRed: 0x7D / 255.0, green: 0x5A / 255.0, blue: 0x1A / 255.0, alpha: 1)
+    }
+    public static let gold = Color(nsColor: goldColor)
     public static func lexical(_ size: CGFloat, weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .serif) }
     public static func chineseExample(_ size: CGFloat) -> Font { .custom("Songti SC", size: size) }
 }
 
 // Every LeXi window is a pane of Liquid Glass, like Control Center: the desktop shows through,
-// blurred and refracted, and takes on the wallpaper's color, as system glass does. Dark windows
-// use regular glass; light windows use clear glass, since regular glass in light mode is a
-// milky white. With Reduce Transparency the system makes it frostier and more opaque.
+// blurred and refracted, as light or dark glass that follows the appearance (and takes on the
+// wallpaper's color, as system glass does). Light windows keep regular glass: clear glass leaves
+// text unreadable over a busy desktop. With Reduce Transparency the system makes it more opaque.
 struct WindowGlass: NSViewRepresentable {
     func makeNSView(context: Context) -> WindowGlassView { WindowGlassView() }
     func updateNSView(_ view: WindowGlassView, context: Context) {}
@@ -25,23 +34,13 @@ final class WindowGlassView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
+        glass.style = .regular
         glass.frame = bounds
         glass.autoresizingMask = [.width, .height]
         addSubview(glass)
-        updateStyle()
     }
 
     required init?(coder: NSCoder) { nil }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        updateStyle()
-    }
-
-    private func updateStyle() {
-        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        glass.style = dark ? .regular : .clear
-    }
 
     // The glass reaches the desktop only through a transparent window.
     override func viewDidMoveToWindow() {
@@ -93,6 +92,27 @@ struct QuickReadBadge: View {
         .frame(width: 22, height: 22)
         .background(LexiTheme.pink, in: .rect(cornerRadius: 6, style: .continuous))
         .accessibilityHidden(true)
+    }
+}
+
+// The etymology mark from the Windows window: a Rosetta Stone, a slab with a broken top edge and
+// lines of inscription, on the same 24-point grid (it spans x 5–19, y 2–21), scaled uniformly and
+// centered. Stroke it like the symbols beside it.
+struct RosettaStone: Shape {
+    func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width / 14, rect.height / 19)
+        let left = rect.midX - 7 * scale, top = rect.midY - 9.5 * scale
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: left + (x - 5) * scale, y: top + (y - 2) * scale) }
+        var path = Path()
+        path.addLines([point(5, 21), point(5, 7), point(8, 3), point(14, 2), point(19, 6), point(19, 21)])
+        path.closeSubpath()
+        // Inscription lines as (from x, to x, y).
+        let lines: [(CGFloat, CGFloat, CGFloat)] = [(8, 11, 8), (13, 16, 8), (8, 16, 11), (8, 10, 14), (12, 16, 14), (8, 16, 17)]
+        for (from, to, y) in lines {
+            path.move(to: point(from, y))
+            path.addLine(to: point(to, y))
+        }
+        return path
     }
 }
 

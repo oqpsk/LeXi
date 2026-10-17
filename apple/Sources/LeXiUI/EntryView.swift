@@ -64,7 +64,12 @@ struct HeadingRow: View {
                     .accessibilityLabel(speech.speaking ? "停止合成发音" : "播放合成发音")
                 }
                 if !view.etymology.isEmpty {
-                    Button { showEtymology.toggle() } label: { Image(systemName: "text.book.closed") }
+                    Button { showEtymology.toggle() } label: {
+                        RosettaStone()
+                            .stroke(style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                            .frame(width: 16, height: 19)
+                            .contentShape(.rect)
+                    }
                         .help("词源")
                         .accessibilityLabel("查看词源")
                         .popover(isPresented: $showEtymology, arrowEdge: .bottom) { EtymologyPopover(items: view.etymology) }
