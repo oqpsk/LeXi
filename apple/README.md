@@ -43,4 +43,4 @@ dotnet Lexi.Tools/bin/Release/net10.0/Lexi.Tools.dll host-check .cache/test-dict
 
 ## 数据与权限
 
-用户数据、缓存和词库位于 `~/Library/Application Support/LeXi`（词库在其中的 `data`，在线发音缓存在 `speech-cache`）。OpenAI、Grok 与 ElevenLabs 的 API Key 由用户在“设置 → 发音”中填写，存入当前用户登录钥匙串的通用密码（服务名 `io.github.oqpsk.lexi.speech`）；新条目的访问控制只信任 LeXi，不同步到 iCloud。重新构建的临时签名应用首次读取已有密钥时，系统可能询问是否允许访问。应用不使用沙盒：它需要启动本机已安装的官方 Codex / Claude Code 客户端，这些客户端自行管理登录。登录在“终端”中运行官方命令，LeXi 不读取令牌或一次性验证码。
+用户数据、缓存和词库位于 `~/Library/Application Support/LeXi`（词库在其中的 `data`，在线发音缓存在 `speech-cache`）。OpenAI、Grok 与 ElevenLabs 的 API Key 由用户在“设置 → 发音”中填写，存入当前用户登录钥匙串的通用密码（服务名 `io.github.oqpsk.lexi.speech`）；新条目的访问控制只信任 LeXi，不同步到 iCloud。钥匙串把每次重新构建的临时签名应用当作新应用，可能不再允许它读取之前保存的密钥；这时在“设置 → 发音”重新粘贴并保存一次即可，保存会替换旧条目。若要在重新构建后继续使用已保存的密钥，用固定的签名身份构建，例如 `LEXI_SIGN_IDENTITY="Apple Development" apple/scripts/build-app.sh`（`security find-identity -v -p codesigning` 列出可用身份）。应用不使用沙盒：它需要启动本机已安装的官方 Codex / Claude Code 客户端，这些客户端自行管理登录。登录在“终端”中运行官方命令，LeXi 不读取令牌或一次性验证码。

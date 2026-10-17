@@ -11,8 +11,9 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 功能 | 共享行为（Lexi.Core） | Windows | macOS |
 |---|---|---|---|
 | 自动判断查词、翻译与中英方向 | `Queries.IsText`、`Translation.Target`、`QuerySession.SubmitAsync` | 已实现：单一多行输入框，Enter 查询，Shift+Enter 换行 | 已实现：多行输入框，Return 查询，Shift-Return 或 Option-Return 换行 |
+| 窗口来到前台即可输入 | 不适用：窗口行为 | 已实现：窗口激活时聚焦输入框并全选，Ctrl+L 同 | 已实现：窗口来到前台时聚焦输入框并全选上次的查询，⌘L 同 |
 | 离线词典联合查询、简繁检索、词形匹配 | `OfflineLibrary`、`ChineseVariants`（内置 OpenCC 字表，各平台相同） | 已实现 | 已实现：词库位于 `~/Library/Application Support/LeXi/data` |
-| 输入建议 | `QuerySession.Suggest` | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原 | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原；输入法组字时按键留给输入法 |
+| 输入建议 | `QuerySession.Suggest` | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原 | 已实现：列表悬于输入框下方；↑↓ 预览，Tab 或点击接受，Esc 还原；输入法组字时按键留给输入法 |
 | Wiktionary 在线来源与原文 | `OnlineDictionary`、`QueryView.Online` | 已实现：可展开原文与来源链接 | 已实现：可展开原文与来源链接 |
 | 双模型查词、流式预览、失败隔离 | `DictionaryCoordinator`、`QuerySession` | 已实现 | 已实现 |
 | 义项合并与其他表述 | `SenseMerging`、`AnswersView` | 已实现：折叠的“其他表述 / 用法细分” | 已实现：可展开的“其他表述 / 用法细分” |
@@ -39,7 +40,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 在线发音：OpenAI、Grok、ElevenLabs | `SpeechCatalog`（模型、声线、校验与提示）、`SpeechClient`、`ElevenLabsSpeech` | 已实现：设置 → 发音选择模型与声线，可试听 | 已实现：设置 → 发音选择模型与声线，可试听；通过 Host 的 `speech.*` 方法调用同一份 Core |
 | ElevenLabs 账号声线与 Voice ID | `SpeechClient.ElevenVoicesAsync`、`SpeechAudio.ElevenVoicesAsync`（离线时不读取） | 已实现：首次展开声线列表时读取，可刷新；“指定其他声线”填写 Voice ID | 已实现：点击“读取声线列表”读取，可刷新（SwiftUI 选择器没有展开时机）；“指定其他声线”填写 Voice ID |
 | 发音缓存与离线规则 | `SpeechAudio`：按文字、服务、模型、声线分别保存，写完整后才保留；离线时只播放已缓存的在线发音 | 已实现：`MediaPlayer` 播放 | 已实现：`AVAudioPlayer` 播放 Host 返回的 MP3 |
-| 语音密钥 | `SpeechClient`（格式校验与错误提示）；Core 不保存密钥 | 已实现：Windows 当前用户加密；未保存时可用 `OPENAI_API_KEY` 等环境变量 | 已实现：存入当前用户的钥匙串，只供 LeXi 使用，每次请求随调用传给 Host，Host 不保存。不读取环境变量：从访达打开的应用拿不到 shell 环境 |
+| 语音密钥 | `SpeechClient`（格式校验与错误提示）；Core 不保存密钥 | 已实现：Windows 当前用户加密；未保存时可用 `OPENAI_API_KEY` 等环境变量 | 已实现：存入当前用户的钥匙串，只供 LeXi 使用，每次请求随调用传给 Host，Host 不保存。临时签名的应用重新构建后需重新保存一次，或用固定签名身份构建（apple/README.md）。不读取环境变量：从访达打开的应用拿不到 shell 环境 |
 
 ## 平台专属
 
