@@ -13,7 +13,7 @@ public struct SettingsView: View {
             Tab("查询与模型", systemImage: "text.magnifyingglass") { QuerySettings(store: store) }
             Tab("离线词典", systemImage: "books.vertical") { DictionarySettings(store: store) }
             Tab("账号连接", systemImage: "person.badge.key") { ConnectionSettings(store: store) }
-            Tab("发音", systemImage: "speaker.wave.2") { SpeechSettings() }
+            Tab("发音", systemImage: "speaker.wave.2") { SpeechSettings(store: store) }
         }
         .frame(width: 560, height: 520)
         .task { await store.refreshSettings() }
@@ -210,15 +210,244 @@ struct ProviderRow: View {
     }
 }
 
+// Mirrors the Windows speech tab: model, voice, ElevenLabs account voices and Voice ID, keys and a
+// preview. Choices apply as they change; Lexi.Core validates them with the Windows messages.
 struct SpeechSettings: View {
+    @Bindable var store: LexiStore
+    private let keys: any SpeechKeys
+    @State private var speech: SpeechController
+    @State private var models: [SpeechModel] = []
+    @State private var catalog: [String: [SpeechVoice]] = [:]
+    @State private var systemVoices: [SpeechVoice] = []
+    @State private var accountVoices: [SpeechVoice]?
+    @State private var lastEleven: SpeechVoice?
+    @State private var manualVoice = ""
+    // Keys typed but not saved yet, one per provider like the Windows key boxes.
+    @State private var keyInputs: [String: String] = [:]
+    @State private var savedKeys: Set<String> = []
+    @State private var voiceStatus = ""
+    @State private var loadingVoices = false
+    @State private var voiceRequest = 0
+    @State private var voiceTask: Task<Void, Never>?
+    @State private var sample = "Hello, this is LeXi."
+    @State private var message = ""
+
+    init(store: LexiStore, keys: any SpeechKeys = KeychainSpeechKeys()) {
+        _store = Bindable(store)
+        self.keys = keys
+        _speech = State(initialValue: SpeechController(keys: keys))
+    }
+
     var body: some View {
         Form {
-            Section {
-                Note("点击词条旁的扬声器朗读当前输入，再次点击停止。macOS 使用系统声线，按文字语言自动选择中文或英文声线，不需要 API Key。可在“系统设置 → 辅助功能 → 朗读内容”中下载更多声线。")
-                Note("OpenAI、Grok 与 ElevenLabs 在线语音目前仅 Windows 版提供，macOS 版计划使用钥匙串保存密钥。")
+            if let settings = store.settings?.settings, let model = selected(settings) {
+                Section {
+                    Picker("发声模型", selection: Binding(get: { model.key }, set: { key in
+                        if let next = models.first(where: { $0.key == key }) { choose(next, settings) }
+                    })) {
+                        ForEach(models, id: \.key) { Text($0.name).tag($0.key) }
+                    }
+                    let voices = voices(model, settings)
+                    Picker("声线", selection: Binding(get: { settings.speechVoice }, set: { id in
+                        if let voice = voices.first(where: { $0.id == id }) { manualVoice = ""; apply(model, voice) }
+                    })) {
+                        ForEach(voices) { Text($0.name).tag($0.id) }
+                    }
+                    if model.provider == "elevenlabs" { elevenControls(model) }
+                    if !message.isEmpty { Text(message).foregroundStyle(LexiTheme.warm) }
+                } footer: {
+                    Note(info(model))
+                }
+                if !model.local { keySection(model.provider) }
+                Section {
+                    HStack {
+                        TextField("试听文字", text: $sample)
+                        Button(speech.speaking ? "停止" : "试听") { preview(model, settings) }
+                    }
+                    if !speech.status.isEmpty {
+                        Text(speech.status).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently)
+                    }
+                } footer: {
+                    Note("发音仅在点击时生成，重复播放使用缓存。密钥保存在本机钥匙串中，只供 LeXi 使用。这里播放的是合成语音。")
+                }
+            } else {
+                ProgressView()
             }
         }
         .formStyle(.grouped)
+        .task { await load() }
+        .onChange(of: keyInputs["elevenlabs"]) { invalidateVoices() }
+        .onDisappear { speech.stop(); cancelVoiceLoading(); keyInputs = [:] }
+    }
+
+    @ViewBuilder private func elevenControls(_ model: SpeechModel) -> some View {
+        Text(voiceStatusText).font(.callout).foregroundStyle(.secondary)
+            .accessibilityLabel("声线连接状态：" + voiceStatusText).accessibilityAddTraits(.updatesFrequently)
+        HStack {
+            Button(accountVoices == nil ? "读取声线列表" : "刷新声线列表") { loadVoices() }
+                .disabled(loadingVoices)
+                .accessibilityLabel("刷新 ElevenLabs 可用声线列表")
+            Link("获取 API Key ↗", destination: URL(string: "https://elevenlabs.io/app/developers/api-keys")!)
+        }
+        DisclosureGroup("指定其他声线") {
+            TextField("Voice ID", text: $manualVoice, prompt: Text("可在 ElevenLabs 声线页面复制 Voice ID"))
+                .onSubmit { applyManual(model) }
+                .accessibilityLabel("手动指定 ElevenLabs Voice ID")
+        }
+    }
+
+    private func keySection(_ provider: String) -> some View {
+        let saved = savedKeys.contains(provider)
+        let input = Binding(get: { keyInputs[provider] ?? "" }, set: { keyInputs[provider] = $0 })
+        return Section("在线语音连接") {
+            SecureField(KeychainSpeechKeys.title(provider), text: input, prompt: Text(saved ? "留空保留已有密钥" : "粘贴 API Key"))
+                .onSubmit { saveKey(provider) }
+            if provider == "elevenlabs" { Note("粘贴创建时复制的完整 Secret Key；API Key ID 无法用于连接。") }
+            Note(saved ? "已在钥匙串中保存密钥，留空保留。" : "尚未保存密钥。")
+            HStack {
+                Button("保存到钥匙串") { saveKey(provider) }
+                    .disabled(typedKey(provider) == nil)
+                Button("清除已保存的密钥", role: .destructive) { removeKey(provider) }.disabled(!saved)
+            }
+        }
+    }
+
+    private var voiceStatusText: String {
+        if !voiceStatus.isEmpty { return voiceStatus }
+        guard let accountVoices else { return "点击“读取声线列表”即可读取账号可用声线；首次使用请先填好 API Key。" }
+        return accountVoices.isEmpty ? "账号未返回可用声线，可手动填写 Voice ID。" : "已读取 \(accountVoices.count) 条可用声线。"
+    }
+
+    private func info(_ model: SpeechModel) -> String {
+        if model.local { return "使用本机已安装的系统声线，可离线朗读；“按文字语言自动选择”为中文或英文挑选声线。可在“系统设置 → 辅助功能 → 朗读内容”中下载更多声线。" }
+        switch model.provider {
+        case "xai": return "Grok TTS 的模型由服务管理，可选择声线；使用单独的 API Key 与 API 额度。"
+        case "elevenlabs": return "使用 ElevenLabs 账号额度。读取声线列表可获取预置及已添加的声线，读取列表不会生成音频。ElevenReader 套餐与此分开。"
+        default: return "使用 OpenAI 官方语音接口，声线随模型切换；API 额度与查词订阅分开。"
+        }
+    }
+
+    private func selected(_ settings: AppSettings) -> SpeechModel? {
+        models.first { $0.provider == settings.speechProvider && $0.id == settings.speechModel } ?? models.first
+    }
+
+    // The saved voice stays listed even when it is not installed or not in a loaded list.
+    private func voices(_ model: SpeechModel, _ settings: AppSettings) -> [SpeechVoice] {
+        let current = model.provider == settings.speechProvider && model.id == settings.speechModel
+        let saved = SpeechVoice(id: settings.speechVoice, name: settings.speechVoiceName.isEmpty ? "已保存的声线" : settings.speechVoiceName)
+        if model.provider == "elevenlabs" {
+            return SpeechChoices.eleven(loaded: accountVoices, saved: current ? saved : lastEleven, initial: catalog[model.key] ?? [])
+        }
+        let list = model.local ? systemVoices : catalog[model.key] ?? []
+        return current && !list.contains(where: { $0.id == saved.id }) ? [saved] + list : list
+    }
+
+    private func load() async {
+        systemVoices = SystemVoices.choices()
+        savedKeys = Set(KeychainSpeechKeys.providers.filter { keys.hasSaved($0) })
+        let list = await store.speechModels()
+        var voices: [String: [SpeechVoice]] = [:]
+        for model in list where !model.local { voices[model.key] = await store.speechVoices(provider: model.provider, model: model.id) }
+        catalog = voices
+        if let settings = store.settings?.settings, settings.speechProvider == "elevenlabs" {
+            lastEleven = SpeechVoice(id: settings.speechVoice, name: settings.speechVoiceName.isEmpty ? "已保存的声线" : settings.speechVoiceName)
+        }
+        models = list
+    }
+
+    // Same voice rules as Windows: ElevenLabs returns to its last voice, the saved model keeps its
+    // saved voice, and any other model starts with its first voice.
+    private func choose(_ next: SpeechModel, _ settings: AppSettings) {
+        if next.provider != settings.speechProvider {
+            cancelVoiceLoading(); voiceStatus = ""; manualVoice = ""
+        }
+        speech.stop()
+        let preferred = next.provider == "elevenlabs" ? lastEleven?.id
+            : next.provider == settings.speechProvider && next.id == settings.speechModel ? settings.speechVoice : nil
+        let available = voices(next, settings)
+        guard let voice = available.first(where: { $0.id == preferred }) ?? available.first else { return }
+        apply(next, voice)
+    }
+
+    private func apply(_ model: SpeechModel, _ voice: SpeechVoice) {
+        speech.stop()
+        Task { _ = await update(model, voice) }
+    }
+
+    private func update(_ model: SpeechModel, _ voice: SpeechVoice) async -> Bool {
+        let error = await store.update(["speechProvider": .string(model.provider), "speechModel": .string(model.id),
+                                        "speechVoice": .string(voice.id), "speechVoiceName": .string(voice.name)])
+        message = error ?? ""
+        if error == nil, model.provider == "elevenlabs" { lastEleven = voice }
+        return error == nil
+    }
+
+    private func applyManual(_ model: SpeechModel) {
+        let id = manualVoice.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return }
+        speech.stop()
+        Task { if await update(model, SpeechVoice(id: id, name: "自定义声线")) { manualVoice = "" } }
+    }
+
+    // A Voice ID typed but not yet applied is previewed, as on Windows.
+    private func preview(_ model: SpeechModel, _ settings: AppSettings) {
+        if speech.speaking { speech.stop("已停止"); return }
+        let manual = manualVoice.trimmingCharacters(in: .whitespacesAndNewlines)
+        let voice = model.provider == "elevenlabs" && !manual.isEmpty ? manual : settings.speechVoice
+        speech.play(sample, SpeechSelection(provider: model.provider, model: model.id, voice: voice),
+                    key: model.local ? nil : typedKey(model.provider), using: store, finished: "试听结束")
+    }
+
+    private func loadVoices() {
+        guard !loadingVoices else { return }
+        cancelVoiceLoading()
+        let request = voiceRequest
+        loadingVoices = true
+        voiceStatus = "正在读取可用声线…"
+        let typed = typedKey("elevenlabs")
+        voiceTask = Task {
+            do {
+                let key = try typed ?? keys.read("elevenlabs") ?? ""
+                let loaded = try await store.elevenVoices(key: key)
+                guard request == voiceRequest else { return }
+                accountVoices = loaded
+                voiceStatus = loaded.isEmpty ? "账号未返回可用声线，可手动填写 Voice ID。" : "已读取 \(loaded.count) 条可用声线，请选择后试听。"
+            } catch {
+                if request == voiceRequest { voiceStatus = SpeechController.message(error) }
+            }
+            if request == voiceRequest { loadingVoices = false }
+        }
+    }
+
+    private func cancelVoiceLoading() {
+        voiceRequest += 1
+        voiceTask?.cancel(); voiceTask = nil
+        loadingVoices = false
+    }
+
+    // A changed key makes the loaded account voices stale.
+    private func invalidateVoices() {
+        cancelVoiceLoading()
+        accountVoices = nil
+        voiceStatus = "连接信息已更改，可重新读取声线列表。"
+    }
+
+    private func typedKey(_ provider: String) -> String? {
+        let value = (keyInputs[provider] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private func saveKey(_ provider: String) {
+        guard let value = typedKey(provider) else { return }
+        do { try keys.save(provider, value); keyInputs[provider] = nil; savedKeys.insert(provider); message = "" }
+        catch { message = SpeechController.message(error) }
+    }
+
+    private func removeKey(_ provider: String) {
+        do {
+            try keys.remove(provider); savedKeys.remove(provider); message = ""
+            if provider == "elevenlabs" { invalidateVoices() }
+        } catch { message = SpeechController.message(error) }
     }
 }
 

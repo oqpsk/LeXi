@@ -11,7 +11,7 @@ public struct EntryView: View {
     public var body: some View {
         let view = store.view
         VStack(alignment: .leading, spacing: 14) {
-            HeadingRow(view: view, speech: speech)
+            HeadingRow(view: view, store: store, speech: speech)
             if !view.wordForms.isEmpty { WordFormsView(rows: view.wordForms) }
             if view.quickRead.visible { QuickReadCard(quickRead: view.quickRead) }
             if view.kind == .translation {
@@ -28,6 +28,7 @@ public struct EntryView: View {
 
 struct HeadingRow: View {
     let view: QueryView
+    let store: LexiStore
     var speech: SpeechController
     @State private var showEtymology = false
 
@@ -50,7 +51,7 @@ struct HeadingRow: View {
                 }
             }
             if !view.speechText.isEmpty {
-                Button { speech.toggle(view.speechText) } label: {
+                Button { speech.toggle(view.speechText, using: store) } label: {
                     Image(systemName: speech.speaking ? "stop.circle" : "speaker.wave.2")
                 }
                 .buttonStyle(.borderless)

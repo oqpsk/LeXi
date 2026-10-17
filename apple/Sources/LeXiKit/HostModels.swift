@@ -219,6 +219,10 @@ public struct AppSettings: Decodable, Equatable, Sendable {
     public let secondaryModel: String
     public let mergeSenses: Bool
     public let judgeModel: String
+    public let speechProvider: String
+    public let speechModel: String
+    public let speechVoice: String
+    public let speechVoiceName: String
 }
 public struct ModelChoice: Decodable, Equatable, Sendable, Hashable, Identifiable {
     public let label: String

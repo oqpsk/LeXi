@@ -37,6 +37,7 @@ public struct MainView: View {
         .navigationTitle("LeXi")
         .frame(minWidth: 540, minHeight: 420)
         .onChange(of: store.view.request) { _, _ in pageChanged() }
+        .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
         .focusedSceneValue(\.lexiActions, LexiActions(back: { navigate(-1) }, forward: { navigate(1) }, home: goHome,
             regenerate: regenerate, focusSearch: { searchFocused = true },
             canBack: store.view.navigation.canBack, canForward: store.view.navigation.canForward, canRegenerate: canRegenerate))
@@ -61,13 +62,16 @@ public struct MainView: View {
     private var online: Bool { store.settings?.settings.online ?? true }
     private var canRegenerate: Bool { store.view.kind != .home && store.view.canRegenerate && online }
 
+    // Speech messages share the status line with the query, as in the Windows status bar; the newer one shows.
+    private var status: String { speech.status.isEmpty ? store.view.status : speech.status }
+
     private var footer: some View {
         HStack(spacing: 12) {
-            Text(store.view.status)
+            Text(status)
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)
-                .help(store.view.status)
-                .accessibilityLabel("查询状态：" + store.view.status)
+                .help(status)
+                .accessibilityLabel("查询状态：" + status)
             Spacer(minLength: 8)
             if store.view.kind != .home {
                 Button("重新生成", action: regenerate)
