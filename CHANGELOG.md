@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.8.0
+
+- Rebrand the product and repository as LeXi, with a pink Greek xi (ξ) mark and multi-size application icon. Replace the detailed README with a concise product introduction and move operational details to the usage guide.
+- Add a model-account connection page and a shortcut beside the primary model selector. Check local Codex/Claude sign-in status, open their official interactive OAuth login on request, and retain Codex executable configuration. Never read credential files or display raw account output.
+- Keep online/offline switch geometry fixed and use equal-length labels.
+- Highlight readable Chinese parts of speech, localize useful usage labels and remove neutral boilerplate. Move model provenance details into source disclosures without equating missing dictionary evidence with an incorrect definition; retain all citations and original labels.
+- Display recorded word forms next to the headword: verb tenses and participles, noun plurals and adjective comparisons. Resolve inflected queries through their original lemma even when the inflected spelling has its own dictionary entry; preserve alternative spellings and avoid guessed endings.
+- Document a single-repository macOS direction with a shared core and platform-specific UI/services. macOS remains future work.
+
 ## 0.7.0
 
 - Consolidate query timing and status into a single bottom bar. Give regeneration a persistent button surface and border, and use an accessible two-state online switch with a thumb, clear labels and keyboard focus. Remove the passive dictionary count and redundant footer text.
