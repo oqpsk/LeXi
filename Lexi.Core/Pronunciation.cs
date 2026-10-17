@@ -24,7 +24,16 @@ public sealed partial class Pronunciation : IDisposable
         var url = "https://en.wiktionary.org/w/api.php?action=parse&prop=wikitext%7Ctext&format=json&formatversion=2&redirects=1&page=" + Uri.EscapeDataString(word);
         var json = await client.GetStringAsync(url, token);
         using var doc = JsonDocument.Parse(json);
-        if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("parse", out var parsed) || parsed.ValueKind != JsonValueKind.Object) return null;
+        if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("parse", out var parsed) || parsed.ValueKind != JsonValueKind.Object)
+        {
+            var lower = Queries.Normalize(word);
+            if (word != lower && !Queries.AbbreviationCandidate(word))
+            {
+                var fallback = await LookupAsync(lower, token);
+                return fallback == null ? null : fallback with { Word = word };
+            }
+            return null;
+        }
         if (Queries.AbbreviationCandidate(word) && parsed.TryGetProperty("title", out var title) &&
             title.ValueKind == JsonValueKind.String && title.GetString() != word) return null;
         var sourceUrl = "https://en.wiktionary.org/wiki/" + Uri.EscapeDataString(word) + "#English";

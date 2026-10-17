@@ -33,6 +33,14 @@ internal static class LexicalChecks
         }
         using (var redirected = new Pronunciation(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { parse = new { title="tee",text=html } })) }))))
             Check(await redirected.LookupAsync("TEE",CancellationToken.None) == null, "redirected lowercase pages never lend pronunciation to uppercase queries");
+        using (var capitalized = new Pronunciation(new Handler((request, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent(request.RequestUri!.Query.Contains("page=Nerf") ? "{}" : JsonSerializer.Serialize(new { parse = new { title="nerf",text=html } }))
+        }))))
+        {
+            var result = await capitalized.LookupAsync("Nerf",CancellationToken.None);
+            Check(result?.Word == "Nerf" && result.Ipa.Single() == "/nɜːf/" && result.SourceUrl.Contains("/nerf#"),
+                "missing title-case pages may use lowercase metadata without changing their cache identity or attribution");
+        }
         var reference = SpecialistReferences.Lookup("TEE").Single();
         Check(reference.Expansion == "Trusted Execution Environment" && SpecialistReferences.Lookup("trusted execution environment").Single() == reference,
             "the acronym and full form resolve to the same attributed technical reference");
