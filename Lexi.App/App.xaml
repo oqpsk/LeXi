@@ -51,6 +51,28 @@
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
+    <Style x:Key="OnlineSwitch" TargetType="ToggleButton">
+      <Setter Property="FontFamily" Value="{StaticResource UiFont}"/><Setter Property="FontSize" Value="13"/>
+      <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Height" Value="32"/><Setter Property="Padding" Value="6,4"/><Setter Property="IsThreeState" Value="False"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+        <Border x:Name="SwitchSurface" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <ContentPresenter VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <Border x:Name="Track" Width="32" Height="18" CornerRadius="9" Background="#565861" Padding="3">
+              <Ellipse x:Name="Thumb" Width="12" Height="12" Fill="{StaticResource Ink}" HorizontalAlignment="Left"/>
+            </Border>
+          </StackPanel>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Track" Property="Background" Value="{StaticResource Accent}"/><Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/><Setter TargetName="Thumb" Property="Fill" Value="{StaticResource Canvas}"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="SwitchSurface" Property="Background" Value="{StaticResource Hover}"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="SwitchSurface" Property="BorderBrush" Value="{StaticResource Accent}"/></Trigger>
+          <Trigger Property="IsPressed" Value="True"><Setter TargetName="SwitchSurface" Property="Opacity" Value="0.75"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter TargetName="SwitchSurface" Property="Opacity" Value="0.4"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="DisclosureButton" TargetType="ToggleButton">
       <Setter Property="Foreground" Value="{StaticResource Muted}"/><Setter Property="FontFamily" Value="{StaticResource UiFont}"/><Setter Property="FontSize" Value="14"/>
       <Setter Property="Cursor" Value="Hand"/><Setter Property="Padding" Value="3,2"/><Setter Property="Margin" Value="0,0,10,0"/><Setter Property="MinHeight" Value="28"/>

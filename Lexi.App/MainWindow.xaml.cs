@@ -37,12 +37,11 @@ public partial class MainWindow : Window
             UpdatePreparedModel();
             try
             {
-                var dictionary = await dictionaryTask;
-                UpdateFooter();
-                if (current.Length == 0) LookupStatus.Text = "准备就绪";
+                await dictionaryTask;
+                UpdateReadyStatus();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-            { LookupStatus.Text = "离线词库未能加载，可继续使用在线查询。"; Footer.Text = "词库文件缺失，请保留整个 Lexi 文件夹。"; }
+            { LookupStatus.Text = "离线词库未能加载，请在设置中检查词库状态。"; }
         };
         Closing += (_, e) =>
         {
@@ -94,15 +93,28 @@ public partial class MainWindow : Window
     private async void Refresh_Click(object sender, RoutedEventArgs e) { if (current.Length > 0) await SearchAsync(current, true); }
     private void SetQuery(string query)
     { suppressSuggestions = true; SearchBox.Text = query; suppressSuggestions = false; Suggestions.Visibility = Visibility.Collapsed; }
-    private void UpdateOnlineButton() { OnlineToggle.Content = settings.Online ? "● 在线补充" : "○ 仅离线"; OnlineToggle.Foreground = settings.Online ? accentBrush : muted; }
-    private void UpdateFooter() => Footer.Text = !settings.OfflineEnabled ? "离线词典已停用 · 可在设置中启用" :
-        dictionaryTask.IsCompletedSuccessfully ? $"{dictionaryTask.Result.Dictionaries.Count(d => d.Available && !(settings.DisabledDictionaries ?? []).Contains(d.Id))} 部离线词典" : "离线词库不可用";
+    private void UpdateOnlineButton()
+    {
+        OnlineToggle.IsChecked = settings.Online;
+        OnlineToggle.Content = settings.Online ? "在线补充" : "仅离线";
+        OnlineToggle.ToolTip = settings.Online ? "在线补充已开启 · 点击关闭，仅使用本地词库与缓存" : "仅离线 · 点击开启在线词典与模型补充";
+        RefreshButton.IsEnabled = settings.Online;
+        RefreshButton.ToolTip = settings.Online ? "重新查询并生成结果，跳过本次查询的已有缓存" : "开启在线补充后可重新生成";
+    }
+    private void UpdateReadyStatus()
+    {
+        if (current.Length > 0) return;
+        LookupStatus.Text = !settings.OfflineEnabled ? "离线词典已停用 · 可在设置中启用" :
+            dictionaryTask.IsCompletedSuccessfully && dictionaryTask.Result.Dictionaries.Any(d => d.Available && !(settings.DisabledDictionaries ?? []).Contains(d.Id)) ?
+                "准备就绪" : "暂无可用离线词库 · 可在设置中检查";
+    }
     private async void Online_Click(object sender, RoutedEventArgs e)
     {
-        settings.Online = !settings.Online; SaveSettings(); UpdateOnlineButton();
+        settings.Online = OnlineToggle.IsChecked == true; SaveSettings(); UpdateOnlineButton();
         lookup?.Cancel();
         UpdatePreparedModel();
         if (current.Length > 0) await SearchAsync(current);
+        else UpdateReadyStatus();
     }
     private void UpdatePreparedModel()
     {
@@ -124,7 +136,7 @@ public partial class MainWindow : Window
         var dialog = new SettingsWindow(settings, dictionaryTask.IsCompletedSuccessfully ? dictionaryTask.Result.Dictionaries : DictionaryCatalog.InspectAll(Path.Combine(App.Root, "data"))) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
-            SaveSettings(); UpdateOnlineButton(); UpdateFooter();
+            SaveSettings(); UpdateOnlineButton(); UpdateReadyStatus();
             if (!settings.OfflineEnabled) Suggestions.Visibility = Visibility.Collapsed;
             if (previous != JsonSerializer.Serialize(settings, Json.Options))
             {

@@ -1,16 +1,29 @@
 [CmdletBinding()]
-param([string]$AppDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/Lexi'))
+param(
+    [string]$AppDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'artifacts/Lexi'),
+    [string[]]$DictionaryIds = @()
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $AppDirectory = [IO.Path]::GetFullPath($AppDirectory)
 $dataRoot = Join-Path $AppDirectory 'data'
 $cache = Join-Path $root '.cache/dictionaries'
+$packages = @(Get-Content (Join-Path $root 'dictionaries/catalog.json') -Raw | ConvertFrom-Json)
+if ($DictionaryIds.Count -gt 0) {
+    $unknown = @($DictionaryIds | Where-Object { $_ -notin $packages.metadata.id })
+    if ($unknown.Count -gt 0) { throw "Unknown dictionary IDs: $($unknown -join ', ')" }
+    $packages = @($packages | Where-Object { $_.metadata.id -in $DictionaryIds })
+}
+function Get-DataPath([string]$name) {
+    $path = [IO.Path]::GetFullPath((Join-Path $dataRoot $name))
+    if (!$path.StartsWith($dataRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Path must stay inside the dictionary folder' }
+    return $path
+}
 New-Item -ItemType Directory -Force $dataRoot,$cache | Out-Null
 Push-Location $root
 try {
     & dotnet build Lexi.Tools -c Release --configfile NuGet.Config
     if ($LASTEXITCODE) { throw 'Dictionary builder failed' }
-    $packages = Get-Content dictionaries/catalog.json -Raw | ConvertFrom-Json
     foreach ($package in $packages) {
         if ($package.metadata.id -notmatch '^[a-z0-9-]+$' -or $package.file -match '[/\\]') { throw 'Invalid dictionary package path' }
         $download = Join-Path $cache $package.file
@@ -28,7 +41,7 @@ try {
             if ($header -notmatch 'https://creativecommons.org/licenses/by-sa/4.0/') { throw 'Review the CC-CEDICT license before installing this version' }
             $package.metadata.version = "snapshot $((Get-Date).ToUniversalTime().ToString('yyyy-MM-dd')) / SHA256 $($hash.Substring(0,12))"
         }
-        $temporary = Join-Path $dataRoot ('.install-' + $package.metadata.id + '-' + [guid]::NewGuid().ToString('N'))
+        $temporary = Get-DataPath ('.install-' + $package.metadata.id + '-' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory $temporary | Out-Null
         $metadata = Join-Path $temporary 'dictionary.json'
         $package.metadata | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $metadata -Encoding utf8
@@ -46,10 +59,9 @@ try {
             if ((Get-FileHash $usage).Hash -ine $package.usageSha256) { throw 'MOE usage notice checksum mismatch' }
             Copy-Item -LiteralPath $usage -Destination (Join-Path $temporary 'MOE-USAGE.pdf')
         }
-        $target = [IO.Path]::GetFullPath((Join-Path $dataRoot $package.metadata.id))
-        if (!$target.StartsWith($dataRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'Target must stay inside the dictionary folder' }
+        $target = Get-DataPath $package.metadata.id
         if (Test-Path -LiteralPath $target) {
-            $backup = Join-Path $dataRoot ('.previous-' + $package.metadata.id + '-' + [guid]::NewGuid().ToString('N'))
+            $backup = Get-DataPath ('.previous-' + $package.metadata.id + '-' + [guid]::NewGuid().ToString('N'))
             Move-Item -LiteralPath $target -Destination $backup
             try { Move-Item -LiteralPath $temporary -Destination $target } catch { Move-Item -LiteralPath $backup -Destination $target; throw }
         } else { Move-Item -LiteralPath $temporary -Destination $target }

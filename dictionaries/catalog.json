@@ -29,5 +29,35 @@
     "url": "https://opendata.naer.edu.tw/學術名詞/國家教育研究院-造船工程學術名詞.csv",
     "sha256": "f7cbba13f878f052837279d1fb12020119b024c833945751540ddeed99f0bebd",
     "metadata": { "id": "naer-shipbuilding", "name": "国家教育研究院 · 造船工程术语", "languages": "造船与轮机专业术语 · 中英双向检索", "sourceUrl": "https://data.gov.tw/dataset/15399", "license": "政府資料開放授權條款第1版", "version": "2026-10 snapshot", "attribution": "國家教育研究院；來源 https://terms.naer.edu.tw/；原词表建立双向索引", "allowAiEvidence": true }
+  },
+  {
+    "file": "naer-computer-science.csv", "format": "naer", "minimumEntries": 140000,
+    "url": "https://opendata.naer.edu.tw/學術名詞/國家教育研究院-電子計算機學術名詞.csv",
+    "sha256": "ed9a713cdbdbd67915796125a13c49875cf225b8f88c5a38ac7d58e2ca9a8360",
+    "metadata": { "id": "naer-computer-science", "name": "国家教育研究院 · 计算机术语", "languages": "计算机与信息技术 · 中英双向检索", "sourceUrl": "https://data.gov.tw/dataset/15416", "license": "政府資料開放授權條款第1版", "version": "2026-10 snapshot", "attribution": "國家教育研究院《電子計算機學術名詞》；來源 https://terms.naer.edu.tw/；保留原文，建立双向与简体索引", "allowAiEvidence": true }
+  },
+  {
+    "file": "naer-computing.csv", "format": "naer", "minimumEntries": 3000,
+    "url": "https://opendata.naer.edu.tw/學術名詞/國家教育研究院-兩岸對照名詞-計算機學術名詞.csv",
+    "sha256": "d8d65ba4097d45dd1c5d6b737fc942a1bd92d74d76ce6d6fb5348001b11b75bd",
+    "metadata": { "id": "naer-computing-cross-strait", "name": "国家教育研究院 · 计算机两岸译名", "languages": "计算机术语 · 英文、台湾与大陆译名对照", "sourceUrl": "https://data.gov.tw/dataset/15275", "license": "政府資料開放授權條款第1版", "version": "2026-10 snapshot", "attribution": "國家教育研究院《兩岸對照名詞-計算機學術名詞》；來源 https://terms.naer.edu.tw/；保留各地译名，建立双向与简体索引", "allowAiEvidence": true }
+  },
+  {
+    "file": "naer-electrical.csv", "format": "naer", "minimumEntries": 200000,
+    "url": "https://opendata.naer.edu.tw/學術名詞/國家教育研究院-電機工程學術名詞.csv",
+    "sha256": "a4ed1fb6bbe7f06a2959c69bfbc7eba3d9a5151c752da77da9b2c73553bc87a7",
+    "metadata": { "id": "naer-electrical", "name": "国家教育研究院 · 电机工程术语", "languages": "电子、电气与通信 · 中英双向检索", "sourceUrl": "https://data.gov.tw/dataset/15418", "license": "政府資料開放授權條款第1版", "version": "2026-10 snapshot", "attribution": "國家教育研究院《電機工程學術名詞》；來源 https://terms.naer.edu.tw/；保留原文，建立双向与简体索引", "allowAiEvidence": true }
+  },
+  {
+    "file": "naer-physics.csv", "format": "naer", "minimumEntries": 30000,
+    "url": "https://opendata.naer.edu.tw/學術名詞/國家教育研究院-物理學學術名詞.csv",
+    "sha256": "deab126282e3ef5cd67274622049198af38f61cdb04a1e617aab850832c2b1c6",
+    "metadata": { "id": "naer-physics", "name": "国家教育研究院 · 物理学术语", "languages": "物理学专业术语 · 中英双向检索", "sourceUrl": "https://data.gov.tw/dataset/15317", "license": "政府資料開放授權條款第1版", "version": "2026-10 snapshot", "attribution": "國家教育研究院《物理學學術名詞》；來源 https://terms.naer.edu.tw/；保留原文，建立双向与简体索引", "allowAiEvidence": true }
+  },
+  {
+    "file": "naer-mathematics.csv", "format": "naer", "minimumEntries": 20000,
+    "url": "https://opendata.naer.edu.tw/學術名詞/國家教育研究院-數學學術名詞.csv",
+    "sha256": "7d87046b66433e4e9331065473b7b1d3f03cddfab4540e3b2315239ad47e802c",
+    "metadata": { "id": "naer-mathematics", "name": "国家教育研究院 · 数学术语", "languages": "数学专业术语 · 中英双向检索", "sourceUrl": "https://data.gov.tw/dataset/15443", "license": "政府資料開放授權條款第1版", "version": "2026-10 snapshot", "attribution": "國家教育研究院《數學學術名詞》；來源 https://terms.naer.edu.tw/；保留原文，建立双向与简体索引", "allowAiEvidence": true }
   }
 ]

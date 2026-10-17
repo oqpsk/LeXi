@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.7.0
+
+- Consolidate query timing and status into a single bottom bar. Give regeneration a persistent button surface and border, and use an accessible two-state online switch with a thumb, clear labels and keyboard focus. Remove the passive dictionary count and redundant footer text.
+- Add five official NAER offline terminology datasets: computer science, cross-strait computing translations, electrical engineering, physics and mathematics. Pin source checksums and retain attribution, original wording and simplified lookup aliases.
+- Preserve and index both regional translations in cross-strait terminology; label them separately. Add optional dictionary IDs to the installer so existing installations can add selected sources without replacing other dictionaries.
+- Verify regional lookup aliases and original text, accessible switch states and compact bottom-bar layout without opening or automating desktop windows.
+
 ## 0.6.1
 
 - Unify search-row controls into evenly spaced 32-DIP targets with 18-DIP vector icons and consistent strokes. Remove the isolated Enter-button background and divider.

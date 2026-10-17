@@ -3,7 +3,7 @@
     Icon="Assets/Lexi.ico" PreviewKeyDown="Window_KeyDown" Activated="Window_Activated">
   <Border Background="{DynamicResource WindowSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="12">
     <Grid>
-      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
       <Border Background="Transparent" BorderBrush="{StaticResource Stroke}" BorderThickness="0,0,0,1" Padding="18,14,10,10">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="32"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -59,23 +59,14 @@
           </StackPanel>
         </StackPanel>
       </ScrollViewer>
-      <Grid Grid.Row="3" Margin="22,0,16,10">
-        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <TextBlock x:Name="LookupStatus" Text="正在准备词库…" FontSize="13" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-        <Button x:Name="RefreshButton" Grid.Column="1" Content="重新生成" Click="Refresh_Click" Padding="8,4" Margin="8,0,0,0" FontSize="13" Foreground="{StaticResource Muted}" Visibility="Collapsed"/>
-      </Grid>
-      <Border Grid.Row="4" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="16,8">
+      <Border x:Name="StatusBar" Grid.Row="3" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="14,6">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Background="Transparent">
-            <Border Background="{StaticResource AccentSurface}" Width="20" Height="20" CornerRadius="5" Margin="0,0,7,0"><TextBlock Text="L" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-            <TextBlock Text="Lexi" FontSize="14" Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
-          </StackPanel>
-          <TextBlock x:Name="Footer" Grid.Column="1" Text="词典 · 翻译" FontSize="13" Margin="14,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+          <Border Background="{StaticResource AccentSurface}" Width="20" Height="20" CornerRadius="5" VerticalAlignment="Center" ToolTip="Lexi"><TextBlock Text="L" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+          <TextBlock x:Name="LookupStatus" Grid.Column="1" Text="正在准备词库…" FontSize="13" Margin="10,0,12,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.LiveSetting="Polite"/>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-            <Button x:Name="OnlineToggle" Click="Online_Click" FontSize="13" Padding="6,3" ToolTip="关闭后只使用本地词库与已缓存结果" Margin="0,0,12,0"/>
-            <TextBlock Text="收起" Foreground="{StaticResource Muted}" FontSize="13" VerticalAlignment="Center" Margin="0,0,7,0"/>
-            <Border BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="4" Padding="5,1"><TextBlock Text="Esc" Foreground="{StaticResource Muted}" FontSize="12"/></Border>
+            <Button x:Name="RefreshButton" Content="重新生成" Click="Refresh_Click" Height="32" Padding="10,4" Margin="0,0,10,0" FontSize="13" Background="{StaticResource Surface}" BorderBrush="#565861" BorderThickness="1" Visibility="Collapsed" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="重新生成当前查询"/>
+            <ToggleButton x:Name="OnlineToggle" Style="{StaticResource OnlineSwitch}" Click="Online_Click" AutomationProperties.Name="在线补充"/>
           </StackPanel>
         </Grid>
       </Border>
