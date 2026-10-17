@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rewrite README.md as a product overview covering both platforms: lookup and translation, offline dictionaries, AI definitions and merging, subscriptions, speech, saved results, navigation and privacy.
+
 - Add LeXi for macOS (`apple/`): a SwiftUI app for macOS 26+ that bundles the self-contained `Lexi.Host` and renders its views. It supports lookup, translation, suggestions, history, back/forward navigation, regeneration, the online switch, settings with the shared validation, dictionary management, official-client status and sign-in in Terminal, and system-voice speech. Liquid Glass is limited to the toolbar, search bar, footer controls and popovers; results use the normal background with pink as an accent. Keys are left to the input method while it composes text.
 - Lay out the macOS window like the Windows one and make Liquid Glass visible: a translucent window background, glass query and bottom bars that results scroll beneath, definitions on panels, the Windows TL;DR badge, and the brand mark in the bottom bar for history. Pink is limited to brand and state; buttons, disclosures and links are neutral, and Settings follow the system accent.
 - Add `apple/scripts/build-app.sh` to assemble `LeXi.app` with the host, model schemas, an icon generated from the brand mark and the license notices, and Swift tests for protocol decoding, view state, the real host and result layout. The macOS CI job runs them and builds the app.
