@@ -24,7 +24,7 @@ public static class StreamingEntry
     {
         var bytes = Encoding.UTF8.GetBytes(Unwrap(text));
         var reader = new Utf8JsonReader(bytes, isFinalBlock: false, state: default);
-        string? property = null, word = null;
+        string? property = null, word = null, phonetic = null;
         bool inSenses = false;
         var senses = new List<AiSense>();
         Dictionary<string, string>? fields = null;
@@ -36,6 +36,7 @@ public static class StreamingEntry
                 else if (reader.TokenType == JsonTokenType.String)
                 {
                     if (reader.CurrentDepth == 1 && property == "word") word = reader.GetString();
+                    if (reader.CurrentDepth == 1 && property == "phonetic") phonetic = reader.GetString();
                     if (fields != null && reader.CurrentDepth == 3 && property != null) fields[property] = reader.GetString() ?? "";
                 }
                 else if (reader.TokenType == JsonTokenType.StartArray && reader.CurrentDepth == 1 && property == "senses") inSenses = true;
@@ -48,7 +49,7 @@ public static class StreamingEntry
         catch (JsonException) { return null; }
         if (fields != null) AddSense(fields, senses);
         if (word == null || Queries.Normalize(word) != Queries.Normalize(query) || senses.Count == 0 || senses.Count > 8) return null;
-        return new(query, true, CodexDictionary.PrioritizeCurrent(senses), "", "unverified");
+        return new(query, true, CodexDictionary.PrioritizeCurrent(senses), "", "unverified", Pronunciation.Valid(phonetic) ? phonetic!.Trim() : "");
     }
 
     private static void AddSense(Dictionary<string, string> fields, List<AiSense> senses)

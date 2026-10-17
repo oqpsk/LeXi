@@ -3,7 +3,7 @@
     Icon="Assets/Lexi.ico" PreviewKeyDown="Window_KeyDown" Activated="Window_Activated">
   <Border Background="{DynamicResource WindowSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="12">
     <Grid>
-      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
       <Border Background="Transparent" BorderBrush="{StaticResource Stroke}" BorderThickness="0,0,0,1" Padding="18,14,10,10">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="32"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -15,6 +15,7 @@
             <TextBlock x:Name="Placeholder" Text="查一个词，或翻译一段文字…" IsHitTestVisible="False" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="20"/>
           </Grid>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+            <local:QueryProgressView x:Name="QueryProgress" Margin="0,0,8,0"/>
             <Button Click="Search_Click" Width="30" Height="26" Padding="0" Background="{StaticResource Surface}" BorderThickness="1" ToolTip="查询" AutomationProperties.Name="查询"><Path Data="{StaticResource EnterIcon}" Style="{StaticResource IconPath}" Width="13" Height="13"/></Button>
             <Border Width="1" Height="20" Background="{StaticResource Stroke}" Margin="12,0,7,0"/>
             <Button Style="{StaticResource IconButton}" Click="Settings_Click" ToolTip="设置 · Ctrl+," AutomationProperties.Name="设置"><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource IconPath}"/></Button>
@@ -23,8 +24,7 @@
         </Grid>
       </Border>
       <ListBox x:Name="Suggestions" Grid.Row="1" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议"/>
-      <local:QueryProgressView x:Name="QueryProgress" Grid.Row="2"/>
-      <ScrollViewer x:Name="ResultsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,14,16,14">
+      <ScrollViewer x:Name="ResultsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,14,16,14">
         <StackPanel>
           <StackPanel x:Name="Welcome">
             <TextBlock Text="随手查，随时懂。" FontSize="26" FontWeight="SemiBold" Margin="4,13,0,8"/>
@@ -56,6 +56,7 @@
             <WrapPanel Margin="0,0,0,10">
               <TextBlock x:Name="Headword" FontSize="30" FontWeight="SemiBold" Margin="0,0,12,0"/>
               <TextBlock x:Name="Phonetic" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
+              <Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button>
             </WrapPanel>
             <StackPanel x:Name="AiPanel"/>
             <StackPanel x:Name="LocalPanel"/>
@@ -63,12 +64,12 @@
           </StackPanel>
         </StackPanel>
       </ScrollViewer>
-      <Grid Grid.Row="4" Margin="22,0,16,10">
+      <Grid Grid.Row="3" Margin="22,0,16,10">
         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <TextBlock x:Name="LookupStatus" Text="正在准备词库…" FontSize="13" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
         <Button x:Name="RefreshButton" Grid.Column="1" Content="重新生成" Click="Refresh_Click" Padding="8,4" Margin="8,0,0,0" FontSize="13" Foreground="{StaticResource Muted}" Visibility="Collapsed"/>
       </Grid>
-      <Border Grid.Row="5" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="16,8">
+      <Border Grid.Row="4" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="16,8">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Background="Transparent">

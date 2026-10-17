@@ -21,6 +21,8 @@ try {
     if ($LASTEXITCODE) { throw 'Extended dictionary/translation checks failed' }
     & dotnet $runner parallel-check (Join-Path $root '.cache/parallel-checks')
     if ($LASTEXITCODE) { throw 'Parallel dictionary checks failed' }
+    & dotnet $runner speech-check
+    if ($LASTEXITCODE) { throw 'Pronunciation and speech checks failed' }
     & dotnet run --project tests/Lexi.PresentationChecks -c Release
     if ($LASTEXITCODE) { throw 'WPF resource construction checks failed' }
 } finally { Pop-Location }

@@ -7,10 +7,11 @@
         "type": "object", "additionalProperties": false,
         "properties": {
           "a": { "type": "string" }, "b": { "type": "string" },
-          "relation": { "type": "string", "enum": ["equivalent", "different", "uncertain"] },
-          "confidence": { "type": "number" }
+          "relation": { "type": "string", "enum": ["equivalent", "same_usage", "a_covers_b", "b_covers_a", "different", "uncertain"] },
+          "confidence": { "type": "number" },
+          "preferred": { "type": "string" }
         },
-        "required": ["a", "b", "relation", "confidence"]
+        "required": ["a", "b", "relation", "confidence", "preferred"]
       }
     }
   },

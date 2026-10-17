@@ -27,7 +27,7 @@ internal static class ParallelChecks
         AiEntry Entry(params AiSense[] senses) => new("chad", true, senses, "", "unverified");
         var answers = new[] { new ModelAnswer(primary, ModelPhase.Complete, Entry(slang, country)), new ModelAnswer(second, ModelPhase.Complete, Entry(reworded)) };
         var request = SenseMerging.Request("chad", answers);
-        var plan = new SenseMergePlan(request.InputHash, request.Pairs.Select(p => new SenseVerdict(p.A, p.B, p.A == "m0s0" ? "equivalent" : "different", 0.99)).ToArray());
+        var plan = new SenseMergePlan(request.InputHash, request.Pairs.Select(p => new SenseVerdict(p.A, p.B, p.A == "m0s0" && p.B == "m1s0" ? "equivalent" : "different", 0.99)).ToArray());
         var groups = SenseMerging.Group(answers, SenseMerging.Parse(JsonSerializer.Serialize(plan, Json.Options), request));
         Check(groups.Length == 2 && groups[0].Variants.Length == 2 && groups[1].Representative.Sense == country, "equivalent slang is grouped while the country meaning remains distinct");
         Check(groups[0].Variants.Any(v => v.Sense == reworded) && groups[0].Representative.Sense == slang, "grouping keeps original definitions and alternative wording");
@@ -47,6 +47,22 @@ internal static class ParallelChecks
         Check(SenseMerging.Group(bridgeAnswers, bridge).Length == 2, "non-transitive comparisons cannot collapse conflicting meanings");
         var exact = new[] { answers[0] with { Entry = Entry(slang) }, answers[1] with { Entry = Entry(slang) } };
         Check(SenseMerging.Request("chad", exact).Pairs.Length == 0 && SenseMerging.Group(exact).Length == 1, "identical definitions need no judge request");
+        var narrowA = Sense("an unpleasant person", "令人反感的人");
+        var narrowB = Sense("a physically unappealing person", "外形难看的人");
+        var broad = Sense("an unpleasant or physically unappealing person", "令人反感或外形难看的人");
+        var facets = new[] { new ModelAnswer(primary, ModelPhase.Complete, Entry(narrowA, narrowB, country)), new ModelAnswer(second, ModelPhase.Complete, Entry(broad)) };
+        var facetRequest = SenseMerging.Request("fixture", facets);
+        Check(facetRequest.Pairs.Any(p => p.A == "m0s0" && p.B == "m0s1"), "the judge compares related senses within the same model");
+        var facetPlan = new SenseMergePlan(facetRequest.InputHash, facetRequest.Pairs.Select(p => p.A == "m0s2" || p.B == "m0s2"
+            ? new SenseVerdict(p.A, p.B, "different", 0.99)
+            : new SenseVerdict(p.A, p.B, "same_usage", 0.99, p.B == "m1s0" ? p.B : p.A)).ToArray());
+        var facetGroups = SenseMerging.Group(facets, SenseMerging.Parse(JsonSerializer.Serialize(facetPlan, Json.Options), facetRequest));
+        Check(facetGroups.Length == 2 && facetGroups[0].Representative.Sense == broad && facetGroups[0].Variants.Length == 3 && facetGroups[0].IncludesUsageVariants,
+            "related facets share the comprehensive original wording while distinct meanings remain separate");
+        Check(facetGroups.Sum(g => g.Variants.Length) == facets.Sum(a => a.Entry!.Senses.Length), "usage grouping retains every original variant and its provenance");
+        var singleFacets = facets.Take(1).ToArray();
+        Check(SenseMerging.Request("fixture", singleFacets).Pairs.Length == 3, "single-model queries still receive sense comparison");
+        Check(SenseMerging.CacheKind == "sense-merges-v2", "revised grouping never reuses legacy comparison caches");
         foreach (var bad in new[]
         {
             plan with { InputHash = "different query" }, plan with { Pairs = [] },
@@ -80,7 +96,7 @@ internal static class ParallelChecks
         Task<SenseMergePlan> Judge(SenseMergeRequest input, AppSettings option, CancellationToken token)
         {
             judgeCalls++;
-            return Task.FromResult(new SenseMergePlan(input.InputHash, input.Pairs.Select(p => new SenseVerdict(p.A, p.B, p.A == "m0s0" ? "equivalent" : "different", 0.99)).ToArray()));
+            return Task.FromResult(new SenseMergePlan(input.InputHash, input.Pairs.Select(p => new SenseVerdict(p.A, p.B, p.A == "m0s0" && p.B == "m1s0" ? "equivalent" : "different", 0.99)).ToArray()));
         }
         var coordinator = new DictionaryCoordinator(cache, Lookup, Judge);
         var run = coordinator.LookupAsync("chad", null, settings, false, CancellationToken.None, new CallbackProgress<LookupSnapshot>(s =>

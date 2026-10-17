@@ -10,7 +10,7 @@ ECDICT is distributed under its upstream MIT license, reproduced in [licenses/EC
 
 ## Wiktionary
 
-English and Chinese entries are retrieved from [English Wiktionary](https://en.wiktionary.org/). Displayed entries retain the originating page link. Wiktionary text is generally provided under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), subject to the source page's terms and attribution requirements. Cached source text remains third-party content; it is not relicensed as Lexi code.
+English and Chinese entries, including English IPA pronunciation, are retrieved from [English Wiktionary](https://en.wiktionary.org/). Displayed entries retain the originating page link; pronunciation attribution is available in its tooltip. Wiktionary text is generally provided under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), subject to the source page's terms and attribution requirements. Cached source text remains third-party content; it is not relicensed as Lexi code.
 
 ## Open English WordNet
 
@@ -37,6 +37,10 @@ Sources: [maritime terms](https://data.gov.tw/dataset/15339), [shipbuilding term
 ## Model clients and generated output
 
 Claude Code and Codex are separately installed official applications. Their terms, authentication and usage limits remain with their respective providers. They are not bundled in this repository. AI-generated explanations and examples are labeled as generated, with available evidence distinguished from unverified output.
+
+## Speech services
+
+Windows speech uses the system's installed SAPI components and voices; Lexi does not redistribute them. Optional [OpenAI TTS](https://developers.openai.com/api/docs/guides/text-to-speech) and [Grok TTS](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech) use user-configured API credentials and are subject to those providers' service terms and billing. Speech is labeled synthetic; generated audio remains local user data and is not included in source or release packages.
 
 ## Test data and icon
 

@@ -53,7 +53,7 @@ public sealed record Sense(string PartOfSpeech, string Definition, string[] Exam
 public sealed record OnlineEntry(string Word, Sense[] Senses, string Url, DateTimeOffset FetchedAt);
 public sealed record AiSense(string PartOfSpeech, string English, string Chinese, string Register,
     string Example, string ExampleChinese, int[] Evidence);
-public sealed record AiEntry(string Word, bool Found, AiSense[] Senses, string Note, string EvidenceStatus);
+public sealed record AiEntry(string Word, bool Found, AiSense[] Senses, string Note, string EvidenceStatus, string Phonetic = "");
 public sealed record AiEnvelope(AiEntry Entry, string EvidenceHash, DateTimeOffset GeneratedAt, string Model = "", string ReasoningEffort = "low", string Provider = "codex");
 
 public static class Json
@@ -77,6 +77,9 @@ public sealed class AppSettings
     public string SecondaryModel { get; set; } = "";
     public bool MergeSenses { get; set; } = true;
     public string JudgeModel { get; set; } = "gpt-6-luna";
+    public string SpeechProvider { get; set; } = "windows";
+    public string SpeechModel { get; set; } = "sapi";
+    public string SpeechVoice { get; set; } = "auto";
     public AppSettings ForModel(LookupModel model)
     {
         var copy = (AppSettings)MemberwiseClone();

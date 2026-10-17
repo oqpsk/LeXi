@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.6.0
+
+- Compare senses within each model as well as across models. Group confident facets of one lexical usage, prefer the most comprehensive original wording, and preserve all original definitions and attribution under expandable details. Keep materially different usages separate and invalidate older merge plans without discarding model results.
+- Restore phonetics independently of model definitions: prefer offline pronunciation, fetch and cache English Wiktionary IPA when missing, and label model-only IPA as unverified. Reject late pronunciation updates from canceled queries.
+- Add explicitly triggered pronunciation with Windows local voices by default, plus OpenAI and Grok TTS model/voice settings and preview. Encrypt user-entered cloud API keys with Windows current-user protection, cache complete audio by text/model/voice, and support cancellation without switching providers. Cloud TTS requires separate API credentials and billing.
+- Move query progress into a four-dot diamond beside the search input. Show dictionary, supplement, merge and completion details on hover or keyboard focus, retain incomplete-result states, and stop animation when results settle.
+- Add account-free IPA, TTS protocol, credential-encryption, cancellation, grouping and compact-progress checks. Local voice validation writes a WAV file without playing audio; cloud endpoints use synthetic responses in automated tests.
+
 ## 0.5.2
 
 - Use a pink accent and rose text-selection highlight across the main window and settings, retaining readable selected text over Acrylic.

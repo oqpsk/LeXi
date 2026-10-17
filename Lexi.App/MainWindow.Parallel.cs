@@ -19,6 +19,7 @@ public partial class MainWindow
 
     internal void RenderAnswers(LookupSnapshot snapshot, OnlineEntry? evidence, bool finalized = true)
     {
+        ApplyModelPronunciation(snapshot);
         AiPanel.Children.Clear();
         if (snapshot.Groups.Length == 0 && snapshot.Answers.All(a => a.Phase == ModelPhase.Offline)) return;
         var stable = finalized && !snapshot.Provisional;
