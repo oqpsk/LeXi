@@ -6,13 +6,15 @@ public sealed class DictionaryCoordinator(Cache cache,
     Func<LookupModel, string, OnlineEntry?, AppSettings, CancellationToken, IProgress<AiEntry>, Task<AiEntry>> lookup,
     Func<SenseMergeRequest, AppSettings, CancellationToken, Task<SenseMergePlan>> judge)
 {
-    public const string CacheKind = "ai-v3";
+    public const string CacheKind = "ai-v4";
     public static bool ExpectedFailure(Exception e) => e is InvalidOperationException or TimeoutException or InvalidDataException or
         JsonException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception;
 
-    private AiEnvelope? Read(string query, OnlineEntry? evidence, LookupModel model, AppSettings settings)
+    private AiEnvelope? Read(string query, OnlineEntry? evidence, LookupModel model, AppSettings settings, out bool legacy)
     {
         var saved = cache.Read<AiEnvelope>(CacheKind, model.CacheKey(query, settings));
+        legacy = saved == null;
+        if (legacy) saved = cache.Read<AiEnvelope>("ai-v3", model.CacheKey(query, settings));
         if (saved == null || saved.Provider != model.Provider || saved.Model != model.Model ||
             saved.ReasoningEffort != settings.ReasoningEffort || saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence)) return null;
         try { return saved with { Entry = CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(saved.Entry, Json.Options), query, evidence) }; }
@@ -23,7 +25,7 @@ public sealed class DictionaryCoordinator(Cache cache,
     {
         var answers = LookupModel.Selected(settings).Select(model =>
         {
-            var saved = Read(query, evidence, model, settings);
+            var saved = Read(query, evidence, model, settings, out _);
             return new ModelAnswer(model, ModelPhase.Offline, saved?.Entry, saved != null);
         }).ToArray();
         var request = SenseMerging.Request(query, answers);
@@ -41,7 +43,8 @@ public sealed class DictionaryCoordinator(Cache cache,
     {
         var settings = options.ForModel(LookupModel.Primary(options));
         var models = LookupModel.Selected(settings);
-        var saved = models.Select(m => Read(query, evidence, m, settings)).ToArray();
+        var loaded = models.Select(m => { var saved = Read(query, evidence, m, settings, out var legacy); return (Saved: saved, Legacy: legacy); }).ToArray();
+        var saved = loaded.Select(s => s.Saved).ToArray();
         var answers = models.Select((m, i) => new ModelAnswer(m, ModelPhase.Pending, saved[i]?.Entry, saved[i] != null)).ToArray();
         var closed = new bool[models.Length];
         var sync = new object();
@@ -53,7 +56,7 @@ public sealed class DictionaryCoordinator(Cache cache,
             try
             {
                 token.ThrowIfCancellationRequested();
-                if (!settings.Online || !force && saved[i] != null && DateTimeOffset.UtcNow - saved[i]!.GeneratedAt < TimeSpan.FromDays(7))
+                if (!settings.Online || !force && !loaded[i].Legacy && saved[i] != null && DateTimeOffset.UtcNow - saved[i]!.GeneratedAt < TimeSpan.FromDays(7))
                 {
                     lock (sync) { answers[i] = answers[i] with { Phase = settings.Online ? ModelPhase.Complete : ModelPhase.Offline }; closed[i] = true; Publish(); }
                     return;

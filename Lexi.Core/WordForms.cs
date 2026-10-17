@@ -1,6 +1,6 @@
 namespace Lexi.Core;
 
-public sealed record WordForm(string Kind, string Label, string[] Words, string SourceName = "", string SourceUrl = "");
+public sealed record WordForm(string Kind, string Label, string[] Words, string SourceName = "", string SourceUrl = "", string Note = "");
 public sealed record WordFormSet(string Lemma, WordForm[] Forms, string SourceName, string SourceUrl)
 {
     public string[] Roles(string query) => Forms.Where(f => f.Words.Any(w => Queries.Normalize(w) == Queries.Normalize(query))).Select(f => f.Label).ToArray();

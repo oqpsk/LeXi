@@ -53,7 +53,9 @@ public sealed record Sense(string PartOfSpeech, string Definition, string[] Exam
 public sealed record OnlineEntry(string Word, Sense[] Senses, string Url, DateTimeOffset FetchedAt);
 public sealed record AiSense(string PartOfSpeech, string English, string Chinese, string Register,
     string Example, string ExampleChinese, int[] Evidence);
-public sealed record AiEntry(string Word, bool Found, AiSense[] Senses, string Note, string EvidenceStatus, string Phonetic = "");
+public sealed record AiInflection(string Kind, string[] Words);
+public sealed record AiWordForms(string Lemma, string PartOfSpeech, AiInflection[] Forms);
+public sealed record AiEntry(string Word, bool Found, AiSense[] Senses, string Note, string EvidenceStatus, string Phonetic = "", AiWordForms[]? WordForms = null);
 public sealed record AiEnvelope(AiEntry Entry, string EvidenceHash, DateTimeOffset GeneratedAt, string Model = "", string ReasoningEffort = "low", string Provider = "codex");
 
 public static class Json

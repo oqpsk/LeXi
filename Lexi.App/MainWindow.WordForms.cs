@@ -9,11 +9,38 @@ namespace Lexi;
 public partial class MainWindow
 {
     private WordFormSet[] localWordForms = [], onlineWordForms = [];
-    private void ResetWordForms() { localWordForms = []; onlineWordForms = []; FormsPanel.Children.Clear(); }
-    private void ApplyLocalWordForms(string query, WordFormSet[] entries)
-    { localWordForms = entries; RenderWordForms(query, WordForms.Combine(localWordForms, onlineWordForms)); }
-    private void ApplyOnlineWordForms(string query, WordFormSet[] entries)
-    { onlineWordForms = entries; RenderWordForms(query, WordForms.Combine(localWordForms, onlineWordForms)); }
+    private readonly Dictionary<LookupModel, AiEntry> wordFormAnswers = [];
+    private LookupModel[] wordFormModelOrder = [];
+    private string wordFormQuery = "";
+    internal void ResetWordForms() { localWordForms = []; onlineWordForms = []; wordFormAnswers.Clear(); wordFormModelOrder = []; wordFormQuery = ""; FormsPanel.Children.Clear(); }
+    private bool MatchWordFormQuery(string query)
+    {
+        if (wordFormQuery.Length > 0 && wordFormQuery != query) return false;
+        wordFormQuery = query; return true;
+    }
+    internal void ApplyLocalWordForms(string query, WordFormSet[] entries)
+    { if (!MatchWordFormQuery(query)) return; localWordForms = entries; RefreshWordForms(query); }
+    internal void ApplyOnlineWordForms(string query, WordFormSet[] entries)
+    { if (!MatchWordFormQuery(query)) return; onlineWordForms = entries; RefreshWordForms(query); }
+    internal void ApplyModelWordForms(string query, LookupSnapshot snapshot)
+    {
+        if (query.Length == 0 || !MatchWordFormQuery(query)) return;
+        wordFormModelOrder = snapshot.Answers.Select(a => a.Model).ToArray();
+        var changed = false;
+        foreach (var answer in snapshot.Answers)
+        {
+            // Keep the last complete data while a replacement streams. Partial morphology
+            // never becomes visible or cached, even if a provider preview includes it.
+            if (answer.Phase == ModelPhase.Streaming) continue;
+            if (answer.Entry is { Found: true, WordForms: not null } entry && Queries.Normalize(entry.Word) == query)
+            { wordFormAnswers[answer.Model] = entry; changed = true; }
+            else if (answer.Entry is { Found: false } || answer.Phase == ModelPhase.Failed && !answer.Cached)
+                changed |= wordFormAnswers.Remove(answer.Model);
+        }
+        if (changed) RefreshWordForms(query);
+    }
+    private void RefreshWordForms(string query) => RenderWordForms(query, ModelInflections.Supplement(query,
+        WordForms.Combine(localWordForms, onlineWordForms), wordFormModelOrder.Where(wordFormAnswers.ContainsKey).Select(m => (m, wordFormAnswers[m]))));
 
     internal void RenderWordForms(string query, WordFormSet[] entries)
     {
@@ -30,10 +57,11 @@ public partial class MainWindow
                 if (sharedPast && original.Kind == "d") continue;
                 var form = sharedPast && original.Kind == "p" ? original with { Label = "过去式 / 过去分词",
                     SourceName = string.Join(" / ", new[] { original.SourceName, participle!.SourceName }.Where(s => s.Length > 0).Distinct()),
-                    SourceUrl = string.Join("\n", new[] { original.SourceUrl, participle!.SourceUrl }.Where(s => s.Length > 0).Distinct()) } : original;
+                    SourceUrl = string.Join("\n", new[] { original.SourceUrl, participle!.SourceUrl }.Where(s => s.Length > 0).Distinct()),
+                    Note = string.Join("\n", new[] { original.Note, participle!.Note }.Where(s => s.Length > 0).Distinct()) } : original;
                 var source = form.SourceName.Length > 0 ? form.SourceName : entry.SourceName;
                 var url = form.SourceUrl.Length > 0 ? form.SourceUrl : entry.SourceUrl;
-                var cell = new TextBlock { Margin = new(0,0,16,4), ToolTip = "词形来源：" + source + "\n" + url };
+                var cell = new TextBlock { Margin = new(0,0,16,4), ToolTip = string.Join("\n", new[] { "词形来源：" + source, url, form.Note }.Where(s => s.Length > 0)) };
                 // Inline runs share a typographic baseline even with different fonts and sizes.
                 cell.Inlines.Add(new Run(form.Label + "  ") { FontSize = 13, Foreground = muted });
                 var spelling = string.Join(" / ", form.Words);
