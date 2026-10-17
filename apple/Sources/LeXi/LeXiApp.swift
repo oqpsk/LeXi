@@ -11,13 +11,14 @@ struct LeXiApp: App {
         Window("LeXi", id: "main") {
             MainView(store: store)
                 .task { await start() }
-                .tint(LexiTheme.pink)
         }
         .defaultSize(width: 720, height: 680)
+        .windowBackgroundDragBehavior(.enabled)
         .commands { LexiCommands() }
 
+        // Settings follow the system accent color; pink stays a brand accent in the query window.
         Settings {
-            SettingsView(store: store).tint(LexiTheme.pink)
+            SettingsView(store: store)
         }
     }
 

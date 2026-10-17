@@ -35,11 +35,11 @@ struct HeadingRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(view.heading)
-                .font(.system(size: view.kind == .translation ? 24 : 28, weight: .semibold))
+                .font(.system(size: view.kind == .translation ? 26 : 30, weight: .bold))
                 .textSelection(.enabled)
             if !view.pronunciation.text.isEmpty {
                 Text(view.pronunciation.text)
-                    .font(view.kind == .translation ? .system(size: 15) : LexiTheme.lexical(17))
+                    .font(view.kind == .translation ? .system(size: 15) : LexiTheme.lexical(19))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                     .help(view.pronunciation.attribution)
@@ -52,15 +52,17 @@ struct HeadingRow: View {
             }
             if !view.speechText.isEmpty {
                 Button { speech.toggle(view.speechText, using: store) } label: {
-                    Image(systemName: speech.speaking ? "stop.circle" : "speaker.wave.2")
+                    Image(systemName: speech.speaking ? "stop.circle" : "speaker.wave.2").font(.system(size: 15))
                 }
                 .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
                 .help(speech.speaking ? "停止播放" : "播放合成发音")
                 .accessibilityLabel(speech.speaking ? "停止合成发音" : "播放合成发音")
             }
             if !view.etymology.isEmpty {
-                Button { showEtymology.toggle() } label: { Image(systemName: "scroll") }
+                Button { showEtymology.toggle() } label: { Image(systemName: "scroll").font(.system(size: 15)) }
                     .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
                     .help("词源")
                     .accessibilityLabel("查看词源")
                     .popover(isPresented: $showEtymology, arrowEdge: .bottom) { EtymologyPopover(items: view.etymology) }
@@ -113,20 +115,16 @@ struct QuickReadCard: View {
     let quickRead: QuickRead
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            Text("TL;DR")
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .foregroundStyle(.black)
-                .padding(.horizontal, 6).padding(.vertical, 3)
-                .background(LexiTheme.pink, in: .rect(cornerRadius: 5))
-                .accessibilityHidden(true)
-            Text(quickRead.text).font(.system(size: 17)).textSelection(.enabled).help(quickRead.tooltip)
+            QuickReadBadge()
+            Text(quickRead.text).font(.system(size: 18, weight: .medium)).textSelection(.enabled).help(quickRead.tooltip)
             if quickRead.showState {
                 Text(quickRead.state).font(.caption).foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
+        .padding(.horizontal, 14).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LexiTheme.pink.opacity(0.14), in: .rect(cornerRadius: 10))
+        .background(LexiTheme.pink.opacity(0.13), in: .rect(cornerRadius: 12))
+        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(LexiTheme.pink.opacity(0.22)) }
         .help(quickRead.caption + "\n" + quickRead.explanation)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(quickRead.caption + "。" + quickRead.text)
@@ -141,25 +139,35 @@ struct TranslationCard: View {
                 Text(translation.error).foregroundStyle(.secondary)
             } else {
                 HStack {
-                    Text("翻译").font(.headline).foregroundStyle(LexiTheme.accentText)
+                    Text("翻译").font(.headline)
                     Spacer()
                     Text(translation.source).font(.caption).foregroundStyle(.secondary)
                 }
                 Text(translation.hint).font(.callout).foregroundStyle(.secondary)
                 ForEach(Array(translation.paragraphs.enumerated()), id: \.offset) { _, paragraph in
-                    Text(paragraph).font(.system(size: 17)).lineSpacing(5).textSelection(.enabled)
+                    Text(paragraph).font(.system(size: 18)).lineSpacing(6).textSelection(.enabled)
                 }
                 if !translation.note.trimmingCharacters(in: .whitespaces).isEmpty {
                     Text(translation.note).font(.callout).foregroundStyle(.secondary)
                 }
                 if translation.complete {
-                    Button("复制译文") { copyToPasteboard(translation.paragraphs.joined(separator: "\n\n")) }
+                    Button { copyToPasteboard(translation.paragraphs.joined(separator: "\n\n")) } label: {
+                        Label("复制译文", systemImage: "doc.on.doc").labelStyle(LeadingCopyIcon())
+                    }
+                    .buttonStyle(DisclosureStyle(open: false))
                 }
             }
         }
-        .padding(16)
+        .padding(.horizontal, 18).padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
+        .background(LexiTheme.panel, in: .rect(cornerRadius: 12))
+        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(LexiTheme.stroke) }
+    }
+}
+
+private struct LeadingCopyIcon: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 5) { configuration.icon.imageScale(.small); configuration.title }
     }
 }
 
@@ -168,8 +176,12 @@ struct SourceLink: View {
     let url: String
     init(_ label: String, url: String) { self.label = label; self.url = url }
     var body: some View {
+        // Quiet like the Windows source links; the pointer and arrow mark them as links.
         Button { openSource(url) } label: { Label(label, systemImage: "arrow.up.right").labelStyle(TrailingIcon()) }
-            .buttonStyle(.link)
+            .buttonStyle(.plain)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .pointerStyle(.link)
             .help(url)
     }
 }
