@@ -30,7 +30,7 @@ public sealed partial class SettingsWindow : Window
         DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
         var cancel = new Button { Content = "取消", Padding = new(22,10,22,10), Margin = new(0,0,8,0), IsCancel = true };
         cancel.Click += (_, _) => DialogResult = false; actions.Children.Add(cancel);
-        var save = new Button { Content = "保存", Background = Theme.Brush("Selection"), Foreground = Theme.Brush("Ink"), Padding = new(26,10,26,10), IsDefault = true }; actions.Children.Add(save);
+        var save = new Button { Content = "保存", Style = (Style)FindResource("PrimaryButton"), Background = Theme.Brush("Accent"), Foreground = Theme.Brush("Canvas"), Padding = new(26,10,26,10), IsDefault = true }; actions.Children.Add(save);
         var tabs = new TabControl();
         root.Children.Add(tabs);
         var general = new StackPanel { Margin = new(2,4,8,10) };
@@ -39,6 +39,7 @@ public sealed partial class SettingsWindow : Window
         var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
         general.Children.Add(online); general.Children.Add(ai);
         general.Children.Add(Text("使用本机 Claude Code / Codex 的订阅登录。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。", 14, Muted));
+        general.Children.Add(Text("查过的内容直接使用缓存。切换模型后，点击“重新生成”才会更新已有结果。", 14, Muted));
         var label = Text("主要模型 · 查词与翻译"); label.Margin = new(0,13,0,8); general.Children.Add(label);
         var choices = new List<ModelChoice> { new("Claude Haiku · 流式显示", "haiku", "claude"), new("GPT-6 Luna · Fast", "gpt-6-luna"), new("GPT-6.1 Sol · Fast", "gpt-6.1-sol"), new("Codex 默认 · Fast", "") };
         var primaryChoice = LookupModel.Primary(settings); var secondChoice = LookupModel.Secondary(settings);

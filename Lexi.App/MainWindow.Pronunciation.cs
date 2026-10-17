@@ -10,11 +10,8 @@ public partial class MainWindow
     private readonly Pronunciation pronunciations = new();
     private bool sourcePronunciation;
 
-    private async Task LoadPronunciationAsync(string query, LocalHit[] local, CancellationToken token, bool force)
+    internal async Task LoadPronunciationAsync(string query, CancellationToken token, bool force, bool allowNetwork = true)
     {
-        sourcePronunciation = !string.IsNullOrWhiteSpace(Phonetic.Text);
-        if (sourcePronunciation)
-            Phonetic.ToolTip = "音标来源：" + local.First(h => Pronunciation.Format(h.Entry.Phonetic).Length > 0).Dictionary.Name;
         if (Queries.HasChinese(query)) return;
         var cached = cache.Read<PronunciationEntry>("pronunciations-v3", query);
         void Apply(PronunciationEntry entry)
@@ -29,7 +26,7 @@ public partial class MainWindow
         }
         if (cached?.Word == query) Apply(cached);
         else if (cache.Read<PronunciationEntry>("pronunciations-v2", query) is { } legacy && legacy.Word == query) Apply(legacy);
-        if (!settings.Online || !force && cached?.Word == query && DateTimeOffset.UtcNow - cached.FetchedAt < TimeSpan.FromDays(30)) return;
+        if (!allowNetwork || !settings.Online || !force && cached?.Word == query) return;
         try
         {
             var entry = await pronunciations.LookupAsync(query, token);

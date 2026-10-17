@@ -117,12 +117,12 @@ public partial class MainWindow : Window
             dictionaryTask.IsCompletedSuccessfully && dictionaryTask.Result.Dictionaries.Any(d => d.Available && !(settings.DisabledDictionaries ?? []).Contains(d.Id)) ?
                 "准备就绪" : "暂无可用离线词库 · 可在设置中检查";
     }
-    private async void Online_Click(object sender, RoutedEventArgs e)
+    private void Online_Click(object sender, RoutedEventArgs e)
     {
         settings.Online = OnlineToggle.IsChecked == true; SaveSettings(); UpdateOnlineButton();
         lookup?.Cancel();
         UpdatePreparedModel();
-        if (current.Length > 0) await SearchAsync(current);
+        if (current.Length > 0) KeepCurrentResult("查询模式已更改");
         else UpdateReadyStatus();
     }
     private void UpdatePreparedModel()
@@ -138,7 +138,7 @@ public partial class MainWindow : Window
         try { settings.Save(App.UserRoot); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { LookupStatus.Text = "设置暂时无法保存，请检查文件夹写入权限。"; }
     }
-    private async void Settings_Click(object sender, RoutedEventArgs e)
+    private void Settings_Click(object sender, RoutedEventArgs e)
     {
         StopSpeech();
         // Closing preferences do not invalidate dictionary/model results.
@@ -157,7 +157,7 @@ public partial class MainWindow : Window
             {
                 lookup?.Cancel();
                 UpdatePreparedModel();
-                if (current.Length > 0) await SearchAsync(current);
+                if (current.Length > 0) KeepCurrentResult("查询设置已保存");
             }
         }
         FocusSearch();
@@ -169,7 +169,9 @@ public partial class MainWindow : Window
         var timing = new LookupTiming();
         var knownTerm = raw.Length <= 100 && !raw.Contains('\n') && dictionaryTask.IsCompletedSuccessfully &&
             dictionaryTask.Result.Lookup(Queries.Normalize(raw), settings).Length > 0;
-        var translating = navigating ? navigation.Current.Translation : Queries.IsText(raw, knownTerm);
+        var savedDictionary = SavedResults.Dictionary(Queries.LookupKey(raw));
+        var savedTranslation = SavedResults.TranslationResult(raw.Trim(), Translation.Target(raw.Trim()));
+        var translating = navigating ? navigation.Current.Translation : savedTranslation != null || savedDictionary == null && Queries.IsText(raw, knownTerm);
         if (!navigating) { RecordVisit(raw.Trim(), translating); history.Record(raw, translating); }
         if (translating)
         { await TranslateTextAsync(raw.Trim(), force, timing); return; }
@@ -197,6 +199,7 @@ public partial class MainWindow : Window
         Task pronunciationTask = Task.CompletedTask;
         try
         {
+            if (RestoreDictionary(query, force, request, timing)) return;
             try
             {
                 if (settings.OfflineEnabled)
@@ -212,7 +215,8 @@ public partial class MainWindow : Window
             RenderLocal(local, query); BeginLexicalOverview(query, local);
             if (local.Any(h => !string.IsNullOrWhiteSpace(h.Entry.Chinese + h.Entry.English + h.Entry.Original)) ||
                 SpecialistReferences.Lookup(query).Length > 0) timing.MarkFirst();
-            pronunciationTask = LoadPronunciationAsync(query, local, token, force);
+            // Read existing pronunciation/etymology before deciding whether any network work is needed.
+            pronunciationTask = LoadPronunciationAsync(query, token, force, allowNetwork: false);
             var online = cache.Read<OnlineEntry>("online-v3", query);
             var legacyOnline = online == null;
             if (legacyOnline && query == Queries.Normalize(query)) online = cache.Read<OnlineEntry>("online-v2", query);
@@ -221,13 +225,25 @@ public partial class MainWindow : Window
             var coordinator = CreateCoordinator();
             var cachedAnswers = coordinator.Cached(query, evidence, settings);
             if (cachedAnswers.Groups.Length > 0) { RenderAnswers(cachedAnswers, evidence, !settings.Online); timing.MarkFirst(); }
+            if (!force && (cachedAnswers.Answers.Any(a => a.Entry != null) || online != null && !settings.AutoAi))
+            {
+                RenderAnswers(cachedAnswers, evidence);
+                await SaveDictionaryAsync(query, local, online, evidence, cachedAnswers, settings.MergeSenses, sourceIncomplete, token);
+                token.ThrowIfCancellationRequested(); timing.MarkFirst();
+                QueryProgress.Update(request, QueryProgressState.Finished(cachedAnswers, settings.MergeSenses, sourceIncomplete) with
+                    { Detail = "已恢复已有缓存 · 点击重新生成可更新" });
+                LookupStatus.Text = timing.Finish("已显示缓存 · 重新生成可更新"); return;
+            }
             if (!settings.Online)
             {
                 await pronunciationTask; token.ThrowIfCancellationRequested();
+                await SaveDictionaryAsync(query, local, online, evidence, cachedAnswers, false, sourceIncomplete, token);
+                token.ThrowIfCancellationRequested();
                 LookupStatus.Text = timing.Finish("离线模式 · 使用本地词库与已缓存释义");
                 QueryProgress.Update(request, QueryProgressState.SourcesFinished(true, sourceIncomplete)); return;
             }
-            var fresh = !force && !legacyOnline && online != null && DateTimeOffset.UtcNow - online.FetchedAt < TimeSpan.FromDays(1);
+            pronunciationTask = LoadPronunciationAsync(query, token, force);
+            var fresh = !force && online != null;
             if (!fresh && (force || !Queries.HasChinese(query) || !local.Any(h => h.Dictionary.AllowAiEvidence)))
             {
                 LookupStatus.Text = "本地查询完成 · 正在查在线词典…";
@@ -251,6 +267,8 @@ public partial class MainWindow : Window
             if (!modelsEnabled)
             {
                 await pronunciationTask; token.ThrowIfCancellationRequested();
+                await SaveDictionaryAsync(query, local, online, evidence, cachedAnswers, false, sourceIncomplete, token);
+                token.ThrowIfCancellationRequested();
                 LookupStatus.Text = timing.Finish(Status(notes, "查询完成 · 点击“重新生成”获取双语释义"));
                 QueryProgress.Update(request, QueryProgressState.SourcesFinished(false, sourceIncomplete)); return;
             }
@@ -272,6 +290,8 @@ public partial class MainWindow : Window
                 RenderAnswers(result, evidence);
                 if (result.Groups.Length > 0) timing.MarkFirst();
                 await pronunciationTask;
+                token.ThrowIfCancellationRequested();
+                await SaveDictionaryAsync(query, local, online, evidence, result, mergeEnabled, sourceIncomplete, token);
                 token.ThrowIfCancellationRequested();
                 QueryProgress.Update(request, QueryProgressState.Finished(result, mergeEnabled, sourceIncomplete, SpecialistReferences.Uncovered(query, result.Groups, evidence).Length));
                 var failures = result.Answers.Count(a => a.Phase == ModelPhase.Failed);
@@ -322,7 +342,10 @@ public partial class MainWindow : Window
         LocalPanel.Children.Clear();
         if (!settings.OfflineEnabled) { LocalPanel.Children.Add(Hint("离线词典已停用，可在设置中重新启用。")); return; }
         if (hits.Length == 0) { LocalPanel.Children.Add(Hint("已启用的离线词典未收录此词。")); return; }
-        Phonetic.Text = Queries.AbbreviationCandidate(query) ? "" : hits.Select(h => Pronunciation.Format(h.Entry.Phonetic)).FirstOrDefault(p => p.Length > 0) ?? "";
+        var pronunciationHit = Queries.AbbreviationCandidate(query) ? null : hits.FirstOrDefault(h => Pronunciation.Format(h.Entry.Phonetic).Length > 0);
+        Phonetic.Text = pronunciationHit == null ? "" : Pronunciation.Format(pronunciationHit.Entry.Phonetic);
+        sourcePronunciation = pronunciationHit != null;
+        Phonetic.ToolTip = pronunciationHit == null ? null : "音标来源：" + pronunciationHit.Dictionary.Name;
         foreach (var hit in hits)
         {
             var entry = hit.Entry;

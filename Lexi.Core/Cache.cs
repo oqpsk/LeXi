@@ -13,12 +13,18 @@ public sealed class Cache(string root)
         try { return JsonSerializer.Deserialize<T>(File.ReadAllText(PathFor(kind, query)), Json.Options); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return default; }
     }
-    public async Task WriteAsync<T>(string kind, string query, T value)
+    public async Task WriteAsync<T>(string kind, string query, T value, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         var path = PathFor(kind, query);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try { await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(value, Json.Options)); File.Move(temp, path, true); }
+        try
+        {
+            await File.WriteAllTextAsync(temp, JsonSerializer.Serialize(value, Json.Options), token);
+            token.ThrowIfCancellationRequested();
+            File.Move(temp, path, true);
+        }
         finally { if (File.Exists(temp)) File.Delete(temp); }
     }
 }
