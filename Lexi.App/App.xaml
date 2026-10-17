@@ -3,7 +3,7 @@
     <FontFamily x:Key="UiFont">Segoe UI, Microsoft YaHei UI</FontFamily>
     <FontFamily x:Key="LexicalFont">Georgia, Cambria, SimSun</FontFamily>
     <FontFamily x:Key="ChineseExampleFont">SimSun, Georgia</FontFamily>
-    <SolidColorBrush x:Key="LogoSurface" Color="#17171B"/>
+    <SolidColorBrush x:Key="LogoSurface" Color="#000000"/>
     <SolidColorBrush x:Key="Canvas" Color="#191A1D"/>
     <SolidColorBrush x:Key="WindowSurface" Color="#191A1D"/>
     <SolidColorBrush x:Key="PanelSurface" Color="#99222327"/>

@@ -41,7 +41,7 @@ internal static class ParallelChecks
             "source labels do not override the user's preferred primary wording");
         var differentlyLabeled = new[] { answers[0] with { Entry = Entry(country, slang with { Register = "informal" }) }, answers[1] };
         var labelPlan = new SenseMergePlan("unused", [new("m0s1", "m1s0", "equivalent", 0.99)]);
-        Check(SenseMerging.Group(differentlyLabeled, labelPlan)[0].Variants.Length == 2, "a secondary slang label keeps the merged modern meaning first");
+        Check(SenseMerging.Group(differentlyLabeled, labelPlan)[0].Representative.Sense == country && SenseMerging.Group(differentlyLabeled, labelPlan)[1].Variants.Length == 2, "labels do not promote secondary variants ahead of semantic order");
         var uncertain = plan with { Pairs = plan.Pairs.Select(p => p with { Relation = "uncertain" }).ToArray() };
         Check(SenseMerging.Group(answers, uncertain).Length == 3, "uncertain meanings stay visible");
         var lowConfidence = plan with { Pairs = plan.Pairs.Select(p => p with { Confidence = 0.7 }).ToArray() };
@@ -66,7 +66,7 @@ internal static class ParallelChecks
         Check(facetGroups.Sum(g => g.Variants.Length) == facets.Sum(a => a.Entry!.Senses.Length), "usage grouping retains every original variant and its provenance");
         var singleFacets = facets.Take(1).ToArray();
         Check(SenseMerging.Request("fixture", singleFacets).Pairs.Length == 3, "single-model queries still receive sense comparison");
-        Check(SenseMerging.CacheKind == "sense-merges-v4", "revised grouping never reuses legacy comparison caches");
+        Check(SenseMerging.CacheKind == "sense-merges-v5", "revised grouping never reuses legacy comparison caches");
         foreach (var bad in new[]
         {
             plan with { InputHash = "different query" }, plan with { Pairs = [] },
@@ -83,7 +83,7 @@ internal static class ParallelChecks
         var combined = DictionaryEvidence.Combine("chad", [], manyEvidence)!;
         Check(combined.Senses[0].Definition.Contains("Internet slang"), "modern evidence survives evidence truncation and is prioritized");
         using (var prompt = JsonDocument.Parse(CodexDictionary.DefineRequest("chad", combined).Split('\n').Last()))
-            Check(prompt.RootElement.GetProperty("priorityEvidence")[0].GetInt32() == 1 && prompt.RootElement.GetProperty("maxSenses").GetInt32() == 6, "definition request explicitly requires modern sense coverage");
+            Check(prompt.RootElement.GetProperty("coverageEvidence")[0].GetInt32() == 1 && prompt.RootElement.GetProperty("maxSenses").GetInt32() == 6, "definition request explicitly requires modern sense coverage");
 
         var cache = new Cache(Path.Combine(work, "parallel"));
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
