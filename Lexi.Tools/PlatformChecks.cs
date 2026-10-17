@@ -51,8 +51,11 @@ internal static class PlatformChecks
         var npmBin = Path.Combine(work, "npm", "bin");
         var cli = Touch(Path.Combine(work, "npm", "lib", "node_modules", "@anthropic-ai", "claude-code", "cli.js"), "#!/usr/bin/env node\n");
         var node = Touch(Path.Combine(npmBin, "node"), "binary");
+        // Another node earlier in the search order (as Homebrew's is on many Macs) must not win.
+        var otherNode = Touch(Path.Combine(home, ".local", "bin", "node"), "binary");
         Check(installed || ToolLocator.Claude(unix) is { } npmClaude && npmClaude.FileName == node && npmClaude.Script == cli,
             "an npm-global Claude runs through node from the same prefix instead of relying on the shebang PATH");
+        File.Delete(otherNode);
         var shim = Touch(Path.Combine(npmBin, "codex"), "#!/usr/bin/env node\nimport('../lib/codex.js');\n");
         var login = ProviderConnection.Command("codex", shim, true)!;
         Check((installed || ToolLocator.Codex("", unix) is { } found && found.FileName == node && found.Script == shim) &&
