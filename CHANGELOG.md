@@ -25,6 +25,11 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.18 (Windows)
+
+- Make each read-aloud row include its speaker gutter and disclosure indentation in one transparent hit area, so moving from the text to the speaker cannot hide it in the gap. Preserve the existing text positions and speaker column.
+- Center speakers on the actual first line's letterforms after layout, including English italics, Chinese fonts, wrapping and display scaling. Reposition the icon without changing row spacing.
+
 ## 0.9.17 (Windows)
 
 - Build and package per-definition and per-example speech for Windows: reveal the speaker on hover, offer whole-block or selected-text reading in the context menu, and keep stop/highlight state attached to the item being read. Use the configured provider and existing audio cache.

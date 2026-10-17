@@ -43,13 +43,21 @@ public partial class MainWindow
         var margin = text.Margin; text.Margin = new(0);
         // The tint reaches a little past the text without moving it.
         var surface = new Border { Child = text, CornerRadius = new(6), Margin = new(-6,-2,-6,-2), Padding = new(6,2,6,2) };
-        var lineHeight = TextBlock.GetLineHeight(text) is var height && double.IsFinite(height) && height > 0 ? height : text.FontSize * 1.4;
+        var speakerOffset = new TranslateTransform();
         var speaker = new Button { Style = (Style)FindResource("IconButton"), Width = 22, Height = 22,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
-            Margin = new(-(ReadAloudGutter + indent), Math.Max(0, (lineHeight - 22) / 2), 0, 0) };
+            RenderTransform = speakerOffset };
         var block = new ReadAloudBlock(key, surface, speaker);
-        var container = new Grid { Margin = margin, Tag = key };
+        var gutter = ReadAloudGutter + indent;
+        // The whole path from the text to its button belongs to this row, including
+        // disclosure indentation. A child outside the old row left a hover dead zone.
+        var container = new Grid { Background = Brushes.Transparent,
+            Margin = new(margin.Left - gutter, margin.Top, margin.Right, margin.Bottom), Tag = key };
+        container.ColumnDefinitions.Add(new() { Width = new(gutter) });
+        container.ColumnDefinitions.Add(new());
+        Grid.SetColumn(surface, 1);
         container.Children.Add(surface); container.Children.Add(speaker);
+        AlignReadAloud(text, container, speakerOffset, speaker.Height);
         container.MouseEnter += (_, _) => { block.Hovering = true; block.Show(speakingKey == key); };
         container.MouseLeave += (_, _) => { block.Hovering = false; block.Show(speakingKey == key); };
         speaker.Click += async (_, _) => await ReadAloudAsync(key, text.Text, "");
@@ -57,6 +65,31 @@ public partial class MainWindow
         readAloudBlocks.Add(block);
         block.Show(speakingKey == key);
         return container;
+    }
+
+    private static void AlignReadAloud(TextBox text, Grid row, TranslateTransform offset, double buttonHeight)
+    {
+        var face = new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch);
+        string? previousLine = null;
+        var previousCaret = Rect.Empty;
+        double previousScale = 0;
+        text.LayoutUpdated += (_, _) =>
+        {
+            if (!text.IsArrangeValid || text.LineCount < 1) return;
+            var caret = text.GetRectFromCharacterIndex(0);
+            if (caret.IsEmpty) return;
+            var firstLine = text.GetLineText(0).TrimEnd('\r', '\n');
+            var scale = VisualTreeHelper.GetDpi(text).PixelsPerDip;
+            if (firstLine == previousLine && caret == previousCaret && scale == previousScale) return;
+            previousLine = firstLine; previousCaret = caret; previousScale = scale;
+            // Use the rendered first line's ink, rather than half the paragraph's
+            // line spacing. This also accounts for serif italics and CJK fallback.
+            var formatted = new FormattedText(firstLine, text.Language.GetSpecificCulture(), text.FlowDirection,
+                face, text.FontSize, Brushes.Black, scale);
+            var ink = formatted.BuildGeometry(new Point()).Bounds;
+            var center = caret.Top + (ink.IsEmpty ? caret.Height / 2 : ink.Top + ink.Height / 2);
+            offset.Y = Math.Max(0, text.TranslatePoint(new Point(0, center), row).Y - buttonHeight / 2);
+        };
     }
 
     private ContextMenu ReadAloudMenu(TextBox text, string key)
