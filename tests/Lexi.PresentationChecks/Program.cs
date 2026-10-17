@@ -61,6 +61,7 @@ internal static partial class Program
         CheckLexicalDetails(main);
         CheckQuickRead(main);
         CheckHistory(main);
+        CheckSuggestions(main);
         CheckWindowNavigation(main, settings);
         CheckWindowMemory();
         CheckNativeWindowMemory();
