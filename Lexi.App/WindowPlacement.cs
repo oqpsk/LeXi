@@ -51,18 +51,23 @@ internal sealed class WindowPlacement : IDisposable
     private readonly Window window;
     private readonly string path;
     private readonly DispatcherTimer timer;
+    private readonly WindowPosition? startup;
     private WindowPosition? last;
     private bool ready;
     internal WindowState RestoreState => last?.Maximized == true ? WindowState.Maximized : WindowState.Normal;
 
     internal WindowPlacement(Window window, string path)
     {
-        this.window = window; this.path = path; last = WindowPosition.Load(path);
-        if (last != null) window.WindowStartupLocation = WindowStartupLocation.Manual;
+        this.window = window; this.path = path; startup = last = WindowPosition.Load(path);
+        if (startup != null)
+        {
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            if (startup.Maximized) window.WindowState = WindowState.Maximized;
+        }
         timer = new(DispatcherPriority.Background, window.Dispatcher) { Interval = TimeSpan.FromMilliseconds(400) };
         timer.Tick += Tick;
         window.SourceInitialized += Initialize;
-        window.Loaded += Loaded;
+        window.ContentRendered += Rendered;
         window.LocationChanged += Changed;
         window.SizeChanged += Resized;
         window.StateChanged += StateChanged;
@@ -71,13 +76,34 @@ internal sealed class WindowPlacement : IDisposable
     }
     private void Initialize(object? sender, EventArgs e)
     {
-        if (last == null) return;
-        var native = ToNative(last);
-        // Windows relocates an entirely off-screen saved rectangle after a monitor
-        // is unplugged. The saved minimized state is never restored on launch.
-        SetWindowPlacement(new WindowInteropHelper(window).Handle, ref native);
+        // Stage native bounds before the first frame without making the HWND visible.
+        // WPF/chrome can still change placement during startup. Never save it here.
+        if (startup != null) Apply(startup);
     }
-    private void Loaded(object sender, RoutedEventArgs e) { ready = true; Flush(); }
+    private void Rendered(object? sender, EventArgs e) => CompleteStartup();
+    internal void CompleteStartup()
+    {
+        if (ready) return;
+        // Keep the original saved rectangle immutable until layout/chrome has settled.
+        // Loaded can run while WPF is still creating the native window; saving then
+        // can replace the stored position before restoration is complete.
+        if (startup != null && !Apply(startup)) return;
+        ready = true;
+        window.ContentRendered -= Rendered;
+        Flush();
+    }
+    private bool Apply(WindowPosition value)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        if (handle == IntPtr.Zero) return false;
+        var native = ToNative(value);
+        // SW_HIDE preserves a never-shown test/initialization HWND. SW_SHOWNOACTIVATE
+        // restores normal bounds without stealing focus. Windows also relocates
+        // off-screen workspace rectangles after a monitor is disconnected.
+        if (!IsWindowVisible(handle)) native.Show = 0;
+        else if (!value.Maximized) native.Show = 4;
+        return SetWindowPlacement(handle, ref native);
+    }
     private void Changed(object? sender, EventArgs e) { if (ready) { timer.Stop(); timer.Start(); } }
     private void Resized(object sender, SizeChangedEventArgs e) => Changed(sender, e);
     private void StateChanged(object? sender, EventArgs e) => Flush();
@@ -108,7 +134,7 @@ internal sealed class WindowPlacement : IDisposable
     public void Dispose()
     {
         timer.Stop(); timer.Tick -= Tick; ready = false;
-        window.SourceInitialized -= Initialize; window.Loaded -= Loaded;
+        window.SourceInitialized -= Initialize; window.ContentRendered -= Rendered;
         window.LocationChanged -= Changed; window.SizeChanged -= Resized;
         window.StateChanged -= StateChanged; window.Closing -= Closing; window.Closed -= Closed;
     }
@@ -116,6 +142,8 @@ internal sealed class WindowPlacement : IDisposable
     [StructLayout(LayoutKind.Sequential)] internal struct Rect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] internal struct Placement
     { public int Length, Flags, Show; public Point Min, Max; public Rect Normal; }
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr hwnd);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetWindowPlacement(IntPtr hwnd, ref Placement placement);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
