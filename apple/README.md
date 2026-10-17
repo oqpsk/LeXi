@@ -51,11 +51,11 @@ dotnet Lexi.Tools/bin/Release/net10.0/Lexi.Tools.dll host-check .cache/test-dict
 
 ```
 apple/scripts/build-ios.sh                # 生成 artifacts/ios/LeXi.app（模拟器版本）
-apple/scripts/build-ios.sh --run          # 生成后安装到已启动的模拟器并打开
-apple/scripts/build-ios.sh --run "iPhone 17"
+apple/scripts/build-ios.sh --run "iPhone 17"   # 生成后启动该模拟器（如未启动），安装并打开
+apple/scripts/build-ios.sh --run               # 安装到已启动的模拟器
 ```
 
-还没有 Apple 开发者账号时，只能在模拟器中运行：应用使用临时签名，装不到真机。
+还没有 Apple 开发者账号时，只能在模拟器中运行：应用使用临时签名，装不到真机。钥匙串所需的权限按 Xcode 的做法链接进可执行文件（`apple/iOS/Package.swift`）；把权限写进签名会让模拟器拒绝启动应用。图标由 `make-icon.swift --ios` 生成满版图片，再用 `actool` 编译成资源目录。
 
 如果 `xcrun simctl boot` 一直没有结果，或 xcodebuild 提示 “CoreSimulator is out of date”，说明系统中的模拟器组件比 Xcode 旧：打开一次 Xcode 并按提示安装附加组件，或运行 `xcodebuild -runFirstLaunch`（需要管理员密码），然后重新启动模拟器。
 
@@ -65,4 +65,4 @@ apple/scripts/build-ios.sh --run "iPhone 17"
 cp -R ~/Library/Application\ Support/LeXi/data "$(xcrun simctl get_app_container booted io.github.oqpsk.lexi data)/Library/Application Support/LeXi/"
 ```
 
-`xcrun simctl openurl booted "lexi://lookup?q=serendipity"` 可以直接查一个词。`swift test --package-path apple` 中的 `EmbeddedHost` 测试用 macOS 版的 `LexiEmbed.dylib`（`dotnet publish Lexi.Embed -r osx-arm64 -o .cache/embed-publish`）检查同一条应用内调用路径。
+`xcrun simctl openurl booted "lexi://lookup?q=serendipity"` 可以直接查一个词（系统会先询问是否打开）。检查界面或截屏时，也可以用启动参数跳过点击：`xcrun simctl launch booted io.github.oqpsk.lexi -LexiLookup serendipity` 打开后直接查词，`-LexiSettings YES` 打开设置。`swift test --package-path apple` 中的 `EmbeddedHost` 测试用 macOS 版的 `LexiEmbed.dylib`（`dotnet publish Lexi.Embed -r osx-arm64 -o .cache/embed-publish`）检查同一条应用内调用路径。

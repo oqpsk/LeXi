@@ -34,7 +34,11 @@ struct RootView: View {
         // The lookup is ready the moment LeXi opens, as on the desktop. The field may join the
         // hierarchy a moment after the first appearance, so focus is asked for again on the next turn.
         .defaultFocus($searching, true)
-        .task { await Task.yield(); searching = true }
+        .task {
+            await Task.yield()
+            // For UI checks and screenshots: `-LexiSettings YES` opens settings at launch.
+            if UserDefaults.standard.bool(forKey: "LexiSettings") { showSettings = true } else { searching = true }
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -172,9 +176,10 @@ struct RootView: View {
         }
     }
 
+    // A new page (from a link, history or back/forward) puts the keyboard away so the result shows.
     private func pageChanged() {
         speech.stop()
-        if store.view.kind != .home { setText(store.view.input) }
+        if store.view.kind != .home { setText(store.view.input); searching = false }
     }
 }
 

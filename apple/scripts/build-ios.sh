@@ -3,7 +3,7 @@
 # NativeAOT library (Lexi.Embed), the SwiftUI app, and the signed app bundle. Needs Xcode 26+ with
 # the iOS Simulator and the .NET 10 SDK.
 #   apple/scripts/build-ios.sh [--run [device]] [output-folder]   (default: artifacts/ios)
-# --run installs and opens the app in the named simulator, or in the booted one.
+# --run boots the named simulator if needed, then installs and opens the app (default: the booted one).
 set -euo pipefail
 root=${0:A:h:h:h}
 run=false; device=booted
@@ -14,7 +14,7 @@ fi
 out=${1:-$root/artifacts/ios}
 work=$root/.cache/ios-build
 version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$root/Directory.Build.props")
-rm -rf "$work/embed" "$work/AppIcon.iconset" && mkdir -p "$work" "$out"
+rm -rf "$work/embed" && mkdir -p "$work" "$out"
 dotnet=${DOTNET:-$(command -v dotnet || true)}
 for candidate in $HOME/.dotnet/dotnet /usr/local/share/dotnet/dotnet /opt/homebrew/bin/dotnet; do
   [[ -z $dotnet && -x $candidate ]] && dotnet=$candidate
@@ -35,19 +35,31 @@ cp "$binary" "$app/LeXi"
 cp "$work/embed/LexiEmbed.dylib" "$app/Frameworks/LexiEmbed.dylib"
 cp -R "$work/embed/assets" "$app/assets"
 sed "s/__VERSION__/$version/g" "$root/apple/iOS/Resources/Info.plist" > "$app/Info.plist"
-swift "$root/apple/scripts/make-icon.swift" "$root/docs/brandmark.svg" "$work/AppIcon.iconset"
-for scale in 2 3; do
-  sips -z $((60 * scale)) $((60 * scale)) "$work/AppIcon.iconset/icon_512x512.png" --out "$app/AppIcon60x60@${scale}x.png" >/dev/null
-done
+# iOS takes the app icon from a compiled asset catalog: one full-bleed 1024-pixel image of the brand mark.
+icons=$work/Assets.xcassets/AppIcon.appiconset
+rm -rf "$work/Assets.xcassets" && mkdir -p "$icons"
+swift "$root/apple/scripts/make-icon.swift" "$root/docs/brandmark.svg" "$icons/AppIcon.png" --ios
+cat > "$icons/Contents.json" <<'JSON'
+{"images":[{"filename":"AppIcon.png","idiom":"universal","platform":"ios","size":"1024x1024"}],"info":{"author":"xcode","version":1}}
+JSON
+xcrun actool "$work/Assets.xcassets" --compile "$app" --platform iphonesimulator --minimum-deployment-target 26.0 \
+  --app-icon AppIcon --output-partial-info-plist "$work/icons.plist" >/dev/null
+/usr/libexec/PlistBuddy -c "Delete :CFBundleIcons" "$app/Info.plist" >/dev/null 2>&1 || true
+/usr/libexec/PlistBuddy -c "Merge $work/icons.plist" "$app/Info.plist" >/dev/null
 cp "$root/LICENSE" "$root/THIRD_PARTY_NOTICES.md" "$app/"
 cp -R "$root/licenses" "$app/licenses"
 
 # Ad-hoc signatures run in the Simulator only. A device build needs an Apple developer account.
 codesign --force --sign - "$app/Frameworks/LexiEmbed.dylib"
-codesign --force --sign - --entitlements "$root/apple/iOS/Resources/LeXi.entitlements" "$app"
+# The entitlements are linked into the binary (apple/iOS/Package.swift), as Xcode does for the Simulator.
+codesign --force --sign - "$app"
 echo "Built $app ($version, iOS Simulator)"
 
 if $run; then
+  # Boot the named simulator if it is not running yet, and show it.
+  [[ $device != booted ]] && { xcrun simctl boot "$device" 2>/dev/null || true }
+  xcrun simctl bootstatus "$device" -b >/dev/null
+  open "$(xcode-select -p)/Applications/Simulator.app" 2>/dev/null || true
   xcrun simctl install "$device" "$app"
   xcrun simctl launch "$device" io.github.oqpsk.lexi
 fi

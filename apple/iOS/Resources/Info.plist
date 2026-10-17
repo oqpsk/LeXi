@@ -12,11 +12,6 @@
 	<key>CFBundleShortVersionString</key><string>__VERSION__</string>
 	<key>CFBundleVersion</key><string>__VERSION__</string>
 	<key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
-	<key>CFBundleIcons</key>
-	<dict>
-		<key>CFBundlePrimaryIcon</key>
-		<dict><key>CFBundleIconFiles</key><array><string>AppIcon60x60</string></array></dict>
-	</dict>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

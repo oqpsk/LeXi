@@ -33,6 +33,8 @@ struct LeXiMobileApp: App {
         }
         await store.start(transport: transport)
         await ModelKeys.sendAll(to: store)
+        // For UI checks and screenshots: `-LexiLookup <text>` looks something up at launch.
+        if let query = UserDefaults.standard.string(forKey: "LexiLookup"), !query.isEmpty { await store.submit(query) }
     }
 }
 
