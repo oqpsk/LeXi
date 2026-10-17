@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.3
+
+- Show first-result latency and total query duration in the footer. Include routing, cached/offline results, model completion, sense judgment and pronunciation; apply the same timing to translation and terminal failures.
+- Select core meanings independently of technical coverage and display order. Reuse the existing sense judge to select overview IDs, place those meanings first, and keep every original definition accessible. New model responses identify core senses without an additional request; legacy unranked output is labeled as an excerpt until judged.
+- Version comparison caches so existing definition caches receive the improved overview selection without regenerating both models. Keep short summaries focused instead of filling a second slot with a peripheral meaning.
+
 ## 0.9.2
 
 - Use a uniformly rounded TL;DR card without a left accent rule. Preserve the existing tint, spacing and lookup behavior.

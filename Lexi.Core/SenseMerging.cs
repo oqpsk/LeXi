@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace Lexi.Core;
 
 public sealed record SenseCandidate(string Id, LookupModel Model, AiSense Sense, string EvidenceStatus, bool Provisional);
-public sealed record SenseGroup(SenseCandidate[] Variants, bool IncludesUsageVariants = false)
+public sealed record SenseGroup(SenseCandidate[] Variants, bool IncludesUsageVariants = false, int? OverviewRank = null, bool OverviewAssessed = false)
 {
     // Prefer the wording covering the group's usages; equal coverage preserves
     // model order. Agreement never upgrades the original provenance.
@@ -11,13 +11,13 @@ public sealed record SenseGroup(SenseCandidate[] Variants, bool IncludesUsageVar
 }
 public sealed record SensePair(string A, string B);
 public sealed record SenseVerdict(string A, string B, string Relation, double Confidence, string Preferred = "");
-public sealed record SenseMergePlan(string InputHash, SenseVerdict[] Pairs);
+public sealed record SenseMergePlan(string InputHash, SenseVerdict[] Pairs, string[]? Overview = null);
 public sealed record SenseMergeRequest(string Query, SenseCandidate[] Candidates, SensePair[] Pairs)
 {
-    // Gloss is display metadata. Keep the pre-gloss judgment identity for old caches.
+    // Presentation metadata cannot influence the independent core-meaning judgment.
     public string InputHash => Cache.Hash(JsonSerializer.Serialize(new
     {
-        version = 3, Query,
+        version = 4, Query,
         Candidates = Candidates.Select(c => new
         {
             c.Id, c.Model,
@@ -37,7 +37,7 @@ public sealed record SenseMergeRequest(string Query, SenseCandidate[] Candidates
 
 public static class SenseMerging
 {
-    public const string CacheKind = "sense-merges-v3";
+    public const string CacheKind = "sense-merges-v4";
     public static SenseCandidate[] Candidates(ModelAnswer[] answers) => answers.SelectMany((answer, modelIndex) =>
         (answer.Entry?.Senses ?? []).Select((sense, senseIndex) => new SenseCandidate($"m{modelIndex}s{senseIndex}",
             answer.Model, sense, answer.Entry!.EvidenceStatus, answer.Phase == ModelPhase.Streaming))).ToArray();
@@ -71,6 +71,10 @@ public static class SenseMerging
                 pair.Preferred != "" && pair.Preferred != pair.A && pair.Preferred != pair.B ||
                 !double.IsFinite(pair.Confidence) || pair.Confidence < 0 || pair.Confidence > 1)
                 throw new InvalidDataException("义项判断包含无效或重复的比较结果。");
+        if (plan.Overview is { } overview && (overview.Length > 2 ||
+            overview.Distinct().Count() != overview.Length ||
+            overview.Any(id => !request.Candidates.Any(c => c.Id == id))))
+            throw new InvalidDataException("核心义项选择包含无效或重复的标识。");
         return plan;
     }
 
@@ -97,8 +101,12 @@ public static class SenseMerging
                 (p.Preferred == c.Id && p.Relation == "same_usage" && g.Any(v => v.Id == p.A) && g.Any(v => v.Id == p.B)));
             var ids = g.Select(c => c.Id).ToHashSet();
             return new SenseGroup(g.OrderByDescending(Coverage).ToArray(), verdicts.Any(p => ids.Contains(p.A) && ids.Contains(p.B) &&
-                p.Relation is "same_usage" or "a_covers_b" or "b_covers_a"));
-        }).OrderBy(g => g.Variants.Min(v => LexicalCoverage.Rank(v.Sense.Register))).ToArray();
+                p.Relation is "same_usage" or "a_covers_b" or "b_covers_a"),
+                plan?.Overview?.Select((id, rank) => (id, rank)).Where(x => ids.Contains(x.id)).Select(x => (int?)x.rank).FirstOrDefault(),
+                plan?.Overview != null);
+        }).OrderBy(g => g.OverviewAssessed ? g.OverviewRank ?? int.MaxValue :
+                g.Variants.Any(v => !v.Provisional && v.Sense.CoreMeaning == true) ? 0 : int.MaxValue)
+            .ThenBy(g => g.Variants.Min(v => LexicalCoverage.Rank(v.Sense.Register))).ToArray();
     }
     private static string PairKey(string a, string b) => string.CompareOrdinal(a, b) < 0 ? a + ":" + b : b + ":" + a;
     public static bool IsCurrent(string? label) => new[] { "slang", "internet", "网络", "俚语" }

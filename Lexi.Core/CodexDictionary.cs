@@ -37,6 +37,7 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
                 priorityEvidence = evidence?.Senses.Select((s, i) => new { sense = s, number = i + 1 })
                     .Where(s => LexicalCoverage.Rank(s.sense.PartOfSpeech + " " + s.sense.Definition) < 2).Select(s => s.number).ToArray() ?? [],
                 coverage = "Independently check established meanings in the priority domains even when general dictionaries omit them, and include known specialist meanings first. Then include current Internet/slang and common everyday meanings. Do not fill the sense budget with only everyday meanings. Distinguish slang, literal and proper-name senses; preserve common meanings rather than spending the limit on obscure names or language families. Case-insensitive input may still refer to a capitalized meme name. Do not invent a slang meaning when none is known.",
+                overview = "Mark coreMeaning independently of coverage order: identify the central meaning of the whole term, normally one, at most two. Preferred domains ensure coverage; they must not displace the word's core concept with a peripheral person or specialized reuse.",
                 etymologyEvidence = evidence?.Etymologies ?? [],
                 evidence = EvidenceText(evidence)
             }, Json.Options);

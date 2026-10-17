@@ -156,10 +156,11 @@ public partial class MainWindow : Window
     {
         var validation = Queries.Validate(raw);
         if (validation != null) { LookupStatus.Text = validation; return; }
+        var timing = new LookupTiming();
         var knownTerm = raw.Length <= 100 && !raw.Contains('\n') && dictionaryTask.IsCompletedSuccessfully &&
             dictionaryTask.Result.Lookup(Queries.Normalize(raw), settings).Length > 0;
         if (Queries.IsText(raw, knownTerm))
-        { await TranslateTextAsync(raw.Trim(), force); return; }
+        { await TranslateTextAsync(raw.Trim(), force, timing); return; }
         var query = Queries.LookupKey(raw);
         StopSpeech();
         lookup?.Cancel(); lookup?.Dispose(); lookup = new();
@@ -178,10 +179,10 @@ public partial class MainWindow : Window
         var mergeEnabled = modelsEnabled && settings.MergeSenses;
         var initialProgress = QueryProgressState.Dictionary(modelsEnabled, mergeEnabled);
         var request = QueryProgress.Begin(initialProgress);
-        var watch = Stopwatch.StartNew();
         var notes = new List<string>();
         var sourceIncomplete = false;
         LocalHit[] local = [];
+        Task pronunciationTask = Task.CompletedTask;
         try
         {
             try
@@ -197,18 +198,21 @@ public partial class MainWindow : Window
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }
             token.ThrowIfCancellationRequested();
             RenderLocal(local, query); BeginLexicalOverview(query, local);
-            var pronunciationTask = LoadPronunciationAsync(query, local, token, force);
+            if (local.Any(h => !string.IsNullOrWhiteSpace(h.Entry.Chinese + h.Entry.English + h.Entry.Original)) ||
+                SpecialistReferences.Lookup(query).Length > 0) timing.MarkFirst();
+            pronunciationTask = LoadPronunciationAsync(query, local, token, force);
             var online = cache.Read<OnlineEntry>("online-v3", query);
             var legacyOnline = online == null;
             if (legacyOnline && query == Queries.Normalize(query)) online = cache.Read<OnlineEntry>("online-v2", query);
-            if (online != null) RenderOnline(online, true);
+            if (online != null) { RenderOnline(online, true); if (online.Senses.Length > 0) timing.MarkFirst(); }
             var evidence = DictionaryEvidence.Combine(query, local, online, sourceEtymologies);
             var coordinator = CreateCoordinator();
             var cachedAnswers = coordinator.Cached(query, evidence, settings);
-            if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence, !settings.Online);
+            if (cachedAnswers.Groups.Length > 0) { RenderAnswers(cachedAnswers, evidence, !settings.Online); timing.MarkFirst(); }
             if (!settings.Online)
             {
-                LookupStatus.Text = "离线模式 · 使用本地词库与已缓存释义";
+                await pronunciationTask; token.ThrowIfCancellationRequested();
+                LookupStatus.Text = timing.Finish("离线模式 · 使用本地词库与已缓存释义");
                 QueryProgress.Update(request, QueryProgressState.SourcesFinished(true, sourceIncomplete)); return;
             }
             var fresh = !force && !legacyOnline && online != null && DateTimeOffset.UtcNow - online.FetchedAt < TimeSpan.FromDays(1);
@@ -231,36 +235,37 @@ public partial class MainWindow : Window
             evidence = DictionaryEvidence.Combine(query, local, online, sourceEtymologies);
             cachedAnswers = coordinator.Cached(query, evidence, settings);
             RenderAnswers(cachedAnswers, evidence, !modelsEnabled);
+            if (cachedAnswers.Groups.Length > 0 || online?.Senses.Length > 0) timing.MarkFirst();
             if (!modelsEnabled)
             {
                 await pronunciationTask; token.ThrowIfCancellationRequested();
-                LookupStatus.Text = Status(notes, "查询完成 · 点击“重新生成”获取双语释义");
+                LookupStatus.Text = timing.Finish(Status(notes, "查询完成 · 点击“重新生成”获取双语释义"));
                 QueryProgress.Update(request, QueryProgressState.SourcesFinished(false, sourceIncomplete)); return;
             }
             QueryProgress.Update(request, QueryProgressState.Updating(new(LookupModel.Selected(settings).Select(m => new ModelAnswer(m, ModelPhase.Pending)).ToArray(), []), mergeEnabled));
-            long? firstDefinitionMs = null;
             var finished = false;
             try
             {
                 var progress = new Progress<LookupSnapshot>(snapshot =>
                 {
                     if (finished || token.IsCancellationRequested || current != query) return;
-                    if (snapshot.Groups.Length > 0) firstDefinitionMs ??= watch.ElapsedMilliseconds;
                     RenderAnswers(snapshot, evidence, false);
+                    if (snapshot.Groups.Length > 0) timing.MarkFirst();
                     QueryProgress.Update(request, QueryProgressState.Updating(snapshot, mergeEnabled));
                     LookupStatus.Text = snapshot.Merging ? "释义已显示 · 正在合并同义项…" : ModelStatus(snapshot);
                 });
                 var result = await coordinator.LookupAsync(query, evidence, settings, force, token, progress);
-                await pronunciationTask;
                 token.ThrowIfCancellationRequested();
                 finished = true;
-                if (result.Groups.Length > 0) firstDefinitionMs ??= watch.ElapsedMilliseconds;
                 RenderAnswers(result, evidence);
+                if (result.Groups.Length > 0) timing.MarkFirst();
+                await pronunciationTask;
+                token.ThrowIfCancellationRequested();
                 QueryProgress.Update(request, QueryProgressState.Finished(result, mergeEnabled, sourceIncomplete, SpecialistReferences.Uncovered(query, result.Groups, evidence).Length));
                 var failures = result.Answers.Count(a => a.Phase == ModelPhase.Failed);
                 var status = failures > 0 ? $"{failures} 个模型未完成 · 其余结果已保留" : "查询完成";
                 if (!string.IsNullOrEmpty(result.MergeNote)) status += " · " + result.MergeNote;
-                LookupStatus.Text = Status(notes, (firstDefinitionMs is { } first ? $"首条释义 {first / 1000.0:0.0} 秒 · " : "") + status);
+                LookupStatus.Text = timing.Finish(Status(notes, status));
             }
             finally { finished = true; }
         }
@@ -270,7 +275,10 @@ public partial class MainWindow : Window
         {
             if (!token.IsCancellationRequested)
             {
-                LookupStatus.Text = "读取失败，请检查词库文件是否完整。";
+                try { await pronunciationTask; }
+                catch (Exception pronunciationError) when (DictionaryCoordinator.ExpectedFailure(pronunciationError) || pronunciationError is OperationCanceledException) { }
+                if (token.IsCancellationRequested || current != query) return;
+                LookupStatus.Text = timing.Finish("读取失败，请检查词库文件是否完整。");
                 QueryProgress.Update(request, initialProgress.Interrupted("查询未完成", "读取失败 · 本次查询已结束，可重试"));
             }
         }

@@ -61,7 +61,7 @@ public sealed record LocalEntry(string Word, string Phonetic, string English, st
 public sealed record Sense(string PartOfSpeech, string Definition, string[] Examples, string SourceName = "", string SourceUrl = "", string Headword = "");
 public sealed record OnlineEntry(string Word, Sense[] Senses, string Url, DateTimeOffset FetchedAt, EtymologyExcerpt[]? Etymologies = null);
 public sealed record AiSense(string PartOfSpeech, string English, string Chinese, string Register,
-    string Example, string ExampleChinese, int[] Evidence, string LexicalForm = "word", string Expansion = "", string Gloss = "");
+    string Example, string ExampleChinese, int[] Evidence, string LexicalForm = "word", string Expansion = "", string Gloss = "", bool? CoreMeaning = null);
 public sealed record AiInflection(string Kind, string[] Words);
 public sealed record AiWordForms(string Lemma, string PartOfSpeech, AiInflection[] Forms);
 public sealed record AiEntry(string Word, bool Found, AiSense[] Senses, string Note, string EvidenceStatus, string Phonetic = "", AiWordForms[]? WordForms = null, string Etymology = "");

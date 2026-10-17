@@ -1,19 +1,61 @@
 {
-  "type": "object", "additionalProperties": false,
+  "type": "object",
+  "additionalProperties": false,
   "properties": {
-    "inputHash": { "type": "string" },
+    "inputHash": {
+      "type": "string"
+    },
     "pairs": {
-      "type": "array", "items": {
-        "type": "object", "additionalProperties": false,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
         "properties": {
-          "a": { "type": "string" }, "b": { "type": "string" },
-          "relation": { "type": "string", "enum": ["equivalent", "same_usage", "a_covers_b", "b_covers_a", "different", "uncertain"] },
-          "confidence": { "type": "number" },
-          "preferred": { "type": "string" }
+          "a": {
+            "type": "string"
+          },
+          "b": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "equivalent",
+              "same_usage",
+              "a_covers_b",
+              "b_covers_a",
+              "different",
+              "uncertain"
+            ]
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "preferred": {
+            "type": "string"
+          }
         },
-        "required": ["a", "b", "relation", "confidence", "preferred"]
+        "required": [
+          "a",
+          "b",
+          "relation",
+          "confidence",
+          "preferred"
+        ]
       }
+    },
+    "overview": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 2,
+      "description": "Select 1 or 2 supplied sense IDs for the central everyday meaning of the query, in importance order. Use [] if uncertain. Do not select two paraphrases of one usage."
     }
   },
-  "required": ["inputHash", "pairs"]
+  "required": [
+    "inputHash",
+    "pairs",
+    "overview"
+  ]
 }

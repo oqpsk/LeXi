@@ -62,6 +62,13 @@ internal static partial class Program
             Check(card.DesiredSize.Height<=92 && summary.FontSize>=19 && summary.IsReadOnly,
                 $"compact selectable overview stays readable at {width+2} DIP");
         }
+        var legacy = answer with { Entry=answer.Entry! with {Senses=[sense, sense with {Chinese="另一个概念",Gloss="另一个概念",Expansion="Other concept"}]} };
+        main.RenderAnswers(new([legacy],SenseMerging.Group([legacy])),evidence);
+        Check(caption.Text.StartsWith("义项摘录"), "unranked cached meanings do not claim to be a curated TLDR");
+        var request = SenseMerging.Request("TEE",[legacy]);
+        var plan = new SenseMergePlan(request.InputHash,request.Pairs.Select(p=>new SenseVerdict(p.A,p.B,"different",1)).ToArray(),["m0s1"]);
+        main.RenderAnswers(new([legacy],SenseMerging.Group([legacy],plan)),evidence);
+        Check(caption.Text=="TL;DR · 已整理" && summary.Text=="另一个概念", "late core selection replaces the excerpt with exactly the chosen meaning");
         main.ResetLexicalDetails();
         Check(card.Visibility==Visibility.Collapsed && summary.Text=="", "translation and a subsequent query cannot inherit the previous overview");
     }
