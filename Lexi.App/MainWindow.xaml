@@ -52,12 +52,12 @@
             <Border x:Name="QuickReadCard" Visibility="Collapsed" Background="{StaticResource AccentSoft}" BorderThickness="0" CornerRadius="7" Padding="12,9,12,10" Margin="0,2,0,14">
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border x:Name="QuickReadGuide" Width="26" Height="28" VerticalAlignment="Top" Margin="0,0,10,0" Background="Transparent">
-                  <TextBlock x:Name="QuickReadGlyph" Text="TL&#10;DR" Foreground="{StaticResource Accent}" FontSize="10.5" FontWeight="SemiBold"
-                      LineHeight="11" LineStackingStrategy="BlockLineHeight" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border x:Name="QuickReadGuide" Width="28" Height="28" VerticalAlignment="Center" Margin="0,0,12,0" Background="{StaticResource Accent}" CornerRadius="2">
+                  <Path x:Name="QuickReadGlyph" Data="{StaticResource QuickReadMark}" Fill="{StaticResource Canvas}" Width="20" Height="20" Stretch="Uniform"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Border>
-                <TextBox x:Name="QuickReadText" Grid.Column="1" Style="{StaticResource Selectable}" FontSize="19" TextBlock.LineHeight="28" TextBlock.LineStackingStrategy="BlockLineHeight"/>
-                <TextBlock x:Name="QuickReadState" Grid.Column="2" Visibility="Collapsed" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Top" Margin="10,5,0,0"/>
+                <TextBox x:Name="QuickReadText" Grid.Column="1" Style="{StaticResource Selectable}" FontSize="19" VerticalAlignment="Center" TextBlock.LineHeight="28" TextBlock.LineStackingStrategy="BlockLineHeight"/>
+                <TextBlock x:Name="QuickReadState" Grid.Column="2" Visibility="Collapsed" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"/>
               </Grid>
             </Border>
             <StackPanel x:Name="AiPanel"/>
