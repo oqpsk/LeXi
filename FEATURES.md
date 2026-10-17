@@ -23,7 +23,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 专业参考摘要 | `SpecialistReferences`、`ReferenceView` | 已实现 | 已实现 |
 | 查询阶段、结束状态与状态文字 | `QueryProgressState`、`QueryProgressTracker`、`QueryView.Status` | 已实现：输入框旁状态环，悬浮查看阶段；单行底栏 | 已实现：输入框旁状态指示，点击查看阶段；底栏状态 |
 | 保存的结果与重新生成 | `SavedQueries`、`QuerySession.RegenerateAsync` | 已实现：底栏“重新生成” | 已实现：底栏“重新生成”，⌘R |
-| 在线补充开关 | `QuerySession.SetOnline`、`ControlText` | 已实现：底栏两态开关 | 已实现：底栏开关 |
+| 在线补充开关 | `QuerySession.SetOnline`、`ControlText` | 已实现：底栏两态开关 | 已实现：底部玻璃按钮，以图标和文字区分在线与离线 |
 | 文本翻译与复制译文 | `Translation`、`TranslationView` | 已实现 | 已实现 |
 | 查询历史 | `QueryHistory` | 已实现：主页列表，可单条删除 | 已实现：主页列表，可单条删除；⌘Y |
 | 后退 / 前进 | `QueryNavigation`、`NavigationView` | 已实现：Alt+← / Alt+→ | 已实现：工具栏按钮，⌘[ / ⌘] |
@@ -32,7 +32,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 
 | 功能 | 共享行为（Lexi.Core） | Windows | macOS |
 |---|---|---|---|
-| 查询与模型设置 | `AppSettings`、`ModelCatalog`（模型选项与校验）、`QuerySession.SettingsSaved` | 已实现 | 已实现：设置窗口，修改即生效，校验与提示同 Windows |
+| 查询与模型设置 | `AppSettings`、`ModelCatalog`（模型选项与校验）、`QuerySession.SettingsSaved` | 已实现 | 已实现：系统设置风格的分组表单，修改即生效，校验与提示同 Windows |
 | 离线词典启停与信息 | `DictionaryCatalog` | 已实现：设置 → 离线词典 | 已实现：设置 → 离线词典；安装词库需 PowerShell 7 运行同一安装脚本 |
 | 官方客户端登录与状态 | `ProviderConnection`、`ToolLocator`（不依赖 shell PATH） | 已实现：设置 → 账号连接 | 已实现：在“终端”中打开官方登录，完成后点击“检查状态” |
 | 本地发音 | `SpeechCatalog.Local`（本机声线模型与校验） | 已实现：Windows SAPI 声线，可选“按文字语言自动选择”；生成 WAV 后按同一规则缓存 | 已实现：系统声线（`AVSpeechSynthesizer`），可选“按文字语言自动选择”；直接朗读，不生成缓存文件 |
@@ -47,10 +47,10 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 |---|---|---|
 | 用户数据位置（`LexiPaths`） | 程序目录 `userdata/`、`data/`，便于升级保留 | `~/Library/Application Support/LeXi`（含 `data/`） |
 | 窗口位置记忆 | `WindowPlacement` 保存正常位置与最大化状态 | 系统窗口恢复 |
-| 查询历史入口 | 底栏 ξ 标志 | 底栏 ξ 标志、⌘Y |
+| 查询历史入口 | 底栏 ξ 标志 | 工具栏“查询历史”按钮、⌘Y |
 | 关闭与后台 | 托盘图标；关闭按钮可在“设置 → 窗口”中设为最小化或退出 | 关闭窗口不退出，点击 Dock 图标重新打开；不提供关闭行为设置 |
 | 单实例 | 互斥量与命名管道激活已有窗口 | macOS 应用默认单实例，单一查询窗口 |
-| 背景材质 | Windows 11 Acrylic，保留不透明回退 | 半透明窗口背景（“降低透明度”时不透明）；查询栏与底栏为 Liquid Glass，结果在其下滚动；释义位于面板上；跟随系统深浅色 |
+| 设计语言 | Windows 11 Acrylic 深色浮窗，粉色点缀 | Apple 设计语言：Liquid Glass 查询胶囊、工具栏与底部控件，结果在其下滚动；系统颜色与强调色，跟随深浅色；粉色只用于 TL;DR |
 | 快捷键 | Ctrl+L、Ctrl+,、Ctrl+Q；Esc 收起建议或最小化 | ⌘L、⌘R、⌘[、⌘]、⌘Y、⌘,、⌘Q；Esc 收起建议 |
 | 查询逻辑接入 | 直接引用 `Lexi.Core` | 内置 `Lexi.Host`（JSON lines） |
 | 构建与分发 | `scripts/Build.ps1`，可生成自包含版本 | `apple/scripts/build-app.sh`，按构建机器架构生成本机签名的应用；Developer ID 签名与公证计划中 |

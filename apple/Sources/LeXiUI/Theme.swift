@@ -1,45 +1,24 @@
 import AppKit
 import SwiftUI
 
+// LeXi for macOS follows Apple's design language rather than the Windows look: system colors that
+// adapt to light, dark and the user's accent, continuous corners, Liquid Glass for the floating
+// controls, and content on quiet grouped surfaces. Pink appears only as the brand TL;DR mark.
 public enum LexiTheme {
     // The one brand pink (#FFADD2). Solid pink fills always carry dark text.
-    public static let pink = Color(nsColor: pinkColor)
-    static let pinkColor = NSColor(srgbRed: 1, green: 0xAD / 255.0, blue: 0xD2 / 255.0, alpha: 1)
-    // Accent text is pink on dark backgrounds; on light backgrounds pale pink is unreadable, so text
-    // falls back to the label color and pink stays a fill or outline.
-    public static let accentText = Color(nsColor: NSColor(name: "LexiAccentText") { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? pinkColor : .labelColor
-    })
-    // Warm part-of-speech and warning color, matching the Windows palette in dark appearance.
-    public static let warm = Color(nsColor: NSColor(name: "LexiWarm") { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0xDD / 255.0, green: 0xBD / 255.0, blue: 0x82 / 255.0, alpha: 1)
-            : NSColor(srgbRed: 0x8A / 255.0, green: 0x63 / 255.0, blue: 0x1F / 255.0, alpha: 1)
-    })
-    public static func lexical(_ size: CGFloat) -> Font { .system(size: size, design: .serif) }
+    public static let pink = Color(nsColor: NSColor(srgbRed: 1, green: 0xAD / 255.0, blue: 0xD2 / 255.0, alpha: 1))
+    public static func lexical(_ size: CGFloat, weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .serif) }
     public static func chineseExample(_ size: CGFloat) -> Font { .custom("Songti SC", size: size) }
-    // Result text sits on a calm panel above the translucent window, like the Windows panels on acrylic.
-    public static let panel = Color(nsColor: NSColor(name: "LexiPanel") { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0.10, green: 0.10, blue: 0.11, alpha: 0.62) : NSColor(white: 1, alpha: 0.72)
-    })
-    public static let stroke = Color.primary.opacity(0.10)
 }
 
-// The LeXi mark: a black rounded square with a pink outline and ξ, as on Windows and the icon.
-struct BrandMark: View {
-    var size: CGFloat = 22
-    var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.22)
-            .fill(.black)
-            .overlay { RoundedRectangle(cornerRadius: size * 0.22).strokeBorder(LexiTheme.pink, lineWidth: max(1, size / 20)) }
-            .overlay { Text("ξ").font(.system(size: size * 0.66, weight: .semibold, design: .serif)).foregroundStyle(LexiTheme.pink).offset(y: -size * 0.03) }
-            .frame(width: size, height: size)
-            .accessibilityHidden(true)
+extension View {
+    // A grouped content surface, like the groups in System Settings.
+    func contentGroup(cornerRadius: CGFloat = 18) -> some View {
+        background(.quinary, in: .rect(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
-// The Windows TL;DR badge: a pale-pink square with stacked dark letterforms.
+// The TL;DR mark: a pale-pink rounded square with stacked dark letterforms.
 struct QuickReadBadge: View {
     var body: some View {
         VStack(spacing: -2) {
@@ -48,22 +27,8 @@ struct QuickReadBadge: View {
         .font(.system(size: 9, weight: .black, design: .rounded))
         .foregroundStyle(.black)
         .frame(width: 22, height: 22)
-        .background(LexiTheme.pink, in: .rect(cornerRadius: 5))
+        .background(LexiTheme.pink, in: .rect(cornerRadius: 6, style: .continuous))
         .accessibilityHidden(true)
-    }
-}
-
-// Secondary disclosures stay neutral: pink is reserved for brand and state, not for every control.
-struct DisclosureStyle: ButtonStyle {
-    let open: Bool
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.callout)
-            .foregroundStyle(open ? .primary : .secondary)
-            .padding(.horizontal, 9).padding(.vertical, 4)
-            .background(Color.primary.opacity(configuration.isPressed ? 0.12 : open ? 0.08 : 0.04), in: .rect(cornerRadius: 7))
-            .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(Color.primary.opacity(open ? 0.22 : 0.14)) }
-            .contentShape(.rect)
     }
 }
 

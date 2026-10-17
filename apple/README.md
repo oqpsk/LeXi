@@ -28,7 +28,7 @@ LEXI_HOST="$PWD/.cache/host-publish/lexi-host" swift test --package-path apple
 ```
 
 - `LeXiKit`：协议模型、`HostClient`（启动 Host、按 id 匹配响应、按顺序转交视图、取消请求）、`LexiStore`（丢弃旧版本视图，保存每次查询的展开状态）与发音接口（`speech.*` 调用、钥匙串中的语音密钥）。
-- `LeXiUI`：SwiftUI 界面，布局对应 Windows 版。窗口背景半透明，查询栏与底栏是结果在其下滚动的 Liquid Glass；释义位于面板上。粉色只用于品牌与状态（序号、当前词形、TL;DR、完成标记、在线开关、标志），按钮与展开项保持中性，实色粉底配深色文字。
+- `LeXiUI`：SwiftUI 界面，采用 Apple 设计语言：Liquid Glass 查询胶囊、工具栏与底部控件浮在结果之上，结果位于连续圆角的分组区域；颜色使用系统颜色与强调色，粉色只用于 TL;DR。设置窗口沿用系统设置的分组表单。
 - `LeXi`：应用入口、菜单命令与设置窗口。
 
 `SpeechController` 负责发音：先请 Core 校验文字与声线并查找缓存，本机声线直接用 `AVSpeechSynthesizer` 朗读，在线声线播放 Host 返回的 MP3（`AVAudioPlayer`），缺失时才从钥匙串读取密钥并请求生成。
