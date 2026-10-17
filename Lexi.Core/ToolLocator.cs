@@ -3,7 +3,8 @@ using System.Text;
 
 namespace Lexi.Core;
 
-public sealed record ToolEnvironment(bool Windows, string Home, string PathVariable, string AppData, string LocalAppData, string NpmPrefix = "")
+// Root locates system folders such as /opt/homebrew and /Applications, so checks can use a synthetic tree.
+public sealed record ToolEnvironment(bool Windows, string Home, string PathVariable, string AppData, string LocalAppData, string NpmPrefix = "", string Root = "/")
 {
     public static ToolEnvironment Current => new(OperatingSystem.IsWindows(),
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetEnvironmentVariable("PATH") ?? "",
@@ -43,7 +44,11 @@ public static class ToolLocator
             return Directory.EnumerateDirectories(root).OrderByDescending(Directory.GetLastWriteTimeUtc)
                 .Select(x => Path.Combine(x, "codex.exe")).Where(File.Exists).Select(x => new ToolCommand(x)).FirstOrDefault();
         }
-        return Find(env, "codex") is { } path ? Resolve(path, env) : null;
+        if (Find(env, "codex") is { } path) return Resolve(path, env);
+        // The ChatGPT desktop app ships the official Codex CLI, as the Codex app does on Windows.
+        return new[] { Path.Combine(env.Home, "Applications"), Path.Combine(env.Root, "Applications") }
+            .Select(apps => Path.Combine(apps, "ChatGPT.app", "Contents", "Resources", "codex-cli", "bin", "codex"))
+            .Where(File.Exists).Select(app => Resolve(app, env)).FirstOrDefault();
     }
 
     public static ToolCommand? Claude(ToolEnvironment? environment = null)
@@ -61,7 +66,23 @@ public static class ToolLocator
             if (File.Exists(native)) return Resolve(native, env);
         if (Find(env, "claude") is { } path) return Resolve(path, env);
         var module = Prefixes(env).Select(p => Path.Combine(p, "lib", "node_modules", "@anthropic-ai", "claude-code", "cli.js")).FirstOrDefault(File.Exists);
-        return module == null ? null : Resolve(module, env);
+        if (module != null) return Resolve(module, env);
+        return DesktopClaude(env) is { } desktop ? Resolve(desktop, env) : null;
+    }
+
+    // The Claude desktop app keeps verified Claude Code builds in claude-code/<version>/<build>/claude.app.
+    // claude-code-vm holds Linux builds for its sandbox and is never used here.
+    private static string? DesktopClaude(ToolEnvironment env)
+    {
+        var root = Path.Combine(env.Home, "Library", "Application Support", "Claude", "claude-code");
+        if (!Directory.Exists(root)) return null;
+        return Directory.EnumerateDirectories(root)
+            .OrderByDescending(v => Version.TryParse(Path.GetFileName(v), out var version) ? version : new Version())
+            .ThenByDescending(Directory.GetLastWriteTimeUtc)
+            .SelectMany(v => Directory.EnumerateDirectories(v).OrderByDescending(Directory.GetLastWriteTimeUtc))
+            .Where(build => File.Exists(Path.Combine(build, ".verified")))
+            .Select(build => Path.Combine(build, "claude.app", "Contents", "MacOS", "claude"))
+            .FirstOrDefault(File.Exists);
     }
 
     // PATH first, then the usual install locations that a Finder-launched app cannot see.
@@ -75,7 +96,7 @@ public static class ToolLocator
             Path.Combine(home, "Library", "Application Support", "fnm", "node-versions") }
             .Where(Directory.Exists).SelectMany(root => Directory.EnumerateDirectories(root).OrderByDescending(Directory.GetLastWriteTimeUtc)
                 .SelectMany(v => new[] { Path.Combine(v, "bin"), Path.Combine(v, "installation", "bin") }));
-        return path.Concat([Path.Combine(home, ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin"])
+        return path.Concat([Path.Combine(home, ".local", "bin"), Path.Combine(env.Root, "opt", "homebrew", "bin"), Path.Combine(env.Root, "usr", "local", "bin")])
             .Concat(Prefixes(env).Select(p => Path.Combine(p, "bin")))
             .Concat([Path.Combine(home, ".volta", "bin"), Path.Combine(home, ".bun", "bin"), Path.Combine(home, "Library", "pnpm")])
             .Concat(managers).Where(d => d.Length > 0).Distinct(StringComparer.Ordinal).ToArray();
@@ -83,7 +104,7 @@ public static class ToolLocator
 
     // npm global prefixes: explicit configuration, a user prefix, Homebrew and the official installer.
     private static IEnumerable<string> Prefixes(ToolEnvironment env) => new[] { env.NpmPrefix, Path.Combine(env.Home, ".npm-global"),
-        Path.Combine(env.Home, ".npm-packages"), "/opt/homebrew", "/usr/local" }.Where(p => p.Length > 0);
+        Path.Combine(env.Home, ".npm-packages"), Path.Combine(env.Root, "opt", "homebrew"), Path.Combine(env.Root, "usr", "local") }.Where(p => p.Length > 0);
 
     private static string? Find(ToolEnvironment env, string name) =>
         SearchDirectories(env).Select(d => Path.Combine(d, name)).FirstOrDefault(File.Exists);

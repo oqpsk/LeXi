@@ -15,7 +15,7 @@ LeXi 使用一个仓库维护 Windows 与 macOS 版本，共享词典格式、�
 ## Core 中的平台服务
 
 - 数据目录（`LexiPaths`）：Windows 保留程序目录下的 `userdata` 与 `data`；macOS 使用 `~/Library/Application Support/LeXi`，词库位于其中的 `data`；其他系统遵循 XDG。
-- 官方客户端发现（`ToolLocator`）：从访达打开的应用拿不到 shell 的 PATH，因此除 PATH 外还检查 `~/.local/bin`、`/opt/homebrew/bin`、`/usr/local/bin`、npm 全局目录及 nvm、fnm、Volta 等目录；npm 安装的入口脚本通过同一前缀下的 `node` 启动，并把找到的目录加入子进程 PATH。Windows 仍查找 `codex.exe`、Codex 应用目录、`claude.exe` 与 npm 的 `cli.js`。
+- 官方客户端发现（`ToolLocator`）：从访达打开的应用拿不到 shell 的 PATH，因此除 PATH 外还检查 `~/.local/bin`、`/opt/homebrew/bin`、`/usr/local/bin`、npm 全局目录及 nvm、fnm、Volta 等目录；都没有时，使用 ChatGPT 桌面应用内置的 Codex 和 Claude 桌面应用下载并校验过的 Claude Code。npm 安装的入口脚本通过同一前缀下的 `node` 启动，并把找到的目录加入子进程 PATH。Windows 仍查找 `codex.exe`、Codex 应用目录、`claude.exe` 与 npm 的 `cli.js`。
 - 简繁检索键（`ChineseVariants`）：内置 OpenCC 字表，各平台生成相同的检索键，不再依赖 Windows 的 `LCMapStringEx`。一个简体字对应多个繁体字时，旧词库会依次尝试有限数量的组合。
 
 发音播放与密钥存储属于各自界面：Windows 使用 SAPI 与当前用户加密，macOS 使用系统声线与钥匙串。
