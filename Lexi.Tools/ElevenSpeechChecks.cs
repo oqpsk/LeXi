@@ -71,6 +71,32 @@ internal static class ElevenSpeechChecks
             try { await client.ElevenVoicesAsync("synthetic",CancellationToken.None); Check(false,"voice authentication"); }
             catch (InvalidOperationException error) { Check(!error.Message.Contains("private-voice-response") && error.Message.Contains("API Key"),"voice-list authentication never reveals the provider response body"); }
         }
+        foreach (var byCode in new[] { false, true })
+        foreach (var discovery in new[] { false, true })
+        using (var client = new SpeechClient(new Handler((_, _) => Reply(JsonSerializer.Serialize(new
+        {
+            detail = new { status = byCode ? "" : "api_key_id_used_as_api_key", code = byCode ? "api_key_id_used_as_api_key" : "",
+                message = "private-key-or-account-value", request_id = "private-request" }
+        }), HttpStatusCode.BadRequest))))
+        {
+            try
+            {
+                if (discovery) await client.ElevenVoicesAsync("synthetic", CancellationToken.None);
+                else await client.GenerateAsync("Hello.", options, "synthetic", CancellationToken.None);
+                Check(false, "key ID rejection");
+            }
+            catch (InvalidOperationException error)
+            {
+                Check(error.Message.Contains("API Key ID") && error.Message.Contains("Secret Key") &&
+                    !error.Message.Contains("private-"), "key IDs receive an actionable private-data-free error for voice discovery and speech in both service envelopes");
+            }
+        }
+        using (var client = new SpeechClient(new Handler((_, _) => Reply("{\"detail\":{\"status\":\"unknown_private_value\",\"message\":\"private-body\"}}", HttpStatusCode.BadRequest))))
+        {
+            try { await client.GenerateAsync("Hello.", options, "synthetic", CancellationToken.None); Check(false, "unknown service error"); }
+            catch (InvalidOperationException error)
+            { Check(error.Message.Contains("HTTP 400") && !error.Message.Contains("private"), "unknown service codes and raw messages stay private in the fallback error"); }
+        }
         var audio = new byte[32]; Encoding.ASCII.GetBytes("ID3").CopyTo(audio,0);
         using (var client = new SpeechClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK){Content=new ByteArrayContent(audio)}))))
             Check((await client.GenerateAsync("word",options,"synthetic",CancellationToken.None)).SequenceEqual(audio),"ElevenLabs MP3 output passes the existing bounded audio validation");

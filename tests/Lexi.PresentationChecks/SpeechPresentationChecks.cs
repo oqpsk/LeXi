@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Windows;
 using System.Windows.Automation;
@@ -25,8 +27,11 @@ internal static partial class Program
             "Grok voices and masked API key fields are available in settings");
         selectors[0].SelectedItem = selectors[0].Items.OfType<SpeechModel>().Single(m => m.Id == "eleven_flash_v2_5");
         Check(selectors[1].Items.OfType<SpeechVoice>().Any(v => v.Name == "George") &&
-            Contents(settings).OfType<Button>().Any(b => AutomationProperties.GetName(b) == "加载 ElevenLabs 账号声线"),
+            Contents(settings).OfType<Button>().Any(b => AutomationProperties.GetName(b) == "刷新 ElevenLabs 可用声线列表"),
             "ElevenLabs offers an initial voice and explicitly triggered account voice loading");
+        Check(SpeechVoiceChoices.Eleven(null, null).Length == 1 && SpeechVoiceChoices.Eleven([], null).Length == 0,
+            "an empty fetched voice list stays distinct from the initial unfetched fallback");
+        CheckSpeechDiscovery(Check);
         var savedVoice = new SpeechVoice("synthetic_private_voice", "Synthetic private voice");
         Check(SpeechVoiceChoices.Eleven([], savedVoice).Any(v => v == savedVoice) &&
             SpeechVoiceChoices.Eleven([savedVoice], savedVoice).Length == 1,
@@ -76,4 +81,51 @@ internal static partial class Program
         }
         Console.WriteLine($"{count} speech presentation and native checks passed");
     }
+    private static void CheckSpeechDiscovery(Action<bool, string> check)
+    {
+        int requests = 0; bool reject = false;
+        using var client = new SpeechClient(new SpeechMetadataHandler((request, _) =>
+        {
+            requests++;
+            check(request.Method == HttpMethod.Get && request.RequestUri!.AbsolutePath == "/v2/voices",
+                "settings discovery never synthesizes speech");
+            return Task.FromResult(new HttpResponseMessage(reject ? HttpStatusCode.BadRequest : HttpStatusCode.OK)
+            {
+                Content = new StringContent(reject
+                    ? "{\"detail\":{\"status\":\"api_key_id_used_as_api_key\",\"message\":\"private-message\"}}"
+                    : "{\"voices\":[{\"voice_id\":\"voice_a\",\"name\":\"Alpha\"},{\"voice_id\":\"voice_b\",\"name\":\"Beta\"}],\"has_more\":false}")
+            });
+        }));
+        var fixture = new SettingsWindow(new AppSettings { Online = true, SpeechProvider = "elevenlabs",
+            SpeechModel = "eleven_flash_v2_5", SpeechVoice = "voice_a", SpeechVoiceName = "Alpha" }, [], client);
+        var picker = Contents(fixture).OfType<SpeechVoicePicker>().Single();
+        var key = Contents(fixture).OfType<PasswordBox>().Last();
+        var connectionStatus = Contents(fixture).OfType<TextBlock>().Single(b => AutomationProperties.GetName(b) == "声线连接状态");
+        check(requests == 0, "constructing settings does not send account requests");
+        check(picker.Style == (Style)Application.Current.FindResource(typeof(ComboBox)),
+            "the voice picker retains the app's dark dropdown style");
+        key.Password = "synthetic-key";
+        picker.DiscoverAsync().GetAwaiter().GetResult();
+        check(requests == 1 && picker.Items.Count == 2 && ((SpeechVoice)picker.SelectedItem).Id == "voice_a",
+            "first voice-list expansion fetches account choices and preserves the selected voice");
+        picker.DiscoverAsync().GetAwaiter().GetResult();
+        check(requests == 1, "reopening the fetched list reuses its choices without a redundant request");
+        picker.DiscoverAsync(true).GetAwaiter().GetResult();
+        check(requests == 2, "explicit refresh fetches voice choices again");
+        key.Password = "synthetic-replacement";
+        reject = true;
+        picker.DiscoverAsync().GetAwaiter().GetResult();
+        check(requests == 3 && connectionStatus.Text.Contains("API Key ID") && !connectionStatus.Text.Contains("private"),
+            "key edits invalidate voice discovery and show safe connection errors beside the selector");
+        reject = false;
+        picker.DiscoverAsync().GetAwaiter().GetResult();
+        check(requests == 4 && picker.Items.Count == 2 && connectionStatus.Text.Contains("2 条"),
+            "failed discovery can be retried by reopening the list");
+        fixture.Close();
+    }
+    private sealed class SpeechMetadataHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request, cancellationToken);
+    }
+
 }
