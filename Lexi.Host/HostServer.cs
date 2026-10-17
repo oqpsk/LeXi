@@ -187,6 +187,15 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
                 var key = Text(p, "key", "");
                 return new SpeechFileResult(await Speech(() => speech.OnlineAsync(Text(p, "text"), SpeechRequest(p), session.Settings.Online, () => key, null, token)));
             }
+            // Model API keys for platforms without the subscription clients. Held in memory for this
+            // session only; never saved, logged or returned.
+            case "keys.set":
+            {
+                var provider = Text(p, "provider");
+                if (!ApiKeys.Supports(provider)) throw new HostException("invalid_params", "provider must be openai or anthropic.");
+                session.Keys.Set(provider, Text(p, "key", ""));
+                return new EmptyResult();
+            }
             case "cancel":
             {
                 if (!p.TryGetProperty("id", out var target) || target.ValueKind is not (JsonValueKind.Number or JsonValueKind.String))

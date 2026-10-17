@@ -102,10 +102,12 @@ public sealed class AppSettings
         {
             var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(Path.Combine(root, "settings.json")), Json.Options) ?? new();
             SpeechCatalog.AdoptLocal(settings);
-            return settings;
+            return Adopt(settings);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return new(); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException) { return Adopt(new()); }
     }
+    // Settings without a subscription client available start from the API models.
+    private static AppSettings Adopt(AppSettings settings) { if (ModelCatalog.ApiOnly) ModelCatalog.UseApiDefaults(settings); return settings; }
     public void Save(string root)
     {
         Directory.CreateDirectory(root);

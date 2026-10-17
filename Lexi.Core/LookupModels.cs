@@ -4,12 +4,19 @@ namespace Lexi.Core;
 
 public sealed record LookupModel(string Provider, string Model)
 {
-    public string Name => Provider == "claude" ? Model switch
-    { "haiku" => "Claude Haiku", "sonnet" => "Claude Sonnet", "opus" => "Claude Opus", _ => "Claude " + Model } : Model switch
-    { "gpt-6-luna" => "GPT-6 Luna", "gpt-6.1-sol" => "GPT-6.1 Sol", "" => "Codex 默认", _ => Model };
+    public string Name => Provider switch
+    {
+        "claude" => Model switch { "haiku" => "Claude Haiku", "sonnet" => "Claude Sonnet", "opus" => "Claude Opus", _ => "Claude " + Model },
+        "anthropic" => Model switch { "claude-haiku-5-5" => "Claude Haiku 5.5", "claude-sonnet-5-5" => "Claude Sonnet 5.5", "claude-opus-5-5" => "Claude Opus 5.5", _ => Model },
+        _ => Model switch { "gpt-6-luna" => "GPT-6 Luna", "gpt-6.1-sol" => "GPT-6.1 Sol", "" => "Codex 默认", _ => Model }
+    };
     public static LookupModel Primary(AppSettings settings) => new(settings.Provider, settings.Model);
     public static LookupModel Secondary(AppSettings settings) => string.IsNullOrWhiteSpace(settings.SecondaryProvider)
-        ? settings.Provider == "claude" ? new("codex", "gpt-6-luna") : new("claude", "haiku")
+        ? settings.Provider switch
+        {
+            "claude" => new("codex", "gpt-6-luna"), "openai" => new("anthropic", "claude-haiku-5-5"),
+            "anthropic" => new("openai", "gpt-6-luna"), _ => new("claude", "haiku")
+        }
         : new(settings.SecondaryProvider, settings.SecondaryModel);
     public static LookupModel[] Selected(AppSettings settings) =>
         (settings.ParallelLookup ? new[] { Primary(settings), Secondary(settings) } : [Primary(settings)]).Distinct().ToArray();
