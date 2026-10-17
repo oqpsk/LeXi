@@ -34,6 +34,8 @@ try {
     if ($LASTEXITCODE) { throw 'Platform path, client discovery and Chinese variant checks failed' }
     & dotnet $runner session-check $fixture (Join-Path $root '.cache/session-checks')
     if ($LASTEXITCODE) { throw 'Shared query session checks failed' }
+    & dotnet $runner host-check $fixture (Join-Path $root '.cache/host-checks') (Join-Path $root 'Lexi.Host/bin/Release/net10.0/lexi-host.dll')
+    if ($LASTEXITCODE) { throw 'Host protocol checks failed' }
     if ($windows) {
         & dotnet run --project tests/Lexi.PresentationChecks -c Release
         if ($LASTEXITCODE) { throw 'WPF resource construction checks failed' }

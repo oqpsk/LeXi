@@ -49,3 +49,11 @@ jobs:
       - name: Build and offline regression checks
         shell: pwsh
         run: ./scripts/Test.ps1
+      # The macOS app bundles this self-contained single-file host; check the shipped form.
+      - name: Publish and check the single-file host
+        shell: bash
+        run: |
+          dotnet publish Lexi.Host/Lexi.Host.csproj -c Release -r osx-arm64 --self-contained \
+            -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:DebugType=none \
+            --source https://api.nuget.org/v3/index.json -o .cache/host-publish
+          dotnet Lexi.Tools/bin/Release/net10.0/Lexi.Tools.dll host-check .cache/test-dictionary .cache/host-published .cache/host-publish/lexi-host
