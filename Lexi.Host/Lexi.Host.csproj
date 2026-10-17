@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>lexi-host</AssemblyName>
+    <RootNamespace>Lexi.Host</RootNamespace>
+    <Product>LeXi Host</Product>
+    <Description>JSON-lines host exposing Lexi.Core to native front ends</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Lexi.Core/Lexi.Core.csproj" />
+    <!-- The official clients read these from disk, so they stay beside a single-file host. -->
+    <Content Include="../Lexi.Core/dictionary.schema.json" Link="assets/dictionary.schema.json" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="../Lexi.Core/translation.schema.json" Link="assets/translation.schema.json" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="../Lexi.Core/dictionary.instructions.txt" Link="assets/dictionary.instructions.txt" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="../Lexi.Core/sense-merge.schema.json" Link="assets/sense-merge.schema.json" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="../Lexi.Core/sense-merge.instructions.txt" Link="assets/sense-merge.instructions.txt" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+</Project>
