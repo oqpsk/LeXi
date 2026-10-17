@@ -1,0 +1,139 @@
+import LeXiKit
+import SwiftUI
+
+// Menu commands act on the focused window's query page.
+public struct LexiActions {
+    public let back, forward, home, regenerate, focusSearch: () -> Void
+    public let canBack, canForward, canRegenerate: Bool
+}
+extension FocusedValues { @Entry public var lexiActions: LexiActions? }
+
+// The query window. Liquid Glass is limited to the floating control layer (toolbar, search
+// bar, footer controls and popovers); results sit on the normal window background.
+public struct MainView: View {
+    @Bindable var store: LexiStore
+    @State private var speech = SpeechController()
+    @State private var text = ""
+    @State private var programmatic = false
+    @State private var position = ScrollPosition(edge: .top)
+    @State private var offset: CGFloat = 0
+    @FocusState private var searchFocused: Bool
+
+    public init(store: LexiStore) { self.store = store }
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            SearchBar(store: store, text: $text, programmatic: $programmatic, focused: $searchFocused, submit: submit)
+                .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 6)
+            ScrollView {
+                content.padding(.horizontal, 20).padding(.vertical, 14)
+            }
+            .scrollPosition($position)
+            .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, value in offset = value }
+        }
+        .background(.background)
+        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .toolbar { toolbar }
+        .navigationTitle("LeXi")
+        .frame(minWidth: 540, minHeight: 420)
+        .onChange(of: store.view.request) { _, _ in pageChanged() }
+        .focusedSceneValue(\.lexiActions, LexiActions(back: { navigate(-1) }, forward: { navigate(1) }, home: goHome,
+            regenerate: regenerate, focusSearch: { searchFocused = true },
+            canBack: store.view.navigation.canBack, canForward: store.view.navigation.canForward, canRegenerate: canRegenerate))
+        .onAppear { searchFocused = true }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch store.phase {
+        case .failed(let message):
+            ContentUnavailableView("LeXi 无法查询", systemImage: "exclamationmark.triangle", description: Text(message))
+        case .starting:
+            ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
+        case .ready:
+            if store.view.kind == .home {
+                HistoryView(store: store) { entry in setText(entry.query); submit(entry.query) }
+            } else {
+                EntryView(store: store, speech: speech)
+            }
+        }
+    }
+
+    private var online: Bool { store.settings?.settings.online ?? true }
+    private var canRegenerate: Bool { store.view.kind != .home && store.view.canRegenerate && online }
+
+    private var footer: some View {
+        HStack(spacing: 12) {
+            Text(store.view.status)
+                .font(.callout).foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.tail)
+                .help(store.view.status)
+                .accessibilityLabel("查询状态：" + store.view.status)
+            Spacer(minLength: 8)
+            if store.view.kind != .home {
+                Button("重新生成", action: regenerate)
+                    .buttonStyle(.glass)
+                    .disabled(!canRegenerate)
+                    .help(store.settings?.controls.regenerateTooltip ?? "")
+            }
+            Toggle(store.settings?.controls.onlineLabel ?? "在线补充", isOn: Binding(
+                get: { online }, set: { value in Task { await store.setOnline(value) } }))
+                .toggleStyle(.switch)
+                .help(store.settings?.controls.onlineTooltip ?? "")
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .padding(.horizontal, 12).padding(.bottom, 10).padding(.top, 4)
+    }
+
+    @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+        let navigation = store.view.navigation
+        ToolbarItemGroup(placement: .navigation) {
+            Button { navigate(-1) } label: { Label("后退", systemImage: "chevron.left") }
+                .disabled(!navigation.canBack)
+                .help(navigation.canBack ? "后退 · \(navigation.backLabel) · ⌘[" : "后退 · ⌘[")
+            Button { navigate(1) } label: { Label("前进", systemImage: "chevron.right") }
+                .disabled(!navigation.canForward)
+                .help(navigation.canForward ? "前进 · \(navigation.forwardLabel) · ⌘]" : "前进 · ⌘]")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button(action: goHome) { Label("查询历史", systemImage: "clock") }.help("查询历史 · ⌘Y")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            SettingsLink { Label("设置", systemImage: "gearshape") }.help("设置 · ⌘,")
+        }
+    }
+
+    private func setText(_ value: String) { if text != value { programmatic = true; text = value } }
+
+    private func submit(_ value: String) {
+        guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            Task { await store.submit(value) }; return
+        }
+        speech.stop()
+        Task { await store.submit(value, scroll: offset) }
+    }
+
+    private func regenerate() { guard canRegenerate else { return }; speech.stop(); Task { await store.regenerate() } }
+
+    private func goHome() {
+        speech.stop()
+        setText("")
+        Task { await store.home(scroll: offset) }
+        searchFocused = true
+    }
+
+    // A newer submission or the reader's own scrolling wins over restoring the old position.
+    private func navigate(_ direction: Int) {
+        Task {
+            guard let page = await store.navigate(direction, scroll: offset) else { return }
+            if page.query.isEmpty { setText("") }
+            if offset == 0, page.scrollOffset > 0 { position.scrollTo(y: page.scrollOffset) }
+        }
+    }
+
+    private func pageChanged() {
+        speech.stop()
+        position.scrollTo(edge: .top)
+        if store.view.kind != .home { setText(store.view.input) }
+    }
+}

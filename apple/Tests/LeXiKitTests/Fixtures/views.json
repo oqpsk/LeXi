@@ -1,0 +1,400 @@
+{
+  "dictionary": {
+    "request": 1,
+    "revision": 17,
+    "kind": "dictionary",
+    "query": "serendipity",
+    "input": "serendipity",
+    "speechText": "serendipity",
+    "heading": "serendipity",
+    "pronunciation": {
+      "text": "",
+      "label": "",
+      "attribution": "",
+      "labelAttribution": "",
+      "sourced": false
+    },
+    "progress": {
+      "stage": "finished",
+      "title": "已完成 · 1 个义项",
+      "detail": "结果已稳定，不再自动增减",
+      "outcome": "complete",
+      "modelsEnabled": true,
+      "mergeEnabled": true,
+      "translation": false,
+      "failedStage": null,
+      "busy": false,
+      "warning": false,
+      "stageLabels": [
+        "词典：已结束",
+        "补充：已结束",
+        "合并：已结束",
+        "完成：完成"
+      ],
+      "accessibleName": "已完成 · 1 个义项。结果已稳定，不再自动增减。词典：已结束，补充：已结束，合并：已结束，完成：完成"
+    },
+    "progressGeneration": 1,
+    "status": "首条释义 0.0 秒 · 总耗时 0.1 秒 · 查询完成 · 同义项已整理 · 在线词典未收录",
+    "canRegenerate": true,
+    "navigation": {
+      "canBack": true,
+      "canForward": false,
+      "backLabel": "查询历史",
+      "forwardLabel": ""
+    },
+    "local": [
+      {
+        "name": "ECDICT 英汉词典",
+        "headword": "",
+        "chinese": "偶然发现有用事物",
+        "english": "the chance discovery of something useful",
+        "original": "",
+        "sourceUrl": "https://github.com/skywind3000/ECDICT",
+        "attribution": "skywind3000 / ECDICT · MIT"
+      }
+    ],
+    "localHint": "",
+    "online": null,
+    "onlineHint": "",
+    "answers": {
+      "empty": false,
+      "references": [],
+      "senses": [
+        {
+          "key": "EFBE8FF7D2F4AE02D492F6AB6C3FEA126EEF32FCE65089D3CE056DB7487B1B2F",
+          "heading": {
+            "prefix": "01",
+            "partOfSpeech": "noun",
+            "form": "",
+            "usage": "",
+            "abbreviation": false,
+            "provisional": false,
+            "tooltip": "noun · "
+          },
+          "expansion": "",
+          "chinese": "合成释义：Codex 默认",
+          "english": "Codex 默认 meaning",
+          "example": "",
+          "exampleChinese": "",
+          "provenance": "Codex 默认 · 这条解释由模型补充，现有词典原文不足以核对全部内容；这不表示释义错误。",
+          "originalLabels": "原始用法标签：noun · ",
+          "citations": [],
+          "briefs": [],
+          "referenceKeys": [],
+          "sourceNote": "当前解释来自模型知识，未附可直接核对的资料。",
+          "alternativesNote": "资料链接包含同义项的其他表述所引用的内容。",
+          "sourceLabel": "参考资料",
+          "alternatives": [
+            {
+              "key": "BAA0B9FCDAD0D633EB89E11C5BA4F928CEC669D8B8B1C90FE2E7CD4D2C636839",
+              "heading": {
+                "prefix": "Claude Haiku",
+                "partOfSpeech": "noun",
+                "form": "",
+                "usage": "",
+                "abbreviation": false,
+                "provisional": false,
+                "tooltip": "noun · "
+              },
+              "expansion": "",
+              "chinese": "合成释义：Claude Haiku",
+              "english": "Claude Haiku meaning",
+              "example": "",
+              "exampleChinese": "",
+              "provenance": "Claude Haiku · 这条解释由模型补充，现有词典原文不足以核对全部内容；这不表示释义错误。",
+              "originalLabels": "原始用法标签：noun · ",
+              "citations": [],
+              "briefs": [],
+              "referenceKeys": [],
+              "sourceNote": "当前解释来自模型知识，未附可直接核对的资料。",
+              "alternativesNote": "",
+              "sourceLabel": "参考资料",
+              "alternatives": [],
+              "alternativesLabel": ""
+            }
+          ],
+          "alternativesLabel": "其他表述 · 1"
+        }
+      ],
+      "notices": [],
+      "notes": [],
+      "mergeWarning": "",
+      "originals": "collapse"
+    },
+    "quickRead": {
+      "visible": true,
+      "text": "合成释义：Codex 默认",
+      "tooltip": "noun：合成释义：Codex 默认",
+      "state": "已整理",
+      "showState": false,
+      "caption": "TL;DR · 已整理",
+      "explanation": "从完整义项中选出的核心含义，不涵盖全部用法。详细释义和参考资料见下方。"
+    },
+    "wordForms": [],
+    "etymology": [],
+    "translation": null
+  },
+  "translation": {
+    "request": 3,
+    "revision": 33,
+    "kind": "translation",
+    "query": "The ship is ready.\nKeep 42 intact.",
+    "input": "The ship is ready.\nKeep 42 intact.",
+    "speechText": "The ship is ready.\nKeep 42 intact.",
+    "heading": "翻译",
+    "pronunciation": {
+      "text": "英文 → 中文",
+      "label": "",
+      "attribution": "",
+      "labelAttribution": "",
+      "sourced": false
+    },
+    "progress": {
+      "stage": "finished",
+      "title": "翻译完成",
+      "detail": "译文已完整，本次翻译已结束",
+      "outcome": "complete",
+      "modelsEnabled": true,
+      "mergeEnabled": false,
+      "translation": true,
+      "failedStage": null,
+      "busy": false,
+      "warning": false,
+      "stageLabels": [
+        "词典：跳过",
+        "翻译：已结束",
+        "合并：跳过",
+        "完成：完成"
+      ],
+      "accessibleName": "翻译完成。译文已完整，本次翻译已结束。词典：跳过，翻译：已结束，合并：跳过，完成：完成"
+    },
+    "progressGeneration": 3,
+    "status": "首段译文 0.0 秒 · 总耗时 0.0 秒 · 翻译完成",
+    "canRegenerate": true,
+    "navigation": {
+      "canBack": true,
+      "canForward": false,
+      "backLabel": "hello",
+      "forwardLabel": ""
+    },
+    "local": [],
+    "localHint": "",
+    "online": null,
+    "onlineHint": "",
+    "answers": null,
+    "quickRead": {
+      "visible": false,
+      "text": "",
+      "tooltip": "",
+      "state": "",
+      "showState": false,
+      "caption": "",
+      "explanation": ""
+    },
+    "wordForms": [],
+    "etymology": [],
+    "translation": {
+      "source": "Codex",
+      "hint": "AI 翻译",
+      "paragraphs": [
+        "船已就绪。",
+        "保留 42。"
+      ],
+      "note": "",
+      "complete": true,
+      "error": ""
+    }
+  },
+  "preview": {
+    "request": 3,
+    "revision": 31,
+    "kind": "translation",
+    "query": "The ship is ready.\nKeep 42 intact.",
+    "input": "The ship is ready.\nKeep 42 intact.",
+    "speechText": "The ship is ready.\nKeep 42 intact.",
+    "heading": "翻译",
+    "pronunciation": {
+      "text": "英文 → 中文",
+      "label": "",
+      "attribution": "",
+      "labelAttribution": "",
+      "sourced": false
+    },
+    "progress": {
+      "stage": "supplement",
+      "title": "正在翻译",
+      "detail": "译文逐步显示，生成中的内容尚未完整",
+      "outcome": "running",
+      "modelsEnabled": true,
+      "mergeEnabled": false,
+      "translation": true,
+      "failedStage": null,
+      "busy": true,
+      "warning": false,
+      "stageLabels": [
+        "词典：跳过",
+        "翻译：进行中",
+        "合并：跳过",
+        "完成：等待"
+      ],
+      "accessibleName": "正在翻译。译文逐步显示，生成中的内容尚未完整。词典：跳过，翻译：进行中，合并：跳过，完成：等待"
+    },
+    "progressGeneration": 3,
+    "status": "翻译生成中…",
+    "canRegenerate": true,
+    "navigation": {
+      "canBack": true,
+      "canForward": false,
+      "backLabel": "hello",
+      "forwardLabel": ""
+    },
+    "local": [],
+    "localHint": "",
+    "online": null,
+    "onlineHint": "",
+    "answers": null,
+    "quickRead": {
+      "visible": false,
+      "text": "",
+      "tooltip": "",
+      "state": "",
+      "showState": false,
+      "caption": "",
+      "explanation": ""
+    },
+    "wordForms": [],
+    "etymology": [],
+    "translation": {
+      "source": "Codex · 生成中",
+      "hint": "生成中的内容尚未完成",
+      "paragraphs": [
+        "船已就绪。"
+      ],
+      "note": "",
+      "complete": false,
+      "error": ""
+    }
+  },
+  "streaming": {
+    "request": 1,
+    "revision": 5,
+    "kind": "dictionary",
+    "query": "serendipity",
+    "input": "serendipity",
+    "speechText": "serendipity",
+    "heading": "serendipity",
+    "pronunciation": {
+      "text": "",
+      "label": "",
+      "attribution": "",
+      "labelAttribution": "",
+      "sourced": false
+    },
+    "progress": {
+      "stage": "dictionary",
+      "title": "查询词典中",
+      "detail": "即时结果先显示，随后补充与整理",
+      "outcome": "running",
+      "modelsEnabled": true,
+      "mergeEnabled": true,
+      "translation": false,
+      "failedStage": null,
+      "busy": true,
+      "warning": false,
+      "stageLabels": [
+        "词典：进行中",
+        "补充：等待",
+        "合并：等待",
+        "完成：等待"
+      ],
+      "accessibleName": "查询词典中。即时结果先显示，随后补充与整理。词典：进行中，补充：等待，合并：等待，完成：等待"
+    },
+    "progressGeneration": 1,
+    "status": "查询本地词库…",
+    "canRegenerate": true,
+    "navigation": {
+      "canBack": true,
+      "canForward": false,
+      "backLabel": "查询历史",
+      "forwardLabel": ""
+    },
+    "local": [
+      {
+        "name": "ECDICT 英汉词典",
+        "headword": "",
+        "chinese": "偶然发现有用事物",
+        "english": "the chance discovery of something useful",
+        "original": "",
+        "sourceUrl": "https://github.com/skywind3000/ECDICT",
+        "attribution": "skywind3000 / ECDICT · MIT"
+      }
+    ],
+    "localHint": "",
+    "online": null,
+    "onlineHint": "",
+    "answers": {
+      "empty": true,
+      "references": [],
+      "senses": [],
+      "notices": [],
+      "notes": [],
+      "mergeWarning": "",
+      "originals": "keep"
+    },
+    "quickRead": {
+      "visible": true,
+      "text": "偶然发现有用事物",
+      "tooltip": "ECDICT 英汉词典：偶然发现有用事物",
+      "state": "词典摘录",
+      "showState": false,
+      "caption": "TL;DR · 词典摘录",
+      "explanation": "当前可用释义的简短摘录，尚未选定核心含义。完整用法见下方。"
+    },
+    "wordForms": [],
+    "etymology": [],
+    "translation": null
+  },
+  "home": {
+    "request": 0,
+    "revision": 2,
+    "kind": "home",
+    "query": "",
+    "input": "",
+    "speechText": "",
+    "heading": "",
+    "pronunciation": {
+      "text": "",
+      "label": "",
+      "attribution": "",
+      "labelAttribution": "",
+      "sourced": false
+    },
+    "progress": null,
+    "progressGeneration": 0,
+    "status": "准备就绪",
+    "canRegenerate": false,
+    "navigation": {
+      "canBack": false,
+      "canForward": false,
+      "backLabel": "",
+      "forwardLabel": ""
+    },
+    "local": [],
+    "localHint": "",
+    "online": null,
+    "onlineHint": "",
+    "answers": null,
+    "quickRead": {
+      "visible": false,
+      "text": "",
+      "tooltip": "",
+      "state": "",
+      "showState": false,
+      "caption": "",
+      "explanation": ""
+    },
+    "wordForms": [],
+    "etymology": [],
+    "translation": null
+  }
+}
