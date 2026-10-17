@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -9,7 +8,7 @@ namespace Lexi;
 
 public partial class MainWindow
 {
-    private async Task TranslateTextAsync(string text, bool force)
+    private async Task TranslateTextAsync(string text, bool force, LookupTiming timing)
     {
         StopSpeech();
         speechText = text;
@@ -33,18 +32,17 @@ public partial class MainWindow
             try
             {
                 var validated = Translation.Parse(JsonSerializer.Serialize(cached.Entry, Json.Options), text, target);
-                RenderTranslation(validated, true); LookupStatus.Text = "已显示缓存翻译";
+                RenderTranslation(validated, true); timing.MarkFirst(); LookupStatus.Text = timing.Finish("已显示缓存翻译", "首段译文");
                 QueryProgress.Update(request, QueryProgressState.Translated(true)); return;
             }
             catch (InvalidDataException) { }
         }
         if (!settings.Online)
         {
-            LookupStatus.Text = "离线模式下没有这段文本的缓存翻译。开启在线补充后可翻译。";
+            LookupStatus.Text = timing.Finish("离线模式下没有这段文本的缓存翻译。开启在线补充后可翻译。", "首段译文");
             QueryProgress.Update(request, initialProgress.Interrupted("没有缓存翻译", "本次查询已结束 · 开启在线补充后可翻译")); return;
         }
         LookupStatus.Text = $"{ProviderName} 正在翻译…";
-        var watch = Stopwatch.StartNew();
         bool finished = false;
         string? lastPreview = null;
         try
@@ -55,16 +53,16 @@ public partial class MainWindow
                 var fingerprint = string.Join("\n\n", partial.Paragraphs);
                 if (fingerprint == lastPreview) return;
                 lastPreview = fingerprint;
-                RenderTranslation(partial, false, true); LookupStatus.Text = "翻译生成中…";
+                RenderTranslation(partial, false, true); timing.MarkFirst(); LookupStatus.Text = "翻译生成中…";
             });
             var entry = settings.Provider == "claude"
                 ? await claude.TranslateAsync(text, target, settings.Model, token, progress)
                 : await codex.TranslateAsync(text, target, settings, token);
             token.ThrowIfCancellationRequested(); finished = true;
-            RenderTranslation(entry, false);
+            RenderTranslation(entry, false); timing.MarkFirst();
             await TryCacheAsync("translations-v1", key, new TranslationEnvelope(entry, DateTimeOffset.UtcNow));
             token.ThrowIfCancellationRequested();
-            LookupStatus.Text = $"翻译完成 · {watch.Elapsed.TotalSeconds:0.0} 秒";
+            LookupStatus.Text = timing.Finish("翻译完成", "首段译文");
             QueryProgress.Update(request, QueryProgressState.Translated());
         }
         catch (OperationCanceledException)
@@ -74,7 +72,7 @@ public partial class MainWindow
             if (!token.IsCancellationRequested)
             {
                 AiPanel.Children.Clear(); AiPanel.Children.Add(Hint(ex.Message));
-                LookupStatus.Text = "翻译未完成，可重试";
+                LookupStatus.Text = timing.Finish("翻译未完成，可重试", "首段译文");
                 QueryProgress.Update(request, initialProgress.Interrupted("翻译未完成", "本次翻译已结束，可重试"));
             }
         }

@@ -54,6 +54,10 @@
           "gloss": {
             "type": "string",
             "description": "简体中文速记释义，通常4至18字，最多32字。只概括本义项，保留关键区别、否定与语气，不增加解释中没有的内容。"
+          },
+          "coreMeaning": {
+            "type": "boolean",
+            "description": "True only for the central meaning(s) a reader should learn first, normally one, at most two per entry. Determine independently of domain coverage preferences and output order."
           }
         },
         "required": [
@@ -66,7 +70,8 @@
           "evidence",
           "lexicalForm",
           "expansion",
-          "gloss"
+          "gloss",
+          "coreMeaning"
         ]
       }
     },

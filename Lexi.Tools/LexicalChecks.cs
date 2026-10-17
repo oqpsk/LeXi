@@ -71,6 +71,7 @@ internal static class LexicalChecks
         try { CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(inflected with { Word="tee" },Json.Options),"TEE",null); Check(false,"wrong-case acronym"); }
         catch (InvalidDataException) { Check(true,"a lowercase model response cannot replace an uppercase acronym entry"); }
         CheckQuickRead(Check);
+        OverviewTimingChecks.Run(Check);
         Console.WriteLine($"{count} lexical coverage checks passed");
     }
     private static void CheckQuickRead(Action<bool,string> check)

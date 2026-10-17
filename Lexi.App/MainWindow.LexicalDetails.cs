@@ -12,12 +12,13 @@ public partial class MainWindow
     private string etymologyIdentity = "";
     private LocalHit[] overviewLocal = [];
     private bool overviewFromModel;
+    private bool overviewCore;
     internal void ResetLexicalDetails()
     {
         EtymologyPopup.IsOpen = false; EtymologyButton.IsChecked = false;
         EtymologyButton.Visibility = Visibility.Collapsed; EtymologyContent.Children.Clear();
         sourceEtymologies = []; modelEtymologies.Clear(); etymologyIdentity = "";
-        overviewLocal = []; overviewFromModel = false; QuickReadCard.Visibility = Visibility.Collapsed; QuickReadText.Text = "";
+        overviewLocal = []; overviewFromModel = false; overviewCore = false; QuickReadCard.Visibility = Visibility.Collapsed; QuickReadText.Text = "";
     }
     internal void ApplySourceEtymology(EtymologyExcerpt[] excerpts)
     { sourceEtymologies = excerpts; RenderEtymology(); }
@@ -75,15 +76,17 @@ public partial class MainWindow
     {
         var generated = snapshot.Groups.Any(g => g.Variants.Any(v => !v.Provisional));
         if (!generated && overviewFromModel && !finalized && snapshot.Provisional)
-        { QuickReadLabel.Text = "TL;DR · 缓存预览"; return; }
+        { QuickReadLabel.Text = (overviewCore ? "TL;DR" : "义项摘录") + " · 缓存预览"; return; }
         var meanings = QuickRead.Create(snapshot.Groups, uncovered, overviewLocal);
         QuickReadCard.Visibility = meanings.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         overviewFromModel = generated && meanings.Length > 0;
         if (meanings.Length == 0) return;
         var state = !generated ? "词典摘录" : !finalized || snapshot.Provisional ? "预览" :
             snapshot.MergeFailed || snapshot.Answers.Any(a => a.Phase == ModelPhase.Failed) ? "部分结果" : "已整理";
-        QuickReadLabel.Text = "TL;DR · " + state;
-        QuickReadLabel.ToolTip = "核心含义速览，不涵盖全部用法。模型速记与完整释义一同生成，详细含义和参考资料见下方。";
+        overviewCore = meanings.All(m => m.Core);
+        QuickReadLabel.Text = (overviewCore ? "TL;DR" : generated ? "义项摘录" : "速览") + " · " + state;
+        QuickReadLabel.ToolTip = overviewCore ? "从完整义项中选出的核心含义，不涵盖全部用法。详细释义和参考资料见下方。" :
+            "当前可用释义的简短摘录，尚未选定核心含义。完整用法见下方。";
         QuickReadText.Text = string.Join("；", meanings.Select(m => m.Text));
         QuickReadText.ToolTip = string.Join("\n", meanings.Select(m => m.Label + "：" + m.Text));
     }

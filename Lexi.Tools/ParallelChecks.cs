@@ -63,7 +63,7 @@ internal static class ParallelChecks
         Check(facetGroups.Sum(g => g.Variants.Length) == facets.Sum(a => a.Entry!.Senses.Length), "usage grouping retains every original variant and its provenance");
         var singleFacets = facets.Take(1).ToArray();
         Check(SenseMerging.Request("fixture", singleFacets).Pairs.Length == 3, "single-model queries still receive sense comparison");
-        Check(SenseMerging.CacheKind == "sense-merges-v3", "revised grouping never reuses legacy comparison caches");
+        Check(SenseMerging.CacheKind == "sense-merges-v4", "revised grouping never reuses legacy comparison caches");
         foreach (var bad in new[]
         {
             plan with { InputHash = "different query" }, plan with { Pairs = [] },
@@ -97,7 +97,7 @@ internal static class ParallelChecks
         Task<SenseMergePlan> Judge(SenseMergeRequest input, AppSettings option, CancellationToken token)
         {
             judgeCalls++;
-            return Task.FromResult(new SenseMergePlan(input.InputHash, input.Pairs.Select(p => new SenseVerdict(p.A, p.B, p.A == "m0s0" && p.B == "m1s0" ? "equivalent" : "different", 0.99)).ToArray()));
+            return Task.FromResult(new SenseMergePlan(input.InputHash, input.Pairs.Select(p => new SenseVerdict(p.A, p.B, p.A == "m0s0" && p.B == "m1s0" ? "equivalent" : "different", 0.99)).ToArray(), ["m0s0"]));
         }
         var coordinator = new DictionaryCoordinator(cache, Lookup, Judge);
         var run = coordinator.LookupAsync("chad", null, settings, false, CancellationToken.None, new CallbackProgress<LookupSnapshot>(s =>
@@ -109,6 +109,8 @@ internal static class ParallelChecks
         _ = await coordinator.LookupAsync("chad", null, settings, false, CancellationToken.None);
         Check(starts == 2 && judgeCalls == 1, "repeat queries reuse both model caches and the merge plan");
         Check(coordinator.Cached("chad", null, settings).Groups.Length == 2, "offline cache view retains completed semantic grouping");
+        Check(QuickRead.Create(coordinator.Cached("chad",null,settings).Groups,[],[]) is [{Core:true}],
+            "legacy definitions gain cached core selection through the existing judge without extra provider calls");
         var changed = settings.ForModel(primary); changed.SecondaryProvider = "codex"; changed.SecondaryModel = "other-model";
         Check(coordinator.Cached("chad", null, changed).Answers[1].Entry == null, "changing a model cannot reuse another model's cached answer");
         Check(coordinator.Cached("chad", combined, settings).Groups.Length == 0, "changing dictionary evidence invalidates stale generated answers");
