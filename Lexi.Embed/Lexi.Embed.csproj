@@ -7,10 +7,6 @@
     <RootNamespace>Lexi.Embed</RootNamespace>
     <Product>LeXi Embedded Host</Product>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PublishAot>true</PublishAot>
-    <!-- iOS targets compile with the NativeAOT runtime pack from NuGet; no .NET iOS workload is needed. -->
-    <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
-    <NativeLib>Shared</NativeLib>
     <InvariantGlobalization>true</InvariantGlobalization>
     <!-- Core's JSON is source-generated (JsonContext.cs); the analyzers cannot see that its options carry the generated resolver. -->
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
@@ -18,6 +14,13 @@
     <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
     <NoWarn>$(NoWarn);IL2026;IL3050;IL2104;IL3053</NoWarn>
     <DebugType>none</DebugType>
+  </PropertyGroup>
+  <!-- Only a publish for a runtime compiles natively, so plain builds restore offline like the rest of the
+       repository. iOS targets use the NativeAOT runtime pack from NuGet; no .NET iOS workload is needed. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <PublishAot>true</PublishAot>
+    <PublishAotUsingRuntimePack>true</PublishAotUsingRuntimePack>
+    <NativeLib>Shared</NativeLib>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Lexi.Core/Lexi.Core.csproj" />
