@@ -36,7 +36,7 @@
           </StackPanel>
         </Grid>
       </Border>
-      <ListBox x:Name="Suggestions" Grid.Row="2" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议"/>
+      <ListBox x:Name="Suggestions" Grid.Row="2" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Suggestions_SelectionChanged" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="SearchBox_KeyDown" IsTabStop="False" KeyboardNavigation.TabNavigation="None" AutomationProperties.Name="词条建议" AutomationProperties.HelpText="上下键选择并填入输入框，可继续编辑；Enter 查询，Tab 保留所选词，Esc 恢复原输入。"/>
       <ScrollViewer x:Name="ResultsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,14,16,14">
         <StackPanel>
           <StackPanel x:Name="Welcome">

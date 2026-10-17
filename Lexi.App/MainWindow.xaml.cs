@@ -72,7 +72,7 @@ public partial class MainWindow : Window
         if (e.Key == Key.Escape)
         {
             if (EtymologyPopup.IsOpen) DismissEtymology();
-            else if (Suggestions.Visibility == Visibility.Visible) Suggestions.Visibility = Visibility.Collapsed;
+            else if (Suggestions.Visibility == Visibility.Visible) DismissSuggestions(restoreDraft: true);
             else WindowState = WindowState.Minimized;
             e.Handled = true;
         }
@@ -80,30 +80,13 @@ public partial class MainWindow : Window
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Q) { ExitApplication(); e.Handled = true; }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.OemComma) { e.Handled = true; Settings_Click(sender, e); }
     }
-    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (Placeholder == null) return;
-        Placeholder.Visibility = string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
-        if (!suppressSuggestions && string.IsNullOrWhiteSpace(SearchBox.Text) && current.Length > 0) ShowHistory(false);
-        if (suppressSuggestions || !settings.OfflineEnabled || dictionaryTask?.IsCompletedSuccessfully != true) return;
-        var suggestions = dictionaryTask.Result.Suggest(SearchBox.Text, settings);
-        Suggestions.ItemsSource = suggestions;
-        Suggestions.Visibility = suggestions.Length > 0 && SearchBox.IsKeyboardFocused ? Visibility.Visible : Visibility.Collapsed;
-    }
-    private async void SearchBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) { e.Handled = true; await SearchAsync(SearchBox.Text); }
-        if (e.Key == Key.Down && Suggestions.Visibility == Visibility.Visible && Suggestions.Items.Count > 0)
-        { Suggestions.SelectedIndex = 0; Suggestions.Focus(); (Suggestions.ItemContainerGenerator.ContainerFromIndex(0) as ListBoxItem)?.Focus(); e.Handled = true; }
-    }
-    private async void Suggestions_Click(object sender, MouseButtonEventArgs e)
-    { if (Suggestions.SelectedItem is string text) { SetQuery(text); await SearchAsync(text); } }
-    private async void Suggestions_KeyDown(object sender, KeyEventArgs e)
-    { if (e.Key == Key.Enter && Suggestions.SelectedItem is string text) { e.Handled = true; SetQuery(text); await SearchAsync(text); } }
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync(SearchBox.Text);
     private async void Refresh_Click(object sender, RoutedEventArgs e) { if (current.Length > 0) await SearchAsync(current, true); }
     private void SetQuery(string query)
-    { suppressSuggestions = true; SearchBox.Text = query; suppressSuggestions = false; Suggestions.Visibility = Visibility.Collapsed; }
+    {
+        DismissSuggestions();
+        SetSearchText(query);
+    }
     private void UpdateOnlineButton()
     {
         OnlineToggle.IsChecked = settings.Online;

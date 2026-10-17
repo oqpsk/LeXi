@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.9.10
+
+- Preview the selected search suggestion in the input while keeping the caret at its end. Up/down browse the original candidates without launching a lookup; typing immediately edits the selected word. Clicking or pressing Tab accepts a suggestion for editing, Enter searches, and Escape restores the input from before browsing. Keep suggestion previews out of query history and saved results.
+
 ## 0.9.9
 
 - Increase the title's size and use the main text color for clearer contrast on acrylic.
