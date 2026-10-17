@@ -7,7 +7,7 @@ LeXi 使用一个仓库维护 Windows 与 macOS 版本，共享词典格式、�
 - `Lexi.Core`：唯一的逻辑实现。包括离线索引、来源数据、模型协调、词形解析、翻译、缓存、保存的结果、历史与前进／后退记录，以及查询流程本身。`QuerySession` 执行一次查询的全部步骤，每一步发布完整的 `QueryView`：进度阶段、状态文字、义项行、来源、词形、音标、词源、TL;DR 与翻译。界面只负责渲染这些值。
 - `Lexi.App`：Windows 的 WPF 界面。负责布局、焦点、滚动、展开状态、窗口材质、任务栏和托盘、本地发音（SAPI）与密钥保护（当前用户加密）。WPF 仍保留原有的内部入口，检查程序通过它们驱动 Core 的展示模型。
 - `Lexi.Tools`：词库导入与非交互检查，包括共享查询流程（`session-check`）、平台服务（`platform-check`）和 Host 协议（`host-check`）。
-- `Lexi.Host`：以 JSON lines 暴露 Core 的查询、翻译、建议、历史与设置，流式推送 `QueryView`，支持取消。协议见 [host-protocol.md](host-protocol.md)。macOS 应用内置它的自包含单文件发布版本。
+- `Lexi.Host`：以 JSON lines 暴露 Core 的查询、翻译、建议、历史、设置与在线发音，流式推送 `QueryView`，支持取消。协议见 [host-protocol.md](host-protocol.md)。macOS 应用内置它的自包含单文件发布版本。
 - `apple/`：macOS 的 SwiftUI 应用，最低 macOS 26，内置单文件发布的 `Lexi.Host`。`LeXiKit` 启动 Host 并保存最新视图，`LeXiUI` 渲染视图；Liquid Glass 只用于工具栏、控件和弹出层。构建与检查见 [apple/README.md](../apple/README.md)。
 
 [WPF 仅支持 Windows](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/overview/)。macOS 不用 Swift 重写逻辑，而是通过 `Lexi.Host` 调用同一份 Core。
@@ -18,7 +18,7 @@ LeXi 使用一个仓库维护 Windows 与 macOS 版本，共享词典格式、�
 - 官方客户端发现（`ToolLocator`）：从访达打开的应用拿不到 shell 的 PATH，因此除 PATH 外还检查 `~/.local/bin`、`/opt/homebrew/bin`、`/usr/local/bin`、npm 全局目录及 nvm、fnm、Volta 等目录；npm 安装的入口脚本通过同一前缀下的 `node` 启动，并把找到的目录加入子进程 PATH。Windows 仍查找 `codex.exe`、Codex 应用目录、`claude.exe` 与 npm 的 `cli.js`。
 - 简繁检索键（`ChineseVariants`）：内置 OpenCC 字表，各平台生成相同的检索键，不再依赖 Windows 的 `LCMapStringEx`。一个简体字对应多个繁体字时，旧词库会依次尝试有限数量的组合。
 
-发音播放与密钥存储属于各自界面：Windows 使用 SAPI 与当前用户加密，macOS 使用系统声线与钥匙串。
+在线发音的模型、声线、校验、生成、缓存命名与离线规则在 Core（`SpeechCatalog`、`SpeechClient`、`SpeechAudio`），两端共用。本机声线、播放与密钥存储属于各自界面：Windows 使用 SAPI 与当前用户加密，macOS 使用系统声线与钥匙串，密钥只随单次请求传给 Host。
 
 ## 升级兼容
 

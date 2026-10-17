@@ -35,8 +35,11 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 查询与模型设置 | `AppSettings`、`ModelCatalog`（模型选项与校验）、`QuerySession.SettingsSaved` | 已实现 | 已实现：设置窗口，修改即生效，校验与提示同 Windows |
 | 离线词典启停与信息 | `DictionaryCatalog` | 已实现：设置 → 离线词典 | 已实现：设置 → 离线词典；安装词库需 PowerShell 7 运行同一安装脚本 |
 | 官方客户端登录与状态 | `ProviderConnection`、`ToolLocator`（不依赖 shell PATH） | 已实现：设置 → 账号连接 | 已实现：在“终端”中打开官方登录，完成后点击“检查状态” |
-| 本地发音 | `SpeechCatalog` | 已实现：Windows SAPI 声线 | 已实现：系统声线，按文字语言自动选择；声线选择计划中 |
-| 在线发音与密钥 | `SpeechClient`、`ElevenLabsSpeech` | 已实现：密钥使用 Windows 当前用户加密 | 计划：密钥存入钥匙串 |
+| 本地发音 | `SpeechCatalog.Local`（本机声线模型与校验） | 已实现：Windows SAPI 声线，可选“按文字语言自动选择”；生成 WAV 后按同一规则缓存 | 已实现：系统声线（`AVSpeechSynthesizer`），可选“按文字语言自动选择”；直接朗读，不生成缓存文件 |
+| 在线发音：OpenAI、Grok、ElevenLabs | `SpeechCatalog`（模型、声线、校验与提示）、`SpeechClient`、`ElevenLabsSpeech` | 已实现：设置 → 发音选择模型与声线，可试听 | 已实现：设置 → 发音选择模型与声线，可试听；通过 Host 的 `speech.*` 方法调用同一份 Core |
+| ElevenLabs 账号声线与 Voice ID | `SpeechClient.ElevenVoicesAsync`、`SpeechAudio.ElevenVoicesAsync`（离线时不读取） | 已实现：首次展开声线列表时读取，可刷新；“指定其他声线”填写 Voice ID | 已实现：点击“读取声线列表”读取，可刷新（SwiftUI 选择器没有展开时机）；“指定其他声线”填写 Voice ID |
+| 发音缓存与离线规则 | `SpeechAudio`：按文字、服务、模型、声线分别保存，写完整后才保留；离线时只播放已缓存的在线发音 | 已实现：`MediaPlayer` 播放 | 已实现：`AVAudioPlayer` 播放 Host 返回的 MP3 |
+| 语音密钥 | `SpeechClient`（格式校验与错误提示）；Core 不保存密钥 | 已实现：Windows 当前用户加密；未保存时可用 `OPENAI_API_KEY` 等环境变量 | 已实现：存入当前用户的钥匙串，只供 LeXi 使用，每次请求随调用传给 Host，Host 不保存。不读取环境变量：从访达打开的应用拿不到 shell 环境 |
 
 ## 平台专属
 
@@ -50,5 +53,5 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 快捷键 | Ctrl+L、Ctrl+,、Ctrl+Q；Esc 收起建议或最小化 | ⌘L、⌘R、⌘[、⌘]、⌘Y、⌘,、⌘Q；Esc 收起建议 |
 | 查询逻辑接入 | 直接引用 `Lexi.Core` | 内置 `Lexi.Host`（JSON lines） |
 | 构建与分发 | `scripts/Build.ps1`，可生成自包含版本 | `apple/scripts/build-app.sh`，按构建机器架构生成本机签名的应用；Developer ID 签名与公证计划中 |
-| 发音状态 | 底栏显示生成与播放状态 | 扬声器按钮显示播放或停止 |
+| 发音状态 | 底栏显示生成、播放与错误状态 | 底栏显示生成、播放与错误状态；扬声器按钮显示播放或停止 |
 | 任务栏图标刷新 | `Refresh-TaskbarIcon.ps1` | 不适用：Dock 图标随应用包更新 |

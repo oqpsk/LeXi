@@ -34,14 +34,14 @@ dotnet publish Lexi.Host/Lexi.Host.csproj -c Release -r osx-arm64 --self-contain
 
 界面检查在内存中构造和测量控件，并通过不显示、不激活的窗口句柄检查标题栏、缩放及背景配置；不截屏、不模拟键鼠操作。原生配置通过不代表视觉效果已经人工确认。
 
-`speech-check` 使用合成响应验证音标解析和 OpenAI/Grok 请求、取消、错误处理与缓存隔离。Windows 检查使用虚构密钥验证本机加密，并在有本地声线时静默生成 WAV 文件，不播放音频。真实在线 TTS 验证需另有用户授权的 API Key，不能放入常规 CI。
+`speech-check` 使用合成响应验证音标解析和 OpenAI/Grok/ElevenLabs 请求、取消、错误处理，以及两端共用的发音缓存（`SpeechAudio`）的文件隔离、离线规则和完整写入。`host-check` 用合成服务检查 `speech.*` 方法，并确认密钥不出现在响应和用户目录中。Windows 检查使用虚构密钥验证本机加密，并在有本地声线时静默生成 WAV 文件，不播放音频。真实在线 TTS 验证需另有用户授权的 API Key，不能放入常规 CI。
 
 ## 隐私
 
 - 禁止提交 `userdata`、查询缓存、令牌、OAuth 回调码、账号邮箱、机器绝对路径或本地运行日志。
 - 发布包必须从干净的构建目录生成，不要压缩日常使用的应用目录。
 - 官方 CLI 自行完成认证；应用代码不得读取、复制或转发其凭据文件。
-- TTS API Key 由用户单独填写，只能加密存放于本机 userdata；不进入普通设置、日志、构建或仓库。
+- TTS API Key 由用户单独填写：Windows 只能加密存放于本机 userdata，macOS 只存于当前用户的钥匙串；Host 只随单次请求接收密钥，不保存、不记录、不返回。密钥不进入普通设置、日志、构建或仓库。
 - 文档和 Issue 使用虚构示例。截图应先清除个人信息。
 - Git 提交邮箱使用 GitHub noreply 地址。
 

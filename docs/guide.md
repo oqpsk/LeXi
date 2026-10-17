@@ -110,7 +110,7 @@ pwsh ./scripts/Install-Dictionary.ps1 -AppDirectory "$HOME/Library/Application S
 | ⌘Y | 查询历史 |
 | ⌘, | 设置 |
 
-关闭窗口不会退出应用，点击 Dock 图标重新打开。发音使用系统声线，按文字语言自动选择；OpenAI、Grok 与 ElevenLabs 在线语音目前只在 Windows 版提供。
+关闭窗口不会退出应用，点击 Dock 图标重新打开。发音默认使用系统声线并按文字语言自动选择，也可在“设置 → 发音”中指定系统声线，或选择 OpenAI、Grok 与 ElevenLabs 在线语音。ElevenLabs 账号声线需点击“读取声线列表”。在线语音的 API Key 保存在钥匙串中，不读取环境变量。
 
 ## 音标和发音
 
