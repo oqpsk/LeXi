@@ -25,11 +25,13 @@ struct HistoryView: View {
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
-                    .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 8))
+                    .background(LexiTheme.panel, in: .rect(cornerRadius: 10))
+                    .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(LexiTheme.stroke) }
                     .help(entry.query)
                     .accessibilityLabel("重新查询：" + entry.preview)
-                    Button { Task { await store.remove(entry) } } label: { Image(systemName: "xmark") }
+                    Button { Task { await store.remove(entry) } } label: { Image(systemName: "xmark").frame(width: 28, height: 28).contentShape(.rect) }
                         .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
                         .help("删除这条历史")
                         .accessibilityLabel("删除历史：" + entry.preview)
                 }

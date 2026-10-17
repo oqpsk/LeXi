@@ -44,9 +44,10 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 |---|---|---|
 | 用户数据位置（`LexiPaths`） | 程序目录 `userdata/`、`data/`，便于升级保留 | `~/Library/Application Support/LeXi`（含 `data/`） |
 | 窗口位置记忆 | `WindowPlacement` 保存正常位置与最大化状态 | 系统窗口恢复 |
+| 查询历史入口 | 底栏 ξ 标志 | 底栏 ξ 标志、⌘Y |
 | 关闭与后台 | 托盘图标；关闭按钮可在“设置 → 窗口”中设为最小化或退出 | 关闭窗口不退出，点击 Dock 图标重新打开；不提供关闭行为设置 |
 | 单实例 | 互斥量与命名管道激活已有窗口 | macOS 应用默认单实例，单一查询窗口 |
-| 背景材质 | Windows 11 Acrylic，保留不透明回退 | Liquid Glass 用于工具栏、搜索栏、底栏控件与弹出层，结果正文使用常规背景；跟随系统深浅色 |
+| 背景材质 | Windows 11 Acrylic，保留不透明回退 | 半透明窗口背景（“降低透明度”时不透明）；查询栏与底栏为 Liquid Glass，结果在其下滚动；释义位于面板上；跟随系统深浅色 |
 | 快捷键 | Ctrl+L、Ctrl+,、Ctrl+Q；Esc 收起建议或最小化 | ⌘L、⌘R、⌘[、⌘]、⌘Y、⌘,、⌘Q；Esc 收起建议 |
 | 查询逻辑接入 | 直接引用 `Lexi.Core` | 内置 `Lexi.Host`（JSON lines） |
 | 构建与分发 | `scripts/Build.ps1`，可生成自包含版本 | `apple/scripts/build-app.sh`，按构建机器架构生成本机签名的应用；Developer ID 签名与公证计划中 |

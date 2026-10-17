@@ -21,10 +21,10 @@ public struct SearchBar: View {
 
     public var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+            Image(systemName: "magnifyingglass").font(.system(size: 17)).foregroundStyle(.secondary).accessibilityHidden(true)
             TextField("输入单词、短语或待翻译文本", text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.system(size: 18))
+                .font(.system(size: 20))
                 .lineLimit(1...6)
                 .focused(focused)
                 // Keys belong to the input method while it is composing (pinyin, zhuyin…).
@@ -41,13 +41,16 @@ public struct SearchBar: View {
                 .accessibilityLabel("查询")
                 .accessibilityHint("Return 查询，Shift-Return 换行")
             StatusRing(progress: store.view.progress)
-            Button { accept(); submit(text) } label: { Image(systemName: "return") }
-                .buttonStyle(.glass)
-                .help("查询")
+            Button { accept(); submit(text) } label: {
+                Image(systemName: "return").font(.system(size: 16, weight: .medium)).frame(width: 26, height: 26).contentShape(.rect)
+            }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("查询 · Return")
                 .accessibilityLabel("查询")
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .padding(.horizontal, 16).padding(.vertical, 11)
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 18))
         .overlay(alignment: .bottomLeading) {
             // Hangs below the bar however many lines the input has; only while typing in it.
             if focused.wrappedValue && !store.suggestions.isEmpty {
@@ -67,7 +70,7 @@ public struct SearchBar: View {
                 Button { selection = index; accept(); focused.wrappedValue = true } label: {
                     Text(word).font(LexiTheme.lexical(16)).frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(selection == index ? LexiTheme.pink.opacity(0.28) : .clear, in: .rect(cornerRadius: 8))
+                        .background(selection == index ? LexiTheme.pink.opacity(0.24) : .clear, in: .rect(cornerRadius: 8))
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
@@ -75,7 +78,7 @@ public struct SearchBar: View {
         }
         .padding(6)
         .frame(width: 320, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .glassEffect(.regular, in: .rect(cornerRadius: 14))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("输入建议")
         .accessibilityHint("上下方向键预览，Tab 选用，Return 查询，Escape 还原")

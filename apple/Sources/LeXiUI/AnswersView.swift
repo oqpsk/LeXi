@@ -33,9 +33,10 @@ struct AnswersCard: View {
                 Text(answers.mergeWarning).font(.callout).foregroundStyle(LexiTheme.warm).padding(.top, 6)
             }
         }
-        .padding(16)
+        .padding(.horizontal, 18).padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
+        .background(LexiTheme.panel, in: .rect(cornerRadius: 12))
+        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(LexiTheme.stroke) }
     }
 }
 
@@ -54,7 +55,7 @@ struct SenseHeadingText: View {
     let heading: SenseHeading
     var body: some View {
         var text = Text(heading.prefix + "  ").foregroundStyle(LexiTheme.accentText)
-        text = Text("\(text)\(Text(heading.partOfSpeech).font(LexiTheme.lexical(16)).italic().foregroundStyle(LexiTheme.warm))")
+        text = Text("\(text)\(Text(heading.partOfSpeech).font(LexiTheme.lexical(17)).italic().foregroundStyle(LexiTheme.warm))")
         if !heading.form.isEmpty { text = Text("\(text)\(Text("  " + heading.form).font(LexiTheme.lexical(14)).italic())") }
         if !heading.usage.isEmpty { text = Text("\(text)\(Text("  " + heading.usage))") }
         if heading.abbreviation { text = Text("\(text)\(Text("  缩写"))") }
@@ -72,8 +73,8 @@ struct SenseContent: View {
             if !sense.expansion.isEmpty {
                 Text(sense.expansion).font(LexiTheme.lexical(15)).foregroundStyle(LexiTheme.accentText).help("英文全称").textSelection(.enabled)
             }
-            Text(sense.chinese).font(.system(size: 17)).textSelection(.enabled)
-            Text(sense.english).font(.system(size: 15)).textSelection(.enabled)
+            Text(sense.chinese).font(.system(size: 18)).lineSpacing(3).textSelection(.enabled)
+            Text(sense.english).font(.system(size: 16)).lineSpacing(2).textSelection(.enabled)
             DisclosureBar(sense: sense, store: store)
         }
     }
@@ -145,8 +146,8 @@ struct ReferenceRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(reference.caption).font(.callout).foregroundStyle(.secondary)
             if !reference.expansion.isEmpty { Text(reference.expansion).font(LexiTheme.lexical(15)).foregroundStyle(LexiTheme.accentText) }
-            Text(reference.chinese).font(.system(size: 17)).textSelection(.enabled)
-            Text(reference.english).font(.system(size: 15)).textSelection(.enabled)
+            Text(reference.chinese).font(.system(size: 18)).textSelection(.enabled)
+            Text(reference.english).font(.system(size: 16)).textSelection(.enabled)
             Disclosure(label: "参考资料", key: reference.key, store: store) {
                 Text(reference.sourceNote).font(.callout).foregroundStyle(.secondary)
                 SourceLink(reference.sourceName, url: reference.sourceUrl)
@@ -176,8 +177,7 @@ struct DisclosureButton: View {
         Button { toggle(!open) } label: {
             Label(label, systemImage: open ? "chevron.down" : "chevron.right").labelStyle(LeadingIcon())
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
+        .buttonStyle(DisclosureStyle(open: open))
         .help((open ? "收起" : "展开") + label)
         .accessibilityLabel(label)
         .accessibilityValue(open ? "已展开" : "已收起")

@@ -22,18 +22,22 @@ public struct MainView: View {
     public init(store: LexiStore) { self.store = store }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            SearchBar(store: store, text: $text, programmatic: $programmatic, focused: $searchFocused, submit: submit)
-                .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 6)
-            ScrollView {
-                content.padding(.horizontal, 20).padding(.vertical, 14)
-            }
-            .scrollPosition($position)
-            .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, value in offset = value }
+        // Results scroll beneath the glass query bar and footer; the window itself is translucent,
+        // like the Windows acrylic window, and falls back to opaque with Reduce Transparency.
+        ScrollView {
+            content.padding(.horizontal, 22).padding(.vertical, 14)
         }
-        .background(.background)
-        .safeAreaInset(edge: .bottom, spacing: 0) { footer }
+        .scrollPosition($position)
+        .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, value in offset = value }
+        .scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
+        .safeAreaBar(edge: .top) {
+            SearchBar(store: store, text: $text, programmatic: $programmatic, focused: $searchFocused, submit: submit)
+                .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 10)
+        }
+        .safeAreaBar(edge: .bottom) { footer }
+        .containerBackground(.thinMaterial, for: .window)
         .toolbar { toolbar }
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .navigationTitle("LeXi")
         .frame(minWidth: 540, minHeight: 420)
         .onChange(of: store.view.request) { _, _ in pageChanged() }
@@ -61,8 +65,13 @@ public struct MainView: View {
     private var online: Bool { store.settings?.settings.online ?? true }
     private var canRegenerate: Bool { store.view.kind != .home && store.view.canRegenerate && online }
 
+    // The Windows bottom bar: brand mark (query history), status, regeneration and the online switch.
     private var footer: some View {
         HStack(spacing: 12) {
+            Button(action: goHome) { BrandMark(size: 24) }
+                .buttonStyle(.plain)
+                .help("查询历史 · ⌘Y")
+                .accessibilityLabel("查询历史")
             Text(store.view.status)
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)
@@ -78,11 +87,10 @@ public struct MainView: View {
             Toggle(store.settings?.controls.onlineLabel ?? "在线补充", isOn: Binding(
                 get: { online }, set: { value in Task { await store.setOnline(value) } }))
                 .toggleStyle(.switch)
+                .tint(LexiTheme.pink)
                 .help(store.settings?.controls.onlineTooltip ?? "")
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
-        .padding(.horizontal, 12).padding(.bottom, 10).padding(.top, 4)
+        .padding(.horizontal, 16).padding(.vertical, 10)
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
@@ -94,9 +102,6 @@ public struct MainView: View {
             Button { navigate(1) } label: { Label("前进", systemImage: "chevron.right") }
                 .disabled(!navigation.canForward)
                 .help(navigation.canForward ? "前进 · \(navigation.forwardLabel) · ⌘]" : "前进 · ⌘]")
-        }
-        ToolbarItem(placement: .primaryAction) {
-            Button(action: goHome) { Label("查询历史", systemImage: "clock") }.help("查询历史 · ⌘Y")
         }
         ToolbarItem(placement: .primaryAction) {
             SettingsLink { Label("设置", systemImage: "gearshape") }.help("设置 · ⌘,")
