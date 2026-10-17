@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.8.2
+
+- Return structured morphology alongside each model's definitions, covering noun/verb/adjective/adverb uses introduced after initial dictionary lookup. Update forms when each model completes; keep partial output out of the display and cache, and preserve complete data during streaming refreshes.
+- Fill missing recorded forms with model-supplied morphology while retaining its own provenance. Prefer recorded spellings and the configured primary model when proposals differ; retain other proposals in the form tooltip. Late online dictionary data can take precedence without dropping the remaining model enrichment.
+- Keep completed morphology in the model-specific cache for offline use. Preserve legacy definitions as an immediate/offline fallback and refresh them once online to obtain the new fields. Translation and sense-merge model selection are unchanged; morphology adds no separate model request.
+
 ## 0.8.1
 
 - Remove redundant word-form and bilingual-definition headings. Use warm English serif italic parts of speech, upright serif word forms and serif examples, with a Song-style Chinese fallback. Align word-form labels and spellings on a shared text baseline and combine identical past/participle spellings.

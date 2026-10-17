@@ -82,7 +82,7 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
                     if (progress != null && StreamingEntry.Read(text, query) is { } preview)
                     { var value = JsonSerializer.Serialize(preview, Json.Options); if (last != value) { last = value; progress.Report(preview); } }
                 });
-                return CodexDictionary.ParseAndValidate(StreamingEntry.Unwrap(result), query, online);
+                return CodexDictionary.ParseAndValidate(StreamingEntry.Unwrap(result), query, online, true);
             }
             catch (Exception ex) when (attempt == 0 && !token.IsCancellationRequested && ex is JsonException or InvalidDataException) { last = null; }
         }

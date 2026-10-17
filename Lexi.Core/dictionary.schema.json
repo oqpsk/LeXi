@@ -18,8 +18,24 @@
       },
       "required": ["partOfSpeech", "english", "chinese", "register", "example", "exampleChinese", "evidence"]
     }},
+    "wordForms": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "lemma": {"type": "string"},
+        "partOfSpeech": {"type": "string", "enum": ["verb", "noun", "adjective", "adverb"]},
+        "forms": {"type": "array", "items": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "kind": {"type": "string", "enum": ["past", "pastParticiple", "presentParticiple", "thirdPerson", "plural", "comparative", "superlative"]},
+            "words": {"type": "array", "items": {"type": "string"}}
+          },
+          "required": ["kind", "words"]
+        }}
+      },
+      "required": ["lemma", "partOfSpeech", "forms"]
+    }},
     "note": {"type": "string"},
     "evidenceStatus": {"type": "string", "enum": ["source_based", "unverified", "unknown"]}
   },
-  "required": ["word", "found", "phonetic", "senses", "note", "evidenceStatus"]
+  "required": ["word", "found", "phonetic", "senses", "wordForms", "note", "evidenceStatus"]
 }

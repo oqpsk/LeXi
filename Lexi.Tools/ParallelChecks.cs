@@ -5,6 +5,7 @@ internal static class ParallelChecks
 {
     public static async Task Run(string root)
     {
+        await ModelInflectionChecks.Run(root);
         var work = Path.Combine(root, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         int count = 0;
