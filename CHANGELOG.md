@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add LeXi for macOS (`apple/`): a SwiftUI app for macOS 26+ that bundles the self-contained `Lexi.Host` and renders its views. It supports lookup, translation, suggestions, history, back/forward navigation, regeneration, the online switch, settings with the shared validation, dictionary management, official-client status and sign-in in Terminal, and system-voice speech. Liquid Glass is limited to the toolbar, search bar, footer controls and popovers; results use the normal background with pink as an accent. Keys are left to the input method while it composes text.
+- Give the macOS app Apple's design language: a floating Liquid Glass query capsule, toolbar glass for navigation, history and settings, and grouped glass controls for regeneration and the online mode, with results scrolling beneath on grouped surfaces. Colors follow the system and the user's accent; pink appears only as the TL;DR mark. Settings use System Settings-style grouped forms with account status indicators; a General tab chooses system, light or dark appearance and lists the shortcuts. Windows and their toolbars use a neutral background that ignores wallpaper tinting.
+- Add `apple/scripts/build-app.sh` to assemble `LeXi.app` with the host, model schemas, an icon generated from the brand mark and the license notices, and Swift tests for protocol decoding, view state, the real host and result layout. The macOS CI job runs them and builds the app.
+- Online speech services and voice selection remain Windows-only for now; FEATURES.md records the gap.
+
 - Add `Lexi.Host`, a JSON-lines host for native front ends. It exposes query, translation, suggestions, history, settings, dictionaries and official-client status, streams every `QueryView` in order, supports cancelling individual requests, and keeps stdout to protocol messages only. It publishes as a self-contained single file with model schemas beside it. See docs/host-protocol.md.
 - Share model choices, the “two different models” rule and the fixed Codex options through `ModelCatalog`, used by the Windows settings dialog and the host.
 - Add `host-check`, covering streaming, cancellation, errors and settings validation in process, and the host executable's stdout and exit behavior; the macOS CI job also checks the published single-file host.

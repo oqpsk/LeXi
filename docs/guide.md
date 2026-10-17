@@ -1,6 +1,6 @@
 # LeXi 使用指南
 
-Windows 优先的轻量桌面词典。输入中英文词语查看释义，输入一段文本进行翻译；在线 AI 补充新词、俚语和专业术语。
+Windows 与 macOS 上的轻量桌面词典。输入中英文词语查看释义，输入一段文本进行翻译；在线 AI 补充新词、俚语和专业术语。
 
 ## 功能
 
@@ -81,6 +81,36 @@ pwsh ./scripts/Build.ps1 -SelfContained
 义项判断通过本机 Codex CLI 和现有 ChatGPT 登录完成，不调用单独的 Decisions API，也不需要新增 API Key。所有已启用查询模型结束且存在待比较义项时才判断，单模型也会比较内部重复或细分用法；判断期间释义已经可读。同一用法优先展示覆盖更完整的原始解释，其余表述和用法细分可展开核对，各自来源和未核验标记保持独立。不同词性、指代和实质含义保持分开。判断有误的可能仍存在，模型一致不代表事实正确；无法判断、格式无效或超时则保留全部释义。
 
 双模型及后台判断会额外消耗对应订阅额度。完整释义按模型和来源分别缓存，合并结果按全部释义、判断规则版本和判断模型缓存，重复查询无需再次判断。刷新会重新查询和判断。原始离线、在线词典内容保留在可展开的来源区。
+
+## macOS
+
+macOS 版需要 macOS 26 或更新版本，查询、缓存、合并与状态文字与 Windows 版共用同一份 `Lexi.Core`。构建需要 Xcode 26 和 .NET 10 SDK：
+
+```bash
+apple/scripts/build-app.sh
+open artifacts/macos/LeXi.app
+```
+
+用户数据与词库位于 `~/Library/Application Support/LeXi`。安装词库需要 PowerShell 7（例如 `brew install powershell`）：
+
+```bash
+pwsh ./scripts/Install-Dictionary.ps1 -AppDirectory "$HOME/Library/Application Support/LeXi"
+```
+
+从访达打开的应用拿不到终端的 PATH，LeXi 会另外检查 `~/.local/bin`、Homebrew、`/usr/local/bin`、npm 全局目录和常见 Node 版本管理器来查找 Codex 与 Claude Code；也可在“设置 → 账号连接”中指定 Codex 路径。“登录 / 重新连接”会在“终端”中运行官方登录命令，完成后回到设置点击“检查状态”。
+
+| 按键 | 操作 |
+|---|---|
+| Return | 查询 |
+| Shift-Return 或 Option-Return | 换行 |
+| Esc | 收起建议列表 |
+| ⌘L | 选中输入框，继续查词 |
+| ⌘R | 重新生成 |
+| ⌘[ / ⌘] | 后退 / 前进 |
+| ⌘Y | 查询历史 |
+| ⌘, | 设置 |
+
+关闭窗口不会退出应用，点击 Dock 图标重新打开。发音使用系统声线，按文字语言自动选择；OpenAI、Grok 与 ElevenLabs 在线语音目前只在 Windows 版提供。
 
 ## 音标和发音
 
