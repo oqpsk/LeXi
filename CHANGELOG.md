@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.1
+
+- Add a compact pink-tinted TL;DR above definitions. Reuse short glosses from the same definition request, with complete-text fallbacks for old caches and offline entries; keep preview, partial and final states explicit without another model call.
+- Move etymology into a Rosetta-stone-inspired vector control beside the headword. Open a selectable, scrollable popover with source attribution, keyboard dismissal and bounded dimensions; retain content and reader position during model updates.
+- Remove the standalone specialist-reference section. Keep uncovered professional meanings as attributed rows in the definition card, and place covered reference summaries inside the corresponding sense's reference disclosure.
+
 ## 0.9.0
 
 - Preserve query case across online lookup, model requests and caches. Resolve exact-case and lowercase Wiktionary pages separately; keep abbreviation expansions visible and prevent merging unrelated expansions or attaching lowercase homograph inflections.

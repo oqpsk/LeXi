@@ -52,16 +52,31 @@
             </Button>
           </StackPanel>
           <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
-            <TextBlock x:Name="EntryHeading" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"><Run x:Name="Headword" FontSize="30" FontWeight="SemiBold"/><Run Text="&#160;&#160;"/><Run x:Name="Phonetic" Foreground="{StaticResource Muted}"/><Run x:Name="PhoneticLabel" FontSize="12" Foreground="{StaticResource Muted}"/><InlineUIContainer BaselineAlignment="TextBottom"><Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button></InlineUIContainer></TextBlock>
+            <TextBlock x:Name="EntryHeading" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"><Run x:Name="Headword" FontSize="30" FontWeight="SemiBold"/><Run Text="&#160;&#160;"/><Run x:Name="Phonetic" Foreground="{StaticResource Muted}"/><Run x:Name="PhoneticLabel" FontSize="12" Foreground="{StaticResource Muted}"/><InlineUIContainer BaselineAlignment="TextBottom"><Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button></InlineUIContainer><InlineUIContainer BaselineAlignment="TextBottom"><ToggleButton x:Name="EtymologyButton" Style="{StaticResource LexicalIconToggle}" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="语源 · 词的来历" AutomationProperties.Name="展开或收起语源"><Path Data="{StaticResource RosettaIcon}" Style="{StaticResource IconPath}"/></ToggleButton></InlineUIContainer></TextBlock>
             <StackPanel x:Name="FormsPanel"/>
-            <StackPanel x:Name="EtymologyPanel"/>
-            <StackPanel x:Name="ReferencePanel"/>
+            <Border x:Name="QuickReadCard" Visibility="Collapsed" Background="#14FFADD2" BorderBrush="#A0FFADD2" BorderThickness="2,0,0,0" CornerRadius="0,7,7,0" Padding="12,9,12,10" Margin="0,2,0,14">
+              <StackPanel>
+                <TextBlock x:Name="QuickReadLabel" Foreground="{StaticResource Accent}" FontSize="12" Margin="0,0,0,3"/>
+                <TextBox x:Name="QuickReadText" Style="{StaticResource Selectable}" FontSize="19" TextBlock.LineHeight="28" TextBlock.LineStackingStrategy="BlockLineHeight"/>
+              </StackPanel>
+            </Border>
             <StackPanel x:Name="AiPanel"/>
             <StackPanel x:Name="LocalPanel"/>
             <StackPanel x:Name="OnlinePanel"/>
           </StackPanel>
         </StackPanel>
       </ScrollViewer>
+      <Popup x:Name="EtymologyPopup" Grid.RowSpan="4" PlacementTarget="{Binding ElementName=EtymologyButton}" Placement="Bottom" VerticalOffset="8" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked, ElementName=EtymologyButton, Mode=TwoWay}" Opened="Etymology_Opened" PreviewKeyDown="Etymology_KeyDown">
+        <Border x:Name="EtymologySurface" Width="440" Padding="18,14,18,16" Background="#F5222327" BorderBrush="#806E5866" BorderThickness="1" CornerRadius="10" KeyboardNavigation.TabNavigation="Cycle">
+          <StackPanel>
+            <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <TextBlock Text="语源 · Etymology" Foreground="{StaticResource Accent}" FontSize="18" VerticalAlignment="Center"/>
+              <Button x:Name="CloseEtymology" Grid.Column="1" Style="{StaticResource IconButton}" Click="Etymology_Close" ToolTip="关闭 · Esc" AutomationProperties.Name="关闭语源"><Path Data="{StaticResource CloseIcon}" Style="{StaticResource IconPath}"/></Button>
+            </Grid>
+            <ScrollViewer x:Name="EtymologyScroll" MaxHeight="340" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="EtymologyContent"/></ScrollViewer>
+          </StackPanel>
+        </Border>
+      </Popup>
       <Border x:Name="StatusBar" Grid.Row="3" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="14,6">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>

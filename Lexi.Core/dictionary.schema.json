@@ -50,6 +50,10 @@
           },
           "expansion": {
             "type": "string"
+          },
+          "gloss": {
+            "type": "string",
+            "description": "简体中文速记释义，通常4至18字，最多32字。只概括本义项，保留关键区别、否定与语气，不增加解释中没有的内容。"
           }
         },
         "required": [
@@ -61,7 +65,8 @@
           "exampleChinese",
           "evidence",
           "lexicalForm",
-          "expansion"
+          "expansion",
+          "gloss"
         ]
       }
     },

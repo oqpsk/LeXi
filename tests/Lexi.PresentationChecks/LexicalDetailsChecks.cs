@@ -18,7 +18,9 @@ internal static partial class Program
         var answers = new[] { new ModelAnswer(model,ModelPhase.Complete,entry) };
         var snapshot = new LookupSnapshot(answers,SenseMerging.Group(answers));
         main.RenderAnswers(snapshot,null);
-        var ai = (Panel)main.FindName("AiPanel"); var etymology = (Panel)main.FindName("EtymologyPanel");
+        var ai = (Panel)main.FindName("AiPanel"); var etymology = (Panel)main.FindName("EtymologyContent");
+        var etymologyButton = (ToggleButton)main.FindName("EtymologyButton");
+        var popup = (Popup)main.FindName("EtymologyPopup");
         Check(Contents(ai,true).OfType<TextBox>().Any(t=>t.Text==sense.Expansion) && Contents(ai,true).OfType<TextBlock>().SelectMany(t=>t.Inlines.OfType<Run>()).Any(r=>r.Text.Contains("缩写")),
             "abbreviation identity and full English expansion are visible beside their own sense");
         var examples = Contents(ai,true).OfType<ToggleButton>().Single(b=>b.Content.ToString()=="例句");
@@ -29,17 +31,22 @@ internal static partial class Program
         examples.IsChecked=true;
         Check(Contents(ai,true).OfType<TextBox>().Where(t=>t.Text==sense.Example || t.Text==sense.ExampleChinese).All(t=>t.FontStyle==FontStyles.Italic),
             "English and Chinese serif examples use italic text when expanded");
-        Check(Contents(etymology,true).OfType<ToggleButton>().Single().Content.ToString()=="语源" && !Contents(etymology,true).OfType<TextBox>().Any(),
-            "etymology is available without consuming expanded reading space");
-        Contents(etymology,true).OfType<ToggleButton>().Single().IsChecked=true;
+        Check(etymologyButton.Visibility == Visibility.Visible && !popup.IsOpen && !popup.StaysOpen && popup.PlacementTarget == etymologyButton &&
+            etymologyButton.Parent is InlineUIContainer && !Theme.CanDragFrom(etymologyButton),
+            "etymology is an accessible headword icon with a closed, anchored light-dismiss popover");
+        Check(etymologyButton.Content is System.Windows.Shapes.Path icon && !icon.Data.Bounds.IsEmpty && icon.Width == 18 && etymologyButton.Width == 32,
+            "Rosetta-stone geometry matches the other lexical icon and hit-target sizes");
         main.ApplySourceEtymology([new("Etymology","An initialism.","https://example.org/source")]);
-        Check(Contents(etymology,true).OfType<ToggleButton>().Single().IsChecked==true && Contents(etymology,true).OfType<TextBox>().Count()==2,
-            "late source etymology retains the reader's expansion and separates dictionary text from model explanation");
+        Check(!popup.IsOpen && Contents(etymology,true).OfType<TextBox>().Count()==2,
+            "late source etymology updates selectable content without opening the popover");
+        main.RenderAnswers(snapshot,null);
+        Check(Contents(etymology,true).OfType<TextBox>().Count()==2 && !popup.IsOpen,
+            "unchanged model updates retain both source and model origin content without duplicating it");
         main.ResetWordForms();
         main.ApplyLocalWordForms("TEE",[new("tee",[new("p","过去式",["teed"])],"fixture","")]);
         Check(((Panel)main.FindName("FormsPanel")).Children.Count==0,"uppercase queries do not display the lowercase golf verb's forms");
         main.ResetLexicalDetails();
-        Check(etymology.Children.Count==0 && ((Panel)main.FindName("ReferencePanel")).Children.Count==0,
+        Check(etymology.Children.Count==0 && etymologyButton.Visibility == Visibility.Collapsed && !popup.IsOpen && ((FrameworkElement)main.FindName("QuickReadCard")).Visibility == Visibility.Collapsed,
             "the next query or translation clears all lexical detail state");
     }
 }

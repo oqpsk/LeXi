@@ -23,10 +23,14 @@ public partial class MainWindow
         ApplyModelWordForms(current.Length > 0 ? current : Queries.LookupKey(snapshot.Answers.FirstOrDefault(a => a.Entry != null)?.Entry?.Word ?? ""), snapshot);
         ApplyModelEtymology(snapshot);
         AiPanel.Children.Clear();
-        if (snapshot.Groups.Length == 0 && snapshot.Answers.All(a => a.Phase == ModelPhase.Offline)) return;
+        var query = current.Length > 0 ? current : snapshot.Answers.FirstOrDefault(a => a.Entry != null)?.Entry?.Word ?? evidence?.Word ?? "";
+        var uncovered = SpecialistReferences.Uncovered(query, snapshot.Groups, evidence);
+        RenderQuickRead(snapshot, uncovered, finalized);
+        if (snapshot.Groups.Length == 0 && uncovered.Length == 0 && snapshot.Answers.All(a => a.Phase == ModelPhase.Offline)) return;
         var card = Card(AiPanel, "", "", true);
+        foreach (var (brief, i) in uncovered.Select((b,i) => (b,i))) card.Children.Add(ReferenceSenseRow(brief, i));
         foreach (var (group, i) in snapshot.Groups.Select((g, i) => (g, i)))
-            card.Children.Add(SenseRow(group, i, evidence));
+            card.Children.Add(SenseRow(group, i + uncovered.Length, evidence));
         foreach (var answer in snapshot.Answers)
         {
             if (answer.Phase == ModelPhase.Failed) card.Children.Add(CompactHint(answer.Model.Name + "：" + answer.Error + (answer.Cached ? "（已保留缓存）" : ""), true));
@@ -43,7 +47,6 @@ public partial class MainWindow
         if (snapshot.MergeFailed) card.Children.Add(CompactHint(snapshot.MergeNote, true));
         if (snapshot.Groups.Length > 0)
         {
-            CollapseReferenceBriefs(snapshot, evidence);
             if (OnlinePanel.Children.OfType<Expander>().FirstOrDefault() is { Tag: null } onlineOriginal)
             { onlineOriginal.IsExpanded = false; onlineOriginal.Tag = "initially-collapsed"; }
             // Preserve every dictionary's original text, with a compact default view.

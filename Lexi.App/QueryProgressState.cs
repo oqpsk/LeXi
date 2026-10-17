@@ -26,10 +26,10 @@ internal sealed record QueryProgressState(QueryStage Stage, string Title, string
         return new(QueryStage.Supplement, "模型补充中", $"预览 · {snapshot.Groups.Length} 条候选 · " + detail, MergeEnabled: merge);
     }
 
-    public static QueryProgressState Finished(LookupSnapshot snapshot, bool merge, bool sourceIncomplete = false)
+    public static QueryProgressState Finished(LookupSnapshot snapshot, bool merge, bool sourceIncomplete = false, int referenceCount = 0)
     {
         var failed = snapshot.Answers.Count(a => a.Phase == ModelPhase.Failed);
-        var count = snapshot.Groups.Length;
+        var count = snapshot.Groups.Length + referenceCount;
         if (snapshot.MergeFailed) return new(QueryStage.Finished, "合并未完成",
             $"已保留 {count} 条释义 · 本次查询已结束", QueryOutcome.Partial, MergeEnabled: merge);
         if (failed > 0) return new(QueryStage.Finished, failed == snapshot.Answers.Length ? "模型补充未完成" : "部分完成",
