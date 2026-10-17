@@ -4,8 +4,8 @@ LeXi 使用一个仓库维护 Windows 与未来的 macOS 版本，共享词典�
 
 ## 目前的边界
 
-- `Lexi.Core`：离线索引、来源数据、模型协调、词形解析、翻译和缓存。主体是 .NET 类库；简繁转换及客户端发现仍包含 Windows 分支，不能直接宣称已完成跨平台兼容。
-- `Lexi.App`：Windows 的 WPF 界面、窗口材质、任务栏行为、本地发音和密钥保护。
+- `Lexi.Core`：离线索引、来源数据、模型协调、词形解析、翻译、缓存与会话前进／后退记录。主体是 .NET 类库；简繁转换及客户端发现仍包含 Windows 分支，不能直接宣称已完成跨平台兼容。
+- `Lexi.App`：Windows 的 WPF 界面、窗口材质、任务栏和托盘行为、本地发音与密钥保护。托盘使用 Windows Desktop 自带的 NotifyIcon；未来 macOS 前端需要独立适配菜单栏与窗口关闭语义。
 - `Lexi.Tools`：词库导入与非交互检查。
 
 [WPF 仅支持 Windows](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/overview/)。C# 和 .NET 类库可以复用；Windows 界面及系统服务需要独立适配。

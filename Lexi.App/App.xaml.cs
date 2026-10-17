@@ -10,6 +10,7 @@ public partial class App : Application
 {
     public App() => AppContext.SetSwitch("Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering", false);
     private Mutex? mutex;
+    private TrayIcon? tray;
     private readonly CancellationTokenSource lifetime = new();
     public static string Root => AppContext.BaseDirectory;
     public static string UserRoot => Path.Combine(Root, "userdata");
@@ -36,6 +37,7 @@ public partial class App : Application
         try { Directory.CreateDirectory(UserRoot); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { MessageBox.Show("请把 LeXi 文件夹放到可以写入的位置。", "LeXi"); Shutdown(); return; }
         var window = new MainWindow(); MainWindow = window; window.Show();
+        tray = new TrayIcon(window.Restore, window.OpenSettings, window.ExitApplication);
         _ = Task.Run(async () =>
         {
             while (!lifetime.IsCancellationRequested)
@@ -52,5 +54,5 @@ public partial class App : Application
             }
         });
     }
-    protected override void OnExit(ExitEventArgs e) { lifetime.Cancel(); mutex?.Dispose(); base.OnExit(e); }
+    protected override void OnExit(ExitEventArgs e) { lifetime.Cancel(); tray?.Dispose(); mutex?.Dispose(); base.OnExit(e); }
 }

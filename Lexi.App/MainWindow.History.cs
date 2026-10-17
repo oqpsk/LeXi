@@ -9,8 +9,9 @@ public partial class MainWindow
 {
     private readonly QueryHistory history = new(App.UserRoot);
     private void HistoryHome_Click(object sender, RoutedEventArgs e) => ShowHistory();
-    internal void ShowHistory(bool clearInput = true)
+    internal void ShowHistory(bool clearInput = true, bool trackVisit = true)
     {
+        if (trackVisit) RecordVisit("");
         lookup?.Cancel(); StopSpeech(); current = "";
         ResetSenseDetails(); ResetLexicalDetails(); QueryProgress.Reset();
         Suggestions.Visibility = Visibility.Collapsed;

@@ -74,6 +74,7 @@ public static class Json
 
 public sealed class AppSettings
 {
+    public bool MinimizeOnClose { get; set; } = true;
     public bool Online { get; set; } = true;
     public bool AutoAi { get; set; } = true;
     public bool OfflineEnabled { get; set; } = true;

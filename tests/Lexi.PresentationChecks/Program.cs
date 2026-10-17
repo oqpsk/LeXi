@@ -50,6 +50,7 @@ internal static partial class Program
         CheckLexicalDetails(main);
         CheckQuickRead(main);
         CheckHistory(main);
+        CheckWindowNavigation(main, settings);
         CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)

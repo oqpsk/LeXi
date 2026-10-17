@@ -3,8 +3,24 @@
     Icon="Assets/Lexi.ico" PreviewKeyDown="Window_KeyDown" Activated="Window_Activated">
   <Border Background="{DynamicResource WindowSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="12">
     <Grid>
-      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-      <Border Background="Transparent" BorderBrush="{StaticResource Stroke}" BorderThickness="0,0,0,1" Padding="18,14,10,10">
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <Border x:Name="WindowToolbar" Background="#1817171B" CornerRadius="11,11,0,0" Height="40" Padding="12,4,10,4">
+        <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <StackPanel Orientation="Horizontal">
+            <Button x:Name="BackButton" Style="{StaticResource IconButton}" Click="Back_Click" IsEnabled="False" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="后退"><Path Data="{StaticResource BackIcon}" Style="{StaticResource IconPath}"/></Button>
+            <Button x:Name="ForwardButton" Style="{StaticResource IconButton}" Click="Forward_Click" IsEnabled="False" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="前进"><Path Data="{StaticResource ForwardIcon}" Style="{StaticResource IconPath}"/></Button>
+          </StackPanel>
+          <Border x:Name="WindowDragArea" Grid.Column="1" Background="Transparent" Cursor="SizeAll" ToolTip="拖动此处移动窗口" Margin="8,0">
+            <TextBlock Text="LeXi" FontSize="12" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <StackPanel Grid.Column="2" Orientation="Horizontal">
+            <Button x:Name="SettingsButton" Style="{StaticResource IconButton}" Click="Settings_Click" Margin="0,0,4,0" ToolTip="设置 · Ctrl+," AutomationProperties.Name="设置"><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource IconPath}"/></Button>
+            <Button x:Name="CloseButton" Style="{StaticResource IconButton}" Click="Close_Click" ToolTip="最小化" AutomationProperties.Name="最小化"><Path Data="{StaticResource CloseIcon}" Style="{StaticResource IconPath}"/></Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+      <Border x:Name="QueryBar" Grid.Row="1" Background="Transparent" BorderBrush="{StaticResource Stroke}" BorderThickness="0,0,0,1" Padding="18,2,10,8">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="32"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <Border Background="Transparent">
@@ -17,13 +33,11 @@
           <StackPanel x:Name="SearchActions" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
             <local:QueryProgressView x:Name="QueryProgress" Margin="0,0,4,0"/>
             <Button Style="{StaticResource IconButton}" Click="Search_Click" Margin="0,0,4,0" ToolTip="查询 · Enter" AutomationProperties.Name="查询"><Path Data="{StaticResource EnterIcon}" Style="{StaticResource IconPath}"/></Button>
-            <Button Style="{StaticResource IconButton}" Click="Settings_Click" Margin="0,0,4,0" ToolTip="设置 · Ctrl+," AutomationProperties.Name="设置"><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource IconPath}"/></Button>
-            <Button Style="{StaticResource IconButton}" Click="Hide_Click" ToolTip="收起 · Esc" AutomationProperties.Name="收起窗口"><Path Data="{StaticResource CloseIcon}" Style="{StaticResource IconPath}"/></Button>
           </StackPanel>
         </Grid>
       </Border>
-      <ListBox x:Name="Suggestions" Grid.Row="1" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议"/>
-      <ScrollViewer x:Name="ResultsScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,14,16,14">
+      <ListBox x:Name="Suggestions" Grid.Row="2" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="Suggestions_KeyDown" AutomationProperties.Name="词条建议"/>
+      <ScrollViewer x:Name="ResultsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,14,16,14">
         <StackPanel>
           <StackPanel x:Name="Welcome">
             <TextBlock Text="随手查，随时懂。" FontSize="26" FontWeight="SemiBold" Margin="4,13,0,8"/>
@@ -47,7 +61,7 @@
           </StackPanel>
         </StackPanel>
       </ScrollViewer>
-      <Popup x:Name="EtymologyPopup" Grid.RowSpan="4" PlacementTarget="{Binding ElementName=EtymologyButton}" Placement="Bottom" VerticalOffset="8" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked, ElementName=EtymologyButton, Mode=TwoWay}" Opened="Etymology_Opened" PreviewKeyDown="Etymology_KeyDown">
+      <Popup x:Name="EtymologyPopup" Grid.RowSpan="5" PlacementTarget="{Binding ElementName=EtymologyButton}" Placement="Bottom" VerticalOffset="8" StaysOpen="False" AllowsTransparency="True" IsOpen="{Binding IsChecked, ElementName=EtymologyButton, Mode=TwoWay}" Opened="Etymology_Opened" PreviewKeyDown="Etymology_KeyDown">
         <Border x:Name="EtymologySurface" Width="440" Padding="18,14,18,16" Background="#F5222327" BorderBrush="#806E5866" BorderThickness="1" CornerRadius="10" KeyboardNavigation.TabNavigation="Cycle">
           <StackPanel>
             <Grid Margin="0,0,0,10"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -58,7 +72,7 @@
           </StackPanel>
         </Border>
       </Popup>
-      <Border x:Name="StatusBar" Grid.Row="3" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="14,6">
+      <Border x:Name="StatusBar" Grid.Row="4" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="14,6">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <Button x:Name="HistoryHomeButton" Style="{StaticResource IconButton}" Click="HistoryHome_Click" ToolTip="查询历史" AutomationProperties.Name="返回查询历史"><Border Background="{StaticResource LogoSurface}" Width="20" Height="20" CornerRadius="5"><TextBlock Text="ξ" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Button>

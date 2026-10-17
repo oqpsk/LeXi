@@ -30,7 +30,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         RenderHistory(history.Entries);
         Theme.ApplyChrome(this);
-        UpdateOnlineButton();
+        UpdateOnlineButton(); UpdateNavigation(); UpdateCloseAction();
         LocationChanged += (_, _) => EtymologyPopup.IsOpen = false;
         SizeChanged += (_, _) => EtymologyPopup.IsOpen = false;
         Deactivated += (_, _) => EtymologyPopup.IsOpen = false;
@@ -50,7 +50,7 @@ public partial class MainWindow : Window
         };
         Closing += (_, e) =>
         {
-            if (!quit && !Dispatcher.HasShutdownStarted) { e.Cancel = true; WindowState = WindowState.Minimized; }
+            if (!quit && settings.MinimizeOnClose && !Dispatcher.HasShutdownStarted) { e.Cancel = true; WindowState = WindowState.Minimized; }
         };
         Closed += (_, _) => { lookup?.Cancel(); StopSpeech(); speech.Dispose(); pronunciations.Dispose(); claude.Dispose(); secondaryClaude.Dispose(); web.Dispose(); if (dictionaryTask.IsCompletedSuccessfully) dictionaryTask.Result.Dispose(); };
     }
@@ -60,10 +60,13 @@ public partial class MainWindow : Window
         Show(); Activate(); FocusSearch();
     }
     private void FocusSearch() { SearchBox.Focus(); SearchBox.SelectAll(); }
-    private void Hide_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
     private void Window_Activated(object? sender, EventArgs e) => Dispatcher.BeginInvoke(FocusSearch);
-    private void Window_KeyDown(object sender, KeyEventArgs e)
+    private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (Keyboard.Modifiers == ModifierKeys.Alt && key is Key.Left or Key.Right)
+        { e.Handled = true; await NavigateAsync(key == Key.Left ? -1 : 1); return; }
         if (e.Key == Key.Escape)
         {
             if (EtymologyPopup.IsOpen) DismissEtymology();
@@ -72,7 +75,7 @@ public partial class MainWindow : Window
             e.Handled = true;
         }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.L) { FocusSearch(); e.Handled = true; }
-        if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Q) { quit = true; Close(); e.Handled = true; }
+        if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Q) { ExitApplication(); e.Handled = true; }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.OemComma) { e.Handled = true; Settings_Click(sender, e); }
     }
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -138,13 +141,19 @@ public partial class MainWindow : Window
     private async void Settings_Click(object sender, RoutedEventArgs e)
     {
         StopSpeech();
-        var previous = JsonSerializer.Serialize(settings, Json.Options);
+        // Closing preferences do not invalidate dictionary/model results.
+        string QuerySettings()
+        {
+            var copy = settings.ForModel(LookupModel.Primary(settings)); copy.MinimizeOnClose = true;
+            return JsonSerializer.Serialize(copy, Json.Options);
+        }
+        var previous = QuerySettings();
         var dialog = new SettingsWindow(settings, dictionaryTask.IsCompletedSuccessfully ? dictionaryTask.Result.Dictionaries : DictionaryCatalog.InspectAll(Path.Combine(App.Root, "data"))) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
-            SaveSettings(); UpdateOnlineButton(); UpdateReadyStatus();
+            SaveSettings(); UpdateOnlineButton(); UpdateCloseAction(); UpdateReadyStatus();
             if (!settings.OfflineEnabled) Suggestions.Visibility = Visibility.Collapsed;
-            if (previous != JsonSerializer.Serialize(settings, Json.Options))
+            if (previous != QuerySettings())
             {
                 lookup?.Cancel();
                 UpdatePreparedModel();
@@ -153,15 +162,15 @@ public partial class MainWindow : Window
         }
         FocusSearch();
     }
-    private async Task SearchAsync(string raw, bool force = false)
+    private async Task SearchAsync(string raw, bool force = false, bool navigating = false)
     {
         var validation = Queries.Validate(raw);
         if (validation != null) { LookupStatus.Text = validation; return; }
         var timing = new LookupTiming();
         var knownTerm = raw.Length <= 100 && !raw.Contains('\n') && dictionaryTask.IsCompletedSuccessfully &&
             dictionaryTask.Result.Lookup(Queries.Normalize(raw), settings).Length > 0;
-        var translating = Queries.IsText(raw, knownTerm);
-        history.Record(raw, translating);
+        var translating = navigating ? navigation.Current.Translation : Queries.IsText(raw, knownTerm);
+        if (!navigating) { RecordVisit(raw.Trim(), translating); history.Record(raw, translating); }
         if (translating)
         { await TranslateTextAsync(raw.Trim(), force, timing); return; }
         var query = Queries.LookupKey(raw);
