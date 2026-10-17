@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.8.1
+
+- Remove redundant word-form and bilingual-definition headings. Use warm English serif italic parts of speech, upright serif word forms and serif examples, with a Song-style Chinese fallback. Align word-form labels and spellings on a shared text baseline and combine identical past/participle spellings.
+- Read expanded English headword inflections from Wiktionary alongside pronunciation. Combine online verb forms with offline noun data, retain source attribution and cache forms for offline use without guessing endings or adding model calls. Query counts remain in progress details.
+- Update the xi icon and in-app mark to a charcoal-black background with pink lettering.
+
 ## 0.8.0
 
 - Rebrand the product and repository as LeXi, with a pink Greek xi (ξ) mark and multi-size application icon. Replace the detailed README with a concise product introduction and move operational details to the usage guide.

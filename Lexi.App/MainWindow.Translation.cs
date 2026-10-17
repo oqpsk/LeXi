@@ -24,7 +24,7 @@ public partial class MainWindow
         Headword.Text = "翻译"; Headword.FontSize = 28;
         Phonetic.Text = target == "zh" ? "英文 → 中文" : "中文 → English";
         Phonetic.ToolTip = null; PhoneticLabel.Text = ""; PhoneticLabel.ToolTip = null;
-        AiPanel.Children.Clear(); LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); FormsPanel.Children.Clear(); ResultsScroll.ScrollToTop();
+        AiPanel.Children.Clear(); LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); ResetWordForms(); ResultsScroll.ScrollToTop();
         var initialProgress = QueryProgressState.Translating();
         var request = QueryProgress.Begin(initialProgress);
         var cached = cache.Read<TranslationEnvelope>("translations-v1", key);

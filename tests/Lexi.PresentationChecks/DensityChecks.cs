@@ -48,6 +48,9 @@ internal static partial class Program
         Measure((FrameworkElement)main.Content, 718, 618);
         Check(Texts().Count(t => t.Text == sense.Example || t.Text == sense.ExampleChinese) == 2,
             "opening an example reveals both selectable languages for only that sense");
+        Check(Texts().Single(t => t.Text == sense.Example).FontFamily.Source.Contains("Georgia") &&
+            Texts().Single(t => t.Text == sense.ExampleChinese).FontFamily.Source.StartsWith("SimSun"),
+            "expanded examples use serif English and Song-style Chinese while remaining selectable");
         main.RenderAnswers(snapshot with { Merging = true }, evidence);
         Check(Toggle(":examples").IsChecked == true && Texts().Any(t => t.Text == sense.Example), "example expansion survives an incoming model update");
         Toggle(":sources").IsChecked = true;

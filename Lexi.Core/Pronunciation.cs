@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Lexi.Core;
 
-public sealed record PronunciationEntry(string Word, string[] Ipa, string SourceUrl, DateTimeOffset FetchedAt);
+public sealed record PronunciationEntry(string Word, string[] Ipa, string SourceUrl, DateTimeOffset FetchedAt, WordFormSet[]? Forms = null);
 
 public sealed partial class Pronunciation : IDisposable
 {
@@ -18,12 +18,14 @@ public sealed partial class Pronunciation : IDisposable
     public async Task<PronunciationEntry?> LookupAsync(string word, CancellationToken token)
     {
         if (Queries.HasChinese(word)) return null;
-        var url = "https://en.wiktionary.org/w/api.php?action=parse&prop=wikitext&format=json&formatversion=2&redirects=1&page=" + Uri.EscapeDataString(word);
+        var url = "https://en.wiktionary.org/w/api.php?action=parse&prop=wikitext%7Ctext&format=json&formatversion=2&redirects=1&page=" + Uri.EscapeDataString(word);
         var json = await client.GetStringAsync(url, token);
         using var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("parse", out var parsed) || !parsed.TryGetProperty("wikitext", out var text)) return null;
-        var values = ParseEnglish(text.GetString() ?? "");
-        return values.Length == 0 ? null : new(word, values, "https://en.wiktionary.org/wiki/" + Uri.EscapeDataString(word) + "#English", DateTimeOffset.UtcNow);
+        if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("parse", out var parsed) || parsed.ValueKind != JsonValueKind.Object) return null;
+        var values = parsed.TryGetProperty("wikitext", out var text) && text.ValueKind == JsonValueKind.String ? ParseEnglish(text.GetString() ?? "") : [];
+        var sourceUrl = "https://en.wiktionary.org/wiki/" + Uri.EscapeDataString(word) + "#English";
+        var forms = parsed.TryGetProperty("text", out var html) && html.ValueKind == JsonValueKind.String ? WordForms.ParseEnglishHtml(html.GetString() ?? "", sourceUrl) : [];
+        return values.Length == 0 && forms.Length == 0 ? null : new(word, values, sourceUrl, DateTimeOffset.UtcNow, forms);
     }
     public static string[] ParseEnglish(string wikitext)
     {

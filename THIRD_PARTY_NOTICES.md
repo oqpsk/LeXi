@@ -10,7 +10,7 @@ ECDICT is distributed under its upstream MIT license, reproduced in [licenses/EC
 
 ## Wiktionary
 
-English and Chinese entries, including English IPA pronunciation, are retrieved from [English Wiktionary](https://en.wiktionary.org/). Displayed entries retain the originating page link; pronunciation attribution is available in its tooltip. Wiktionary text is generally provided under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), subject to the source page's terms and attribution requirements. Cached source text remains third-party content; it is not relicensed as Lexi code.
+English and Chinese entries, including English IPA pronunciation and expanded headword inflections, are retrieved from [English Wiktionary](https://en.wiktionary.org/). Displayed entries retain the originating page link; pronunciation and word-form attribution is available in their tooltips. Wiktionary text is generally provided under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), subject to the source page's terms and attribution requirements. Cached source text remains third-party content; it is not relicensed as LeXi code.
 
 ## Open English WordNet
 

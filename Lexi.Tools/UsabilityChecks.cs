@@ -4,6 +4,7 @@ internal static class UsabilityChecks
 {
     public static void Run(string folder)
     {
+        WordFormChecks.Run();
         int count = 0;
         void Check(bool ok, string label) { if (!ok) throw new Exception("FAIL: " + label); Console.WriteLine("PASS: " + label); count++; }
         var parsed = WordForms.Parse("p:learned,learnt/d:learned,learnt/i:learning/3:learns/broken");
@@ -22,11 +23,11 @@ internal static class UsabilityChecks
         Check(library.Forms("went", settings).Length == 0, "disabled source cannot supply word forms");
         settings.DisabledDictionaries = []; settings.OfflineEnabled = false;
         Check(library.Forms("went", settings).Length == 0, "offline master switch applies to word forms");
-        Check(LexicalLabels.PartOfSpeech("verb (gerund/present participle)") == "动词" && LexicalLabels.Form("verb (gerund/present participle)") == "动名词 / 现在分词", "inflection description is separate from the prominent verb label");
-        Check(LexicalLabels.PartOfSpeech("noun") == "名词" && LexicalLabels.PartOfSpeech("adverb") == "副词" && LexicalLabels.PartOfSpeech("pronoun") == "代词", "word-class labels do not confuse embedded noun and verb strings");
+        Check(LexicalLabels.PartOfSpeech("verb (gerund/present participle)") == "verb" && LexicalLabels.Form("verb (gerund/present participle)") == "gerund / present participle", "inflection description is separate from the prominent verb label");
+        Check(LexicalLabels.PartOfSpeech("noun") == "noun" && LexicalLabels.PartOfSpeech("adverb") == "adverb" && LexicalLabels.PartOfSpeech("pronoun") == "pronoun", "word-class labels do not confuse embedded noun and verb strings");
         Check(LexicalLabels.Usage("formal") == "书面语" && LexicalLabels.Usage("technical, computing") == "计算机" &&
             LexicalLabels.Usage("standard") == "" && LexicalLabels.Usage("slang, derogatory") == "俚语 · 贬义", "usage labels favor readable Chinese and omit neutral boilerplate");
-        Check(LexicalLabels.Usage("计算机；信息安全") == "计算机 · 信息安全" && LexicalLabels.PartOfSpeech("unknown") == "词语", "unknown labels are not falsely assigned a word class");
+        Check(LexicalLabels.Usage("计算机；信息安全") == "计算机 · 信息安全" && LexicalLabels.PartOfSpeech("unknown") == "term", "unknown labels are not falsely assigned a word class");
         Check(ProviderConnection.Parse("claude", 0, "{\"loggedIn\":true,\"authMethod\":\"claude.ai\",\"email\":\"someone@example.org\"}") is { SignedIn: true, Message: "已登录 Claude 订阅" }, "Claude status exposes mode without account identifiers");
         Check(!ProviderConnection.Parse("claude", 1, "{\"loggedIn\":false}").SignedIn && !ProviderConnection.Parse("claude", 0, "unexpected output").SignedIn &&
             !ProviderConnection.Parse("claude", 0, "[]").SignedIn, "logged-out and unsupported status responses stay distinct from signed in");

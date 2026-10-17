@@ -23,7 +23,7 @@ internal sealed record QueryProgressState(QueryStage Stage, string Title, string
         var failed = snapshot.Answers.Count(a => a.Phase == ModelPhase.Failed);
         var detail = failed > 0 ? $"{completed}/{snapshot.Answers.Length} 个模型已返回 · {failed} 个未完成"
             : $"{completed}/{snapshot.Answers.Length} 个模型已返回 · 义项仍可能增减";
-        return new(QueryStage.Supplement, "模型补充中", detail, MergeEnabled: merge);
+        return new(QueryStage.Supplement, "模型补充中", $"预览 · {snapshot.Groups.Length} 条候选 · " + detail, MergeEnabled: merge);
     }
 
     public static QueryProgressState Finished(LookupSnapshot snapshot, bool merge, bool sourceIncomplete = false)

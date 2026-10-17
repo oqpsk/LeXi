@@ -14,13 +14,23 @@ internal static class SpeechChecks
         Check(Pronunciation.ParseEnglish("==French==\n{{IPA|fr|/x/}}").Length == 0 && !Pronunciation.Valid("/x/\nunsafe"), "missing English and malformed IPA stay absent");
         using (var phonetics = new Pronunciation(new Handler((request, _) =>
         {
-            Check(request.RequestUri!.Host == "en.wiktionary.org" && request.RequestUri.Query.Contains("page=chud"), "pronunciation request uses the word-specific official source");
+            Check(request.RequestUri!.Host == "en.wiktionary.org" && request.RequestUri.Query.Contains("page=chud") && Uri.UnescapeDataString(request.RequestUri.Query).Contains("prop=wikitext|text"), "pronunciation and forms share one word-specific official source request");
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { parse = new { wikitext = wiki } })) });
         })))
         {
             var result = await phonetics.LookupAsync("chud", CancellationToken.None);
             Check(result?.Ipa.Single() == "/t͡ʃʌd/" && result.SourceUrl.EndsWith("#English"), "online IPA retains its source attribution");
         }
+        using (var metadata = new Pronunciation(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent(JsonSerializer.Serialize(new { parse = new { text = "<p><span class=\"headword-line\"><strong class=\"headword\" lang=\"en\">mog</strong> (<i>present participle</i> <b class=\"form-of\" lang=\"en\">mogging</b>)</span></p>" } })) }))))
+        {
+            var result = await metadata.LookupAsync("mog", CancellationToken.None);
+            Check(result is { Ipa.Length: 0, Forms.Length: 1 } && result.Forms[0].Forms[0].Words[0] == "mogging",
+                "a word-form response remains usable even when the page has no explicit IPA template");
+        }
+        using (var invalidMetadata = new Pronunciation(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+            Content = new StringContent("{\"parse\":{\"text\":{},\"wikitext\":null}}") }))))
+            Check(await invalidMetadata.LookupAsync("word", CancellationToken.None) == null, "unsupported metadata shapes do not crash or replace existing forms");
         var original = new AiEntry("word", true, [new("noun", "a definition", "释义", "", "example", "例句", [])], "", "unverified", "/wɜːd/");
         var json = JsonSerializer.Serialize(original, Json.Options);
         Check(CodexDictionary.ParseAndValidate(json, "word", null).Phonetic == "/wɜːd/" && StreamingEntry.Read(json, "word")?.Phonetic == "/wɜːd/", "model IPA survives complete and streaming output");
