@@ -60,3 +60,5 @@ Rules are grouped by where they apply. Shared behavior belongs to `Lexi.Core` an
 - The app bundles a self-contained `Lexi.Host` and talks to it over JSON lines. Render Host views as received and reject stale revisions. Incompatible protocol changes raise `HostServer.Protocol` and update docs/host-protocol.md and host-check in the same PR.
 - User data lives in `~/Library/Application Support/LeXi`. Local speech uses system voices; speech keys use the Keychain.
 - Keep window state with the system's restoration. The app is a regular windowed app; closing the window does not quit it.
+- Keys belong to the input method while it is composing text. Text that Core marks as accent stays readable: pale pink is a fill or outline in light appearance, never body text.
+- Build with apple/scripts/build-app.sh and check with `swift test --package-path apple`. Regenerate the protocol fixture with host-check when QueryView changes.
