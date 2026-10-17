@@ -25,3 +25,7 @@
 - Use LeXi / ξ for the public brand. Preserve existing executable, IPC, AppUserModelID and userdata identities for upgrade compatibility. Keep future macOS work in this repository and share the core; do not claim WPF or Windows services run on macOS.
 - Avoid unrelated refactors and new runtime dependencies. Do not add global shortcut hooks, selection translation, launchers, account systems or subscription services.
 - Use direct Chinese explanations with the result first. Avoid “不是……而是……”, “本质上”, “换句话说”, “总的来说”, “值得注意的是”, “需要注意的是”, “当然”, “其实”, and repetitive conclusions.
+
+- Preserve case in dictionary request and cache identities, with case-insensitive keys confined to the local index. Keep abbreviations, their full expansions, and ordinary homographs distinct in morphology and merging.
+- Prioritize known cryptoasset, blockchain, cryptography and information-security meanings without inventing them. Reference briefs are original attributed summaries; keep them visible if generated output omits their cited meaning. New terms must continue to use general coverage rather than word-specific application branches.
+- Reject malformed IPA escapes; render sourced and model IPA with consistent delimiters. Etymology remains collapsed, with source excerpts separate from model explanation; do not promote mnemonics or model agreement into historical evidence. Use serif italic examples and visibly interactive “参考资料” disclosures.

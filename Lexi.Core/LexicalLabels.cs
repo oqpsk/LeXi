@@ -20,7 +20,7 @@ public static class LexicalLabels
         if (text.Contains("determiner") || text == "限定词") return "determiner";
         if (text.Contains("prefix") || text == "前缀") return "prefix";
         if (text.Contains("suffix") || text == "后缀") return "suffix";
-        if (text.Contains("abbreviation") || text.Contains("acronym") || text == "缩写") return "abbreviation";
+        if (text.Contains("abbreviation") || text.Contains("acronym") || text.Contains("initialism") || text == "缩写") return "abbreviation";
         if (text.Contains("participle") || text.Contains("gerund")) return "verb form";
         return "term";
     }
@@ -43,8 +43,13 @@ public static class LexicalLabels
             ["informal"]="口语", ["colloquial"]="口语", ["slang"]="俚语", ["internet slang"]="网络俚语", ["gaming"]="游戏",
             ["derogatory"]="贬义", ["pejorative"]="贬义", ["offensive"]="冒犯用语", ["vulgar"]="粗俗用语", ["humorous"]="诙谐",
             ["archaic"]="古语", ["obsolete"]="旧时用语", ["rare"]="少见用法", ["literary"]="文学用语", ["dated"]="旧时用语",
+            ["cryptocurrency"]="加密资产", ["cryptoasset"]="加密资产", ["crypto"]="加密资产", ["blockchain"]="区块链",
+            ["cryptography"]="密码学", ["web3"]="Web3", ["defi"]="去中心化金融", ["cybersecurity"]="信息安全",
+            ["security"]="信息安全", ["confidential computing"]="机密计算", ["abbreviation"]="缩写", ["acronym"]="缩写", ["initialism"]="首字母缩写",
             ["computing"]="计算机", ["computer science"]="计算机", ["information security"]="信息安全", ["geography"]="地理",
             ["nautical"]="航海", ["maritime"]="航海", ["mathematics"]="数学", ["physics"]="物理", ["medical"]="医学",
+            ["linguistics"]="语言学", ["medicine"]="医学", ["electronics"]="电子学", ["engineering"]="工程",
+            ["software development"]="软件开发", ["audio engineering"]="音频工程", ["radio engineering"]="无线电工程",
             ["anatomy"]="解剖学", ["biology"]="生物", ["chemistry"]="化学", ["law"]="法律", ["legal"]="法律", ["finance"]="金融",
             ["figurative"]="比喻", ["literal"]="字面含义", ["chiefly british"]="主要用于英式英语", ["british"]="英式英语", ["american"]="美式英语"
         };

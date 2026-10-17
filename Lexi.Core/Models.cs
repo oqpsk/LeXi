@@ -9,6 +9,15 @@ public static partial class Queries
 {
     public static string Normalize(string value) => Whitespace().Replace(
         value.Normalize(NormalizationForm.FormKC).Replace('’', '\'').Replace('‘', '\'').Trim(), " ").ToLowerInvariant();
+    // Search identity preserves case; Normalize remains the offline index key.
+    public static string LookupKey(string value) => Whitespace().Replace(
+        value.Normalize(NormalizationForm.FormKC).Replace('’', '\'').Replace('‘', '\'').Trim(), " ");
+    public static bool AbbreviationCandidate(string value)
+    {
+        var letters = value.Where(char.IsLetter).ToArray();
+        return letters.Length is >= 2 and <= 12 && letters.All(c => c is >= 'A' and <= 'Z') &&
+            value.All(c => char.IsLetterOrDigit(c) || c is '.' or '-');
+    }
     public const int MaxLength = 5000;
     public static string? Validate(string value) => string.IsNullOrWhiteSpace(value) ? "输入单词、短语或待翻译文本。" :
         value.Length > MaxLength ? "每次最多输入 5000 个字符。" :
@@ -49,13 +58,13 @@ public static partial class Queries
 }
 
 public sealed record LocalEntry(string Word, string Phonetic, string English, string Chinese, string Exchange, int Frequency, string Original = "");
-public sealed record Sense(string PartOfSpeech, string Definition, string[] Examples, string SourceName = "", string SourceUrl = "");
-public sealed record OnlineEntry(string Word, Sense[] Senses, string Url, DateTimeOffset FetchedAt);
+public sealed record Sense(string PartOfSpeech, string Definition, string[] Examples, string SourceName = "", string SourceUrl = "", string Headword = "");
+public sealed record OnlineEntry(string Word, Sense[] Senses, string Url, DateTimeOffset FetchedAt, EtymologyExcerpt[]? Etymologies = null);
 public sealed record AiSense(string PartOfSpeech, string English, string Chinese, string Register,
-    string Example, string ExampleChinese, int[] Evidence);
+    string Example, string ExampleChinese, int[] Evidence, string LexicalForm = "word", string Expansion = "");
 public sealed record AiInflection(string Kind, string[] Words);
 public sealed record AiWordForms(string Lemma, string PartOfSpeech, AiInflection[] Forms);
-public sealed record AiEntry(string Word, bool Found, AiSense[] Senses, string Note, string EvidenceStatus, string Phonetic = "", AiWordForms[]? WordForms = null);
+public sealed record AiEntry(string Word, bool Found, AiSense[] Senses, string Note, string EvidenceStatus, string Phonetic = "", AiWordForms[]? WordForms = null, string Etymology = "");
 public sealed record AiEnvelope(AiEntry Entry, string EvidenceHash, DateTimeOffset GeneratedAt, string Model = "", string ReasoningEffort = "low", string Provider = "codex");
 
 public static class Json

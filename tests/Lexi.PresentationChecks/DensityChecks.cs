@@ -39,7 +39,7 @@ internal static partial class Program
         Check(Texts().Count(t => t.FontSize == 20) == 5 && Texts().Count(t => t.FontSize == 18) == 5 &&
             Texts().All(t => t.IsReadOnly && t.Text != sense.Example && t.Text != sense.ExampleChinese),
             "all bilingual definitions retain 20/18 DIP selectable text with examples hidden");
-        Check(Contents(ai, true).OfType<ToggleButton>().Count(t => t.Content.ToString() == "来源 · 模型补充") == 5 &&
+        Check(Contents(ai, true).OfType<ToggleButton>().Count(t => t.Content.ToString() == "参考资料 · 3") == 5 &&
             !Contents(ai, true).OfType<Button>().Any(t => t.Content.ToString()!.Contains("Source")),
             "model supplementation is quietly identified in source disclosures while citations remain collapsed");
         var exampleToggle = Toggle(":examples");

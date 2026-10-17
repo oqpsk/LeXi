@@ -14,24 +14,24 @@ public sealed record SenseVerdict(string A, string B, string Relation, double Co
 public sealed record SenseMergePlan(string InputHash, SenseVerdict[] Pairs);
 public sealed record SenseMergeRequest(string Query, SenseCandidate[] Candidates, SensePair[] Pairs)
 {
-    public string InputHash => Cache.Hash(JsonSerializer.Serialize(new { version = 2, Query, Candidates, Pairs }, Json.Options));
+    public string InputHash => Cache.Hash(JsonSerializer.Serialize(new { version = 3, Query, Candidates, Pairs }, Json.Options));
     public string Prompt => JsonSerializer.Serialize(new
     {
         task = "compare_senses", inputHash = InputHash, query = Query,
-        senses = Candidates.Select(c => new { c.Id, c.Sense.PartOfSpeech, c.Sense.English, c.Sense.Chinese, c.Sense.Register, c.Sense.Example }),
+        senses = Candidates.Select(c => new { c.Id, c.Sense.PartOfSpeech, c.Sense.English, c.Sense.Chinese, c.Sense.Register, c.Sense.Example, c.Sense.LexicalForm, c.Sense.Expansion }),
         pairs = Pairs
     }, Json.Options);
 }
 
 public static class SenseMerging
 {
-    public const string CacheKind = "sense-merges-v2";
+    public const string CacheKind = "sense-merges-v3";
     public static SenseCandidate[] Candidates(ModelAnswer[] answers) => answers.SelectMany((answer, modelIndex) =>
         (answer.Entry?.Senses ?? []).Select((sense, senseIndex) => new SenseCandidate($"m{modelIndex}s{senseIndex}",
             answer.Model, sense, answer.Entry!.EvidenceStatus, answer.Phase == ModelPhase.Streaming))).ToArray();
 
     public static bool Exact(SenseCandidate a, SenseCandidate b) =>
-        Queries.Normalize(a.Sense.English) == Queries.Normalize(b.Sense.English) &&
+        LexicalCoverage.Compatible(a.Sense, b.Sense) && Queries.Normalize(a.Sense.English) == Queries.Normalize(b.Sense.English) &&
         Queries.Normalize(a.Sense.Chinese) == Queries.Normalize(b.Sense.Chinese) &&
         Queries.Normalize(a.Sense.PartOfSpeech) == Queries.Normalize(b.Sense.PartOfSpeech) &&
         Queries.Normalize(a.Sense.Register) == Queries.Normalize(b.Sense.Register);
@@ -68,8 +68,8 @@ public static class SenseMerging
         var verdicts = (plan?.Pairs ?? []).Where(p => p.Confidence >= 0.95).ToArray();
         var approved = verdicts.Where(p => p.Relation is "equivalent" or "same_usage" or "a_covers_b" or "b_covers_a")
             .Select(p => PairKey(p.A, p.B)).ToHashSet();
-        bool Same(SenseCandidate a, SenseCandidate b) => Exact(a, b) ||
-            !a.Provisional && !b.Provisional && approved.Contains(PairKey(a.Id, b.Id));
+        bool Same(SenseCandidate a, SenseCandidate b) => LexicalCoverage.Compatible(a.Sense, b.Sense) && (Exact(a, b) ||
+            !a.Provisional && !b.Provisional && approved.Contains(PairKey(a.Id, b.Id)));
         var groups = new List<List<SenseCandidate>>();
         foreach (var candidate in candidates)
         {
@@ -86,7 +86,7 @@ public static class SenseMerging
             var ids = g.Select(c => c.Id).ToHashSet();
             return new SenseGroup(g.OrderByDescending(Coverage).ToArray(), verdicts.Any(p => ids.Contains(p.A) && ids.Contains(p.B) &&
                 p.Relation is "same_usage" or "a_covers_b" or "b_covers_a"));
-        }).OrderBy(g => g.Variants.Any(v => IsCurrent(v.Sense.Register)) ? 0 : 1).ToArray();
+        }).OrderBy(g => g.Variants.Min(v => LexicalCoverage.Rank(v.Sense.Register))).ToArray();
     }
     private static string PairKey(string a, string b) => string.CompareOrdinal(a, b) < 0 ? a + ":" + b : b + ":" + a;
     public static bool IsCurrent(string? label) => new[] { "slang", "internet", "网络", "俚语" }

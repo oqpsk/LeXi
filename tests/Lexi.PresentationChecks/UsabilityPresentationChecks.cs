@@ -30,7 +30,7 @@ internal static partial class Program
             r.Foreground is SolidColorBrush b && b.Color == ((SolidColorBrush)Theme.Brush("Warning")).Color),
             "noun and verb senses have prominent warm-colored word-class labels");
         Check(runs.All(r => !r.Text.Contains("未核验") && !r.Text.Contains("standard")) &&
-            Contents(ai, true).OfType<ToggleButton>().Count(t => t.Content.ToString() == "来源 · 模型补充") == 2,
+            Contents(ai, true).OfType<ToggleButton>().Count(t => t.Content.ToString() == "参考资料") == 2,
             "plain source disclosures retain model-origin context without alarm-colored evidence verdicts");
         main.RenderWordForms("went", [new("go", [new("p","过去式",["went"]),new("d","过去分词",["gone"]),new("i","现在分词",["going"]),new("3","第三人称单数",["goes"])], "Synthetic source","https://example.org/forms")]);
         main.RenderAnswers(new(answers, SenseMerging.Group(answers)), null);

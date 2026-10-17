@@ -2,40 +2,150 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "word": {"type": "string"},
-    "found": {"type": "boolean"},
-    "phonetic": {"type": "string"},
-    "senses": {"type": "array", "items": {
-      "type": "object", "additionalProperties": false,
-      "properties": {
-        "partOfSpeech": {"type": "string"},
-        "english": {"type": "string"},
-        "chinese": {"type": "string"},
-        "register": {"type": "string"},
-        "example": {"type": "string"},
-        "exampleChinese": {"type": "string"},
-        "evidence": {"type": "array", "items": {"type": "integer"}}
-      },
-      "required": ["partOfSpeech", "english", "chinese", "register", "example", "exampleChinese", "evidence"]
-    }},
-    "wordForms": {"type": "array", "items": {
-      "type": "object", "additionalProperties": false,
-      "properties": {
-        "lemma": {"type": "string"},
-        "partOfSpeech": {"type": "string", "enum": ["verb", "noun", "adjective", "adverb"]},
-        "forms": {"type": "array", "items": {
-          "type": "object", "additionalProperties": false,
-          "properties": {
-            "kind": {"type": "string", "enum": ["past", "pastParticiple", "presentParticiple", "thirdPerson", "plural", "comparative", "superlative"]},
-            "words": {"type": "array", "items": {"type": "string"}}
+    "word": {
+      "type": "string"
+    },
+    "found": {
+      "type": "boolean"
+    },
+    "phonetic": {
+      "type": "string"
+    },
+    "senses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "partOfSpeech": {
+            "type": "string"
           },
-          "required": ["kind", "words"]
-        }}
-      },
-      "required": ["lemma", "partOfSpeech", "forms"]
-    }},
-    "note": {"type": "string"},
-    "evidenceStatus": {"type": "string", "enum": ["source_based", "unverified", "unknown"]}
+          "english": {
+            "type": "string"
+          },
+          "chinese": {
+            "type": "string"
+          },
+          "register": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string"
+          },
+          "exampleChinese": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "lexicalForm": {
+            "type": "string",
+            "enum": [
+              "word",
+              "abbreviation"
+            ]
+          },
+          "expansion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "partOfSpeech",
+          "english",
+          "chinese",
+          "register",
+          "example",
+          "exampleChinese",
+          "evidence",
+          "lexicalForm",
+          "expansion"
+        ]
+      }
+    },
+    "wordForms": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "lemma": {
+            "type": "string"
+          },
+          "partOfSpeech": {
+            "type": "string",
+            "enum": [
+              "verb",
+              "noun",
+              "adjective",
+              "adverb"
+            ]
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "past",
+                    "pastParticiple",
+                    "presentParticiple",
+                    "thirdPerson",
+                    "plural",
+                    "comparative",
+                    "superlative"
+                  ]
+                },
+                "words": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "kind",
+                "words"
+              ]
+            }
+          }
+        },
+        "required": [
+          "lemma",
+          "partOfSpeech",
+          "forms"
+        ]
+      }
+    },
+    "note": {
+      "type": "string"
+    },
+    "evidenceStatus": {
+      "type": "string",
+      "enum": [
+        "source_based",
+        "unverified",
+        "unknown"
+      ]
+    },
+    "etymology": {
+      "type": "string",
+      "description": "用简体中文写1至3句简短语源说明，最多450字符；保留必要的外语词形。不要编造年代、人名或民间缩略语来源，不确定则空字符串。"
+    }
   },
-  "required": ["word", "found", "phonetic", "senses", "wordForms", "note", "evidenceStatus"]
+  "required": [
+    "word",
+    "found",
+    "phonetic",
+    "senses",
+    "wordForms",
+    "note",
+    "evidenceStatus",
+    "etymology"
+  ]
 }

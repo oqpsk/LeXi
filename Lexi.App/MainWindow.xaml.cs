@@ -155,13 +155,13 @@ public partial class MainWindow : Window
             dictionaryTask.Result.Lookup(Queries.Normalize(raw), settings).Length > 0;
         if (Queries.IsText(raw, knownTerm))
         { await TranslateTextAsync(raw.Trim(), force); return; }
-        var query = Queries.Normalize(raw);
+        var query = Queries.LookupKey(raw);
         StopSpeech();
         lookup?.Cancel(); lookup?.Dispose(); lookup = new();
         speechText = raw.Trim();
         var token = lookup.Token;
         current = query;
-        ResetSenseDetails();
+        ResetSenseDetails(); ResetLexicalDetails();
         SetQuery(raw.Trim());
         Welcome.Visibility = Visibility.Collapsed; EntryPanel.Visibility = Visibility.Visible;
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
@@ -191,11 +191,13 @@ public partial class MainWindow : Window
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }
             token.ThrowIfCancellationRequested();
-            RenderLocal(local, query);
+            RenderLocal(local, query); RenderReferenceBriefs(query);
             var pronunciationTask = LoadPronunciationAsync(query, local, token, force);
-            var online = cache.Read<OnlineEntry>("online-v2", query);
+            var online = cache.Read<OnlineEntry>("online-v3", query);
+            var legacyOnline = online == null;
+            if (legacyOnline && query == Queries.Normalize(query)) online = cache.Read<OnlineEntry>("online-v2", query);
             if (online != null) RenderOnline(online, true);
-            var evidence = DictionaryEvidence.Combine(query, local, online);
+            var evidence = DictionaryEvidence.Combine(query, local, online, sourceEtymologies);
             var coordinator = CreateCoordinator();
             var cachedAnswers = coordinator.Cached(query, evidence, settings);
             if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence, !settings.Online);
@@ -204,7 +206,7 @@ public partial class MainWindow : Window
                 LookupStatus.Text = "离线模式 · 使用本地词库与已缓存释义";
                 QueryProgress.Update(request, QueryProgressState.SourcesFinished(true, sourceIncomplete)); return;
             }
-            var fresh = !force && online != null && DateTimeOffset.UtcNow - online.FetchedAt < TimeSpan.FromDays(1);
+            var fresh = !force && !legacyOnline && online != null && DateTimeOffset.UtcNow - online.FetchedAt < TimeSpan.FromDays(1);
             if (!fresh && (force || !Queries.HasChinese(query) || !local.Any(h => h.Dictionary.AllowAiEvidence)))
             {
                 LookupStatus.Text = "本地查询完成 · 正在查在线词典…";
@@ -212,7 +214,7 @@ public partial class MainWindow : Window
                 {
                     var fetched = await web.LookupAsync(query, token);
                     token.ThrowIfCancellationRequested();
-                    if (fetched != null) { online = fetched; await TryCacheAsync("online-v2", query, online); }
+                    if (fetched != null) { online = fetched; await TryCacheAsync("online-v3", query, online); }
                     else if (online == null) notes.Add("在线词典未收录");
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested) { notes.Add("在线查询超时"); sourceIncomplete = true; }
@@ -221,7 +223,7 @@ public partial class MainWindow : Window
             token.ThrowIfCancellationRequested();
             if (online != null) RenderOnline(online, fresh || DateTimeOffset.UtcNow - online.FetchedAt > TimeSpan.FromMinutes(1));
             else { OnlinePanel.Children.Clear(); if (local.Length == 0) OnlinePanel.Children.Add(Hint("Wiktionary 暂无可用词条。")); }
-            evidence = DictionaryEvidence.Combine(query, local, online);
+            evidence = DictionaryEvidence.Combine(query, local, online, sourceEtymologies);
             AiPanel.Children.Clear();
             cachedAnswers = coordinator.Cached(query, evidence, settings);
             if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence, !modelsEnabled);
@@ -296,12 +298,12 @@ public partial class MainWindow : Window
         LocalPanel.Children.Clear();
         if (!settings.OfflineEnabled) { LocalPanel.Children.Add(Hint("离线词典已停用，可在设置中重新启用。")); return; }
         if (hits.Length == 0) { LocalPanel.Children.Add(Hint("已启用的离线词典未收录此词。")); return; }
-        Phonetic.Text = hits.Select(h => h.Entry.Phonetic).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p)) ?? "";
+        Phonetic.Text = Queries.AbbreviationCandidate(query) ? "" : hits.Select(h => Pronunciation.Format(h.Entry.Phonetic)).FirstOrDefault(p => p.Length > 0) ?? "";
         foreach (var hit in hits)
         {
             var entry = hit.Entry;
             var card = Card(LocalPanel, hit.Dictionary.Name, "离线原文");
-            if (Queries.Normalize(entry.Word) != query) card.Children.Add(Hint("词条：" + entry.Word));
+            if (Queries.Normalize(entry.Word) != Queries.Normalize(query)) card.Children.Add(Hint("词条：" + entry.Word));
             if (!string.IsNullOrWhiteSpace(entry.Chinese)) card.Children.Add(Selectable(entry.Chinese));
             if (!string.IsNullOrWhiteSpace(entry.English)) card.Children.Add(Selectable(entry.English));
             if (!string.IsNullOrWhiteSpace(entry.Original)) card.Children.Add(new Expander { Header = "完整原始条目", Content = Selectable(entry.Original, 16), Margin = new(0,10,0,4) });
