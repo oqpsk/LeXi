@@ -1,9 +1,18 @@
+import AppKit
 import LeXiKit
 import LeXiUI
 import SwiftUI
 
+// Applies the saved appearance before any window appears.
+@MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        AppearanceChoice.apply(UserDefaults.standard.string(forKey: AppearanceChoice.key) ?? AppearanceChoice.system.rawValue)
+    }
+}
+
 @main
 struct LeXiApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var store = LexiStore()
 
     var body: some Scene {

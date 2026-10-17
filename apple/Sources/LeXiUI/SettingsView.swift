@@ -11,6 +11,7 @@ public struct SettingsView: View {
 
     public var body: some View {
         TabView {
+            Tab("通用", systemImage: "gearshape") { GeneralSettings() }
             Tab("查询", systemImage: "text.magnifyingglass") { QuerySettings(store: store) }
             Tab("词典", systemImage: "books.vertical") { DictionarySettings(store: store) }
             Tab("账号", systemImage: "person.crop.circle") { ConnectionSettings(store: store) }
@@ -20,6 +21,9 @@ public struct SettingsView: View {
         // Neutral like the query window: the forms keep their grouped rows on the same untinted base.
         .scrollContentBackground(.hidden)
         .containerBackground(LexiTheme.windowBackground, for: .window)
+        // The tab bar is the window toolbar, which macOS would otherwise tint with the wallpaper.
+        .toolbarBackground(LexiTheme.windowBackground, for: .windowToolbar)
+        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
         .task { await store.refreshSettings() }
     }
 }
@@ -77,20 +81,12 @@ struct QuerySettings: View {
                 if let error {
                     Section { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
                 }
-                Section("键盘快捷键") {
-                    ForEach(Self.shortcuts, id: \.0) { action, keys in
-                        LabeledContent(action) { Text(keys).foregroundStyle(.secondary).monospaced() }
-                    }
-                }
             }
             .formStyle(.grouped)
         } else {
             ProgressView()
         }
     }
-
-    private static let shortcuts = [("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
-        ("重新生成", "⌘R"), ("后退 / 前进", "⌘[  ⌘]"), ("查询历史", "⌘Y"), ("设置", "⌘,")]
 
     // The secondary model defaults to the other service's fast model, as in Lexi.Core.
     private func secondaryKey(_ settings: AppSettings) -> String {
@@ -115,6 +111,30 @@ struct QuerySettings: View {
     private func apply(_ changes: [String: SettingValue]) {
         Task { error = await store.update(changes) }
     }
+}
+
+struct GeneralSettings: View {
+    @AppStorage(AppearanceChoice.key) private var appearance = AppearanceChoice.system.rawValue
+
+    var body: some View {
+        Form {
+            Section {
+                Picker(selection: Binding(get: { appearance }, set: { appearance = $0; AppearanceChoice.apply($0) })) {
+                    ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0.rawValue) }
+                } label: { SettingLabel("外观", "LeXi 的窗口使用浅色、深色，或跟随系统") }
+                .pickerStyle(.segmented)
+            }
+            Section("键盘快捷键") {
+                ForEach(Self.shortcuts, id: \.0) { action, keys in
+                    LabeledContent(action) { Text(keys).foregroundStyle(.secondary).monospaced() }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private static let shortcuts = [("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
+        ("重新生成", "⌘R"), ("后退 / 前进", "⌘[  ⌘]"), ("查询历史", "⌘Y"), ("设置", "⌘,")]
 }
 
 struct DictionarySettings: View {

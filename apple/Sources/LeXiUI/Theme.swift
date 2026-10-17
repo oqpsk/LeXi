@@ -19,6 +19,21 @@ public enum LexiTheme {
     public static func chineseExample(_ size: CGFloat) -> Font { .custom("Songti SC", size: size) }
 }
 
+// Light, dark or the system appearance, for every LeXi window. Stored in the app's preferences.
+public enum AppearanceChoice: String, CaseIterable, Identifiable, Sendable {
+    case system, light, dark
+    public static let key = "appearance"
+    public var id: String { rawValue }
+    var title: String { switch self { case .system: "跟随系统"; case .light: "浅色"; case .dark: "深色" } }
+    @MainActor public static func apply(_ stored: String) {
+        NSApp.appearance = switch AppearanceChoice(rawValue: stored) ?? .system {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
 extension View {
     // A grouped content surface, like the groups in System Settings.
     func contentGroup(cornerRadius: CGFloat = 18) -> some View {
