@@ -1,6 +1,9 @@
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using Lexi;
 using Lexi.Core;
@@ -62,7 +65,7 @@ internal static partial class Program
         Check(!Descendants((DependencyObject)main.Content).Concat(Descendants((DependencyObject)settings.Content)).OfType<TextBlock>()
             .Any(t => t.Text.Any(c => c is >= '\uE000' and <= '\uF8FF')), "window controls have no private-use font glyphs");
         Check(Theme.CanDragFrom((DependencyObject)main.Content) && Theme.CanDragFrom((DependencyObject)main.FindName("Headword")) &&
-            Theme.CanDragFrom((DependencyObject)main.FindName("Footer")), "frame, result heading and footer are draggable");
+            Theme.CanDragFrom((DependencyObject)main.FindName("LookupStatus")), "frame, result heading and bottom status text are draggable");
         var search = (TextBox)main.FindName("SearchBox");
         Check(!Theme.CanDragFrom(search) && Descendants(search).All(d => !Theme.CanDragFrom(d)), "input and its internal visuals never start a window drag");
         var settingsButton = Descendants((DependencyObject)main.Content).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "设置");
@@ -78,6 +81,26 @@ internal static partial class Program
             !Theme.SupportsGlass(new Version(10, 0, 26200), true, true, true), "glass availability respects OS, composition and accessibility preferences");
         Check(main.Opacity == 1 && !main.AllowsTransparency && ((Border)main.Content).Background is SolidColorBrush fallback && fallback.Color.A == 255,
             "the full window stays opaque and has a solid fallback until native glass succeeds");
+        var online = (ToggleButton)main.FindName("OnlineToggle");
+        var toggle = (IToggleProvider)new ToggleButtonAutomationPeer(online).GetPattern(PatternInterface.Toggle);
+        var savedState = online.IsChecked;
+        online.IsChecked = false;
+        Check(toggle.ToggleState == ToggleState.Off && !Theme.CanDragFrom(online), "offline switch exposes an accessible off state and does not drag the window");
+        online.IsChecked = true;
+        Check(toggle.ToggleState == ToggleState.On, "online switch exposes an accessible on state");
+        online.IsChecked = savedState;
+        var refresh = (Button)main.FindName("RefreshButton");
+        refresh.Visibility = Visibility.Visible;
+        var status = (TextBlock)main.FindName("LookupStatus");
+        var oldText = status.Text; status.Text = "首条释义 2.6 秒 · 查询完成 · 同义项已整理";
+        Measure((FrameworkElement)main.Content, 558, 398);
+        var bar = (Border)main.FindName("StatusBar");
+        var statusRight = status.TranslatePoint(new Point(status.ActualWidth, 0), bar).X;
+        var buttonLeft = refresh.TranslatePoint(new Point(0, 0), bar).X;
+        var switchRight = online.TranslatePoint(new Point(online.ActualWidth, 0), bar).X;
+        Check(status.ActualWidth >= 160 && statusRight <= buttonLeft && switchRight <= bar.ActualWidth && bar.ActualHeight <= 48,
+            "single bottom bar preserves readable status and non-overlapping actions at minimum window width");
+        refresh.Visibility = Visibility.Collapsed; status.Text = oldText;
         Console.WriteLine($"{count} presentation regression checks passed");
     }
     private static double Contrast(Color a, Color b)
