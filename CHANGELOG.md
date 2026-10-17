@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.5
+
+- Add session back/forward navigation, Alt+Left/Right shortcuts, destination tooltips and scroll restoration. Preserve query case, translation paragraphs and routing, reuse the existing cache pipeline, and keep recent-history deletion separate from the visit trail. A new query after going back clears the forward branch; refreshes do not duplicate visits.
+- Separate window controls from lookup controls. A compact top toolbar holds navigation, settings and close, with a continuous labeled drag area; progress and Enter remain alongside the input.
+- Make X/Alt+F4 configurable as minimize or exit, defaulting to taskbar minimization for Win+number access. Add a Windows notification-area icon with open, settings and unconditional exit actions; dispose it when the application exits. Esc still minimizes and Ctrl+Q still quits. Keep this integration in the Windows frontend.
+
 ## 0.9.4
 
 - Put conventional Chinese translations first in quick-read glosses and full definitions. Supply the equivalent as structured metadata, retain it when the summary budget is tight, and keep the existing core-meaning selection. Refresh old model caches once online while retaining them as offline/initial fallbacks; no additional summary request.

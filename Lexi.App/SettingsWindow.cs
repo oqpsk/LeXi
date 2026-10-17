@@ -99,12 +99,22 @@ public sealed partial class SettingsWindow : Window
         dictionaries.Children.Add(Text("取消勾选并保存即可停用，词库文件会保留。", 14,Muted));
         dictionaries.Children.Add(Text("Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。", 14,Muted));
         var saveSpeech = AddSpeechTab(tabs, settings);
+        var windowOptions = new StackPanel { Margin = new(2,4,8,10) };
+        tabs.Items.Add(new TabItem { Header = "窗口", Padding = new(14,9,14,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = windowOptions } });
+        windowOptions.Children.Add(Text("点击窗口的 X 时", 18));
+        var closeBehavior = new ComboBox { ItemsSource = new[] { "最小化 · 保持后台运行", "退出 LeXi" }, SelectedIndex = settings.MinimizeOnClose ? 0 : 1, Margin = new(0,0,0,14) };
+        System.Windows.Automation.AutomationProperties.SetName(closeBehavior, "窗口关闭行为");
+        windowOptions.Children.Add(closeBehavior);
+        windowOptions.Children.Add(Text("最小化后保留任务栏入口，可用 Win+2 切回。右下角托盘的 ξ 图标可打开词典、进入设置或直接退出。Windows 可能将图标放在折叠菜单中。", 14, Muted));
+        windowOptions.Children.Add(Text("Esc 始终收起窗口；Ctrl+Q 和托盘中的“退出 LeXi”始终结束应用。", 14, Muted));
+        windowOptions.Children.Add(Text("Alt+← 后退 · Alt+→ 前进\n顶部中间的 LeXi 区域可拖动窗口。", 14, Muted));
         save.Click += (_, _) =>
         {
             var primaryValue = (ModelChoice)model.SelectedItem; var secondaryValue = (ModelChoice)secondary.SelectedItem;
             if (parallel.IsChecked == true && primaryValue.Provider == secondaryValue.Provider && primaryValue.Id == secondaryValue.Id)
             { modelError.Text = "请选择两个不同的查询模型。"; modelError.Visibility = Visibility.Visible; modelError.BringIntoView(); return; }
             if (!saveSpeech()) return;
+            settings.MinimizeOnClose = closeBehavior.SelectedIndex == 0;
             settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
             settings.OfflineEnabled = master.IsChecked == true;
             settings.DisabledDictionaries = toggles.Where(t => t.Toggle.IsChecked != true).Select(t => t.Dictionary.Id).ToArray();

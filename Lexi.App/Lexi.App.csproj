@@ -3,12 +3,15 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>Lexi</AssemblyName>
     <ApplicationIcon>Assets/Lexi.ico</ApplicationIcon>
     <Product>LeXi 词典</Product>
     <Description>A small English dictionary for Windows</Description>
   </PropertyGroup>
   <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
     <ProjectReference Include="../Lexi.Core/Lexi.Core.csproj" />
     <Content Include="../Lexi.Core/dictionary.schema.json" Link="assets/dictionary.schema.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../Lexi.Core/translation.schema.json" Link="assets/translation.schema.json" CopyToOutputDirectory="PreserveNewest" />
