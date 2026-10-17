@@ -43,6 +43,22 @@ internal static class OverviewTimingChecks
         var parsedEntry = CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(fresh[0].Entry,Json.Options),"fixture",null);
         check(parsedEntry.Senses.Count(s=>s.CoreMeaning==true)==1 && parsedEntry.Senses.Count(s=>s.CoreMeaning==false)==1,
             "core selection metadata survives validation and definition cache serialization");
+        var general = central with { English="A general structured data representation.", Chinese="通用结构化数据表示", Gloss="通用数据表示", Register="software engineering", CoreMeaning=true };
+        var application = general with { English="The same data representation used in token metadata.", Chinese="用于代币元数据的数据表示", Gloss="代币数据表示", Register="blockchain", CoreMeaning=false };
+        var separate = general with { English="An independently established mechanism with a different referent.", Chinese="具有不同指称的独立机制", Gloss="独立机制", Register="cryptography", CoreMeaning=false };
+        var scoped = new[] { new ModelAnswer(primary,ModelPhase.Complete,new("fixture",true,[application,general,separate],"","unverified")) };
+        var scopedRequest = SenseMerging.Request("fixture",scoped);
+        var scopedPlan = new SenseMergePlan(scopedRequest.InputHash, scopedRequest.Pairs.Select(p=>new SenseVerdict(p.A,p.B,
+            p.A=="m0s0" && p.B=="m0s1" ? "b_covers_a" : "different",1,p.A=="m0s0" && p.B=="m0s1" ? "m0s1" : "")).ToArray(),["m0s1"]);
+        var scopedGroups=SenseMerging.Group(scoped,scopedPlan);
+        check(scopedGroups.Length==2 && scopedGroups[0].Representative.Sense==general && scopedGroups[0].Variants.Any(v=>v.Sense==application) && scopedGroups[1].Representative.Sense==separate,
+            "general definitions head their application variants while independently established technical meanings survive");
+        check(QuickRead.Create(scopedGroups,[],[]) is [{Text:"通用数据表示",Core:true}],
+            "overview retains the general meaning rather than its favored-industry application");
+        check(CodexDictionary.PrioritizeCurrent([application,general,separate]).SequenceEqual(new[]{general,application,separate}) &&
+            CodexDictionary.PrioritizeCurrent([application with{Register="ordinary"},general,separate])[0]==general,
+            "core semantics outrank both generation order and domain labels");
+        check(LexicalLabels.Usage("software engineering, data interchange")=="软件工程 · 数据交换", "native technical fields have readable labels without being replaced by crypto tags");
         var clock = new ManualClock();
         var timing = new LookupTiming(clock);
         clock.Advance(100); timing.MarkFirst();

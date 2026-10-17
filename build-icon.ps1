@@ -20,8 +20,9 @@ $glyph.Transform($matrix); $matrix.Dispose()
 $shape = [System.Drawing.Drawing2D.GraphicsPath]::new()
 $shape.AddArc(8,8,72,72,180,90); $shape.AddArc(176,8,72,72,270,90)
 $shape.AddArc(176,176,72,72,0,90); $shape.AddArc(8,176,72,72,90,90); $shape.CloseFigure()
-$background = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#17171B'))
+$background = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#000000'))
 $foreground = [System.Drawing.SolidBrush]::new([System.Drawing.ColorTranslator]::FromHtml('#FFADD2'))
+$outline = [System.Drawing.Pen]::new($foreground, 8)
 $sizes = @(16,24,32,48,64,128,256)
 $frames = @()
 foreach($size in $sizes) {
@@ -30,7 +31,7 @@ foreach($size in $sizes) {
     $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $graphics.Clear([System.Drawing.Color]::Transparent)
     $graphics.ScaleTransform($size/256.0,$size/256.0)
-    $graphics.FillPath($background,$shape); $graphics.FillPath($foreground,$glyph)
+    $graphics.FillPath($background,$shape); $graphics.DrawPath($outline,$shape); $graphics.FillPath($foreground,$glyph)
     $stream = [IO.MemoryStream]::new()
     $image.Save($stream,[System.Drawing.Imaging.ImageFormat]::Png)
     $frames += ,$stream.ToArray()
@@ -58,7 +59,7 @@ for($i=0; $i -lt $points.Length; $i++) {
     elseif($kind -eq 3) { $parts.Add('C'+(PointText $points[$i])+' '+(PointText $points[$i+1])+' '+(PointText $points[$i+2])); $i+=2 }
     if(($types[$i] -band 128) -ne 0) { $parts.Add('Z') }
 }
-$svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="LeXi"><rect x="8" y="8" width="240" height="240" rx="36" fill="#17171B"/><path fill="#FFADD2" d="'+($parts -join ' ')+'"/></svg>'
+$svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="LeXi"><rect x="8" y="8" width="240" height="240" rx="36" fill="#000000" stroke="#FFADD2" stroke-width="8"/><path fill="#FFADD2" d="'+($parts -join ' ')+'"/></svg>'
 New-Item -ItemType Directory -Path (Join-Path $PSScriptRoot 'docs') -Force | Out-Null
 $svg | Set-Content (Join-Path $PSScriptRoot 'docs/brandmark.svg') -Encoding utf8NoBOM
-$foreground.Dispose(); $background.Dispose(); $shape.Dispose(); $glyph.Dispose(); $font.Dispose()
+$outline.Dispose(); $foreground.Dispose(); $background.Dispose(); $shape.Dispose(); $glyph.Dispose(); $font.Dispose()

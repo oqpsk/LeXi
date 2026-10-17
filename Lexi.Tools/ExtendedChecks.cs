@@ -52,8 +52,8 @@ internal static class ExtendedChecks
             Check(evidence?.Senses.Length == 1 && evidence.Senses[0].SourceName == metadata.Name, "original-only dictionary excluded from generated evidence");
             var generated = new AiEntry("车钟", true, [new("noun", "engine order telegraph", "船舶上的指令装置", "maritime", "", "", [1])], "", "source_based");
             Check(CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(generated, Json.Options), "车钟", evidence).EvidenceStatus == "unverified", "terminology equivalents do not verify generated functional details");
-            var oldAndNew = new AiEntry("mog", true, [new("noun", "a cat", "猫", "informal", "", "", []), new("verb", "outclass", "胜过", "internet slang", "", "", [])], "", "unverified");
-            Check(CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(oldAndNew, Json.Options), "mog", null).Senses[0].English == "outclass", "current slang remains ahead of older senses");
+            var oldAndNew = new AiEntry("mog", true, [new("noun", "a cat", "猫", "informal", "", "", []), new("verb", "outclass", "胜过", "internet slang", "", "", [], CoreMeaning:true)], "", "unverified");
+            Check(CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(oldAndNew, Json.Options), "mog", null).Senses[0].English == "outclass", "a current core meaning precedes peripheral senses without relying on register tags");
             settings.DisabledDictionaries = ["naer-test"];
             Check(library.Lookup("车钟", settings).Length == 1, "per-dictionary disable retains other sources");
             settings.OfflineEnabled = false;

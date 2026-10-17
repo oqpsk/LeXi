@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly AppSettings settings = AppSettings.Load(App.UserRoot);
     private CancellationTokenSource? lookup;
     private bool quit;
+    private readonly WindowPlacement windowPlacement;
     private bool suppressSuggestions;
     private string current = "";
     private readonly Brush muted = Theme.Brush("Muted");
@@ -30,6 +31,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         RenderHistory(history.Entries);
         Theme.ApplyChrome(this);
+        windowPlacement = new(this, Path.Combine(App.UserRoot, "window-placement.json"));
         UpdateOnlineButton(); UpdateNavigation(); UpdateCloseAction();
         LocationChanged += (_, _) => EtymologyPopup.IsOpen = false;
         SizeChanged += (_, _) => EtymologyPopup.IsOpen = false;
@@ -56,7 +58,7 @@ public partial class MainWindow : Window
     }
     public void Restore()
     {
-        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        if (WindowState == WindowState.Minimized) WindowState = windowPlacement.RestoreState;
         Show(); Activate(); FocusSearch();
     }
     private void FocusSearch() { SearchBox.Focus(); SearchBox.SelectAll(); }

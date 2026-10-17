@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.7
+
+- Remember main-window size and position automatically, including the normal bounds behind minimization/maximization. Persist separately from preferences and recover safely from missing or invalid state.
+- Use a pure-black logo background with a pale-pink rounded-square outline across the application, tray and repository brandmark.
+- Treat specialist interests as a coverage checklist, not an assumed context. Preserve general definitions and their native domain; distinguish an industry application from a separate meaning in generation and merging. Remove domain-tag promotion. Existing saved queries stay unchanged until explicit regeneration.
+
 ## 0.9.6
 
 - Unify pink accents around the logo's pale pink (#FFADD2). Use the same color for primary buttons and text selection with dark readable text; derive translucent cards and disclosure states from that color. Align the upper-right actions into two consistent columns.

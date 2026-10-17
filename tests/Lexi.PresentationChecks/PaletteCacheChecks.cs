@@ -19,11 +19,17 @@ internal static partial class Program
             ((Border)main.FindName("QuickReadCard")).Background == app.FindResource("AccentSoft"),
             "primary save button uses brand pink with dark text and overview reuses the shared tint");
         using (var stream = Application.GetResourceStream(new Uri("pack://application:,,,/Lexi;component/Assets/Lexi.ico")).Stream)
-        using (var logo = new System.Drawing.Icon(stream, 256, 256))
-        using (var bitmap = logo.ToBitmap())
-            Check(Enumerable.Range(0, bitmap.Width).Any(x => Enumerable.Range(0, bitmap.Height).Any(y =>
-                bitmap.GetPixel(x,y) is var pixel && pixel.R == pink.R && pixel.G == pink.G && pixel.B == pink.B)),
-                "packaged application and tray logo use the same exact pink as UI accents");
+        {
+            var decoded = new System.Windows.Media.Imaging.IconBitmapDecoder(stream, System.Windows.Media.Imaging.BitmapCreateOptions.PreservePixelFormat, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+            var bitmap = new System.Windows.Media.Imaging.FormatConvertedBitmap(decoded.Frames.MaxBy(f=>f.PixelWidth)!, PixelFormats.Bgra32, null, 0);
+            var bytes = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4]; bitmap.CopyPixels(bytes, bitmap.PixelWidth*4, 0);
+            bool Pixel(int x,int y,Color color) { var i=(y*bitmap.PixelWidth+x)*4; return bytes[i]==color.B && bytes[i+1]==color.G && bytes[i+2]==color.R && bytes[i+3]==255; }
+            Check(bitmap.PixelWidth==256 && Pixel(32,128,Colors.Black) && Pixel(8,128,pink),
+                "packaged application and tray logo have a pure-black interior and the exact shared pink outline");
+        }
+        var logoSurface = (Border)((Button)main.FindName("HistoryHomeButton")).Content;
+        Check(((SolidColorBrush)logoSurface.Background).Color == Colors.Black && logoSurface.BorderBrush == app.FindResource("Accent") && logoSurface.BorderThickness == new Thickness(1),
+            "in-window logo shares the pure-black fill and pink rounded border");
         var actions = (Panel)main.FindName("SearchActions");
         var upper = new[] {(Button)main.FindName("SettingsButton"), (Button)main.FindName("CloseButton")};
         var lower = actions.Children.OfType<Button>().ToArray();

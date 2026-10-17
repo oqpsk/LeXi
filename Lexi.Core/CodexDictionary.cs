@@ -33,11 +33,11 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
             {
                 task = "define", query, maxSenses = terminologyOnly ? 1 : 6,
                 inputCase = Queries.AbbreviationCandidate(query) ? "uppercase: check established abbreviations and give their full expansions before lowercase homographs" : "preserve the query spelling",
-                priorityDomains = new[] { "cryptoassets and blockchain", "cryptography", "information security and confidential computing" },
-                priorityEvidence = evidence?.Senses.Select((s, i) => new { sense = s, number = i + 1 })
-                    .Where(s => LexicalCoverage.Rank(s.sense.PartOfSpeech + " " + s.sense.Definition) < 2).Select(s => s.number).ToArray() ?? [],
-                coverage = "Independently check established meanings in the priority domains even when general dictionaries omit them, and include known specialist meanings first. Then include current Internet/slang and common everyday meanings. Do not fill the sense budget with only everyday meanings. Distinguish slang, literal and proper-name senses; preserve common meanings rather than spending the limit on obscure names or language families. Case-insensitive input may still refer to a capitalized meme name. Do not invent a slang meaning when none is known.",
-                overview = "Mark coreMeaning independently of coverage order: identify the central meaning of the whole term, normally one, at most two. Preferred domains ensure coverage; they must not displace the word's core concept with a peripheral person or specialized reuse.",
+                coverageInterests = new[] { "cryptoassets and blockchain", "cryptography", "information security and confidential computing" },
+                coverageEvidence = evidence?.Senses.Select((s, i) => new { sense = s, number = i + 1 })
+                    .Where(s => LexicalCoverage.Specialist(s.sense.PartOfSpeech + " " + s.sense.Definition) || SenseMerging.IsCurrent(s.sense.PartOfSpeech + " " + s.sense.Definition)).Select(s => s.number).ToArray() ?? [],
+                coverage = "Define the established core meaning first, in its natural domain. Check coverageInterests for additional independently established meanings, even when general dictionaries omit them. These interests are a recall checklist, not the context of the query or a ranking instruction. Being used in an industry is not a new lexical meaning: keep such applications as examples under the general definition. Do not narrow general software, computing, scientific or everyday concepts to blockchain/security, or copy interest labels onto unrelated meanings. Preserve established specialist meanings when their referent or defining mechanism differs. Distinguish slang, literal and proper-name senses; preserve common meanings rather than spending the limit on obscure names or language families. Case-insensitive input may still refer to a capitalized meme name. Do not invent a slang meaning when none is known.",
+                overview = "Mark coreMeaning independently of coverage order: identify the central meaning of the whole term, normally one, at most two. Industry application examples cannot replace the standalone definition. Coverage interests ensure recall; they must not displace the word's core concept with a peripheral person or specialized reuse.",
                 translation = "Keep the established Chinese name in chineseTerm, at the start of chinese, and at the start of the short gloss. The translation takes priority over a descriptive paraphrase; never invent an unfamiliar name.",
                 etymologyEvidence = evidence?.Etymologies ?? [],
                 evidence = EvidenceText(evidence)
@@ -76,7 +76,7 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
             Etymology = (entry.Etymology ?? "").Length <= 600 && Queries.HasChinese(entry.Etymology ?? "") ? entry.Etymology ?? "" : "" };
     }
     public static AiSense[] PrioritizeCurrent(IEnumerable<AiSense> senses) => senses.OrderBy(s =>
-        LexicalCoverage.Rank(s.Register ?? "")).ToArray();
+        s.CoreMeaning == true ? 0 : 1).ToArray();
     public async Task<AiEntry> LookupAsync(string query, OnlineEntry? online, AppSettings settings, CancellationToken token)
     {
         var result = await RunAsync(DefineRequest(query, online), "dictionary.schema.json", settings, token);

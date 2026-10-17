@@ -17,7 +17,7 @@ public sealed record SenseMergeRequest(string Query, SenseCandidate[] Candidates
     // Presentation metadata cannot influence the independent core-meaning judgment.
     public string InputHash => Cache.Hash(JsonSerializer.Serialize(new
     {
-        version = 4, Query,
+        version = 5, Query,
         Candidates = Candidates.Select(c => new
         {
             c.Id, c.Model,
@@ -37,7 +37,7 @@ public sealed record SenseMergeRequest(string Query, SenseCandidate[] Candidates
 
 public static class SenseMerging
 {
-    public const string CacheKind = "sense-merges-v4";
+    public const string CacheKind = "sense-merges-v5";
     public static SenseCandidate[] Candidates(ModelAnswer[] answers) => answers.SelectMany((answer, modelIndex) =>
         (answer.Entry?.Senses ?? []).Select((sense, senseIndex) => new SenseCandidate($"m{modelIndex}s{senseIndex}",
             answer.Model, sense, answer.Entry!.EvidenceStatus, answer.Phase == ModelPhase.Streaming))).ToArray();
@@ -105,8 +105,7 @@ public static class SenseMerging
                 plan?.Overview?.Select((id, rank) => (id, rank)).Where(x => ids.Contains(x.id)).Select(x => (int?)x.rank).FirstOrDefault(),
                 plan?.Overview != null);
         }).OrderBy(g => g.OverviewAssessed ? g.OverviewRank ?? int.MaxValue :
-                g.Variants.Any(v => !v.Provisional && v.Sense.CoreMeaning == true) ? 0 : int.MaxValue)
-            .ThenBy(g => g.Variants.Min(v => LexicalCoverage.Rank(v.Sense.Register))).ToArray();
+                g.Variants.Any(v => !v.Provisional && v.Sense.CoreMeaning == true) ? 0 : int.MaxValue).ToArray();
     }
     private static string PairKey(string a, string b) => string.CompareOrdinal(a, b) < 0 ? a + ":" + b : b + ":" + a;
     public static bool IsCurrent(string? label) => new[] { "slang", "internet", "网络", "俚语" }

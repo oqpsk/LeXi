@@ -55,7 +55,7 @@ internal static class LexicalChecks
         var falseMerge = new SenseMergePlan(request.InputHash,request.Pairs.Select(p => new SenseVerdict(p.A,p.B,"equivalent",1)).ToArray());
         Check(SenseMerging.Group(answers,falseMerge).Length == 3, "even a mistaken judge cannot merge distinct expansions or their ordinary homographs");
         var ordered = CodexDictionary.PrioritizeCurrent([ordinary, ordinary with { Register="slang" }, abbreviation]);
-        Check(ordered[0] == abbreviation && ordered[1].Register == "slang", "established domain meanings precede slang and ordinary meanings");
+        Check(ordered[0] == ordinary && ordered[2] == abbreviation, "domain and slang labels do not override semantic generation order");
         Check(LexicalLabels.Usage("cryptography, blockchain") == "密码学 · 区块链", "domain tags remain specific and understandable");
         var inflected = new AiEntry("TEE",true,[abbreviation],"","unverified","",[new("tee","verb",[new("past",["teed"])])]);
         Check(ModelInflections.Sanitize("TEE",inflected)?.Length == 0, "abbreviations cannot inherit a lowercase verb paradigm");

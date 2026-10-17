@@ -49,7 +49,7 @@ public static class LexicalLabels
             ["computing"]="计算机", ["computer science"]="计算机", ["information security"]="信息安全", ["geography"]="地理",
             ["nautical"]="航海", ["maritime"]="航海", ["mathematics"]="数学", ["physics"]="物理", ["medical"]="医学",
             ["linguistics"]="语言学", ["medicine"]="医学", ["electronics"]="电子学", ["engineering"]="工程",
-            ["software development"]="软件开发", ["audio engineering"]="音频工程", ["radio engineering"]="无线电工程",
+            ["software development"]="软件开发", ["software engineering"]="软件工程", ["data interchange"]="数据交换", ["data serialization"]="数据序列化", ["data format"]="数据格式", ["audio engineering"]="音频工程", ["radio engineering"]="无线电工程",
             ["anatomy"]="解剖学", ["biology"]="生物", ["chemistry"]="化学", ["law"]="法律", ["legal"]="法律", ["finance"]="金融",
             ["figurative"]="比喻", ["literal"]="字面含义", ["chiefly british"]="主要用于英式英语", ["british"]="英式英语", ["american"]="美式英语"
         };
