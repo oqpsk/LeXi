@@ -28,6 +28,15 @@ public sealed class QueryNavigation
         index = pages.Count - 1;
     }
 
+    // Destination label for back/forward controls; each front end adds its own shortcut hint.
+    public static string Label(QueryPage? page)
+    {
+        if (page == null) return "";
+        if (page.Query.Length == 0) return "查询历史";
+        var text = page.Query.Replace("\r", " ").Replace("\n", " ");
+        return text.Length > 50 ? text[..50] + "…" : text;
+    }
+
     public QueryPage? Move(int direction)
     {
         if (direction != -1 && direction != 1 || direction == -1 && !CanBack || direction == 1 && !CanForward) return null;

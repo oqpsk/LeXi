@@ -1,13 +1,11 @@
-using Lexi.Core;
+namespace Lexi.Core;
 
-namespace Lexi;
-
-internal enum QueryStage { Dictionary, Supplement, Merge, Finished }
-internal enum QueryOutcome { Running, Complete, Partial, Failed }
+public enum QueryStage { Dictionary, Supplement, Merge, Finished }
+public enum QueryOutcome { Running, Complete, Partial, Failed }
 
 // Only the caller that has awaited the whole query may publish a terminal state.
 // A snapshot with two completed models can still be waiting for the sense judge.
-internal sealed record QueryProgressState(QueryStage Stage, string Title, string Detail,
+public sealed record QueryProgressState(QueryStage Stage, string Title, string Detail,
     QueryOutcome Outcome = QueryOutcome.Running, bool ModelsEnabled = true, bool MergeEnabled = true, bool Translation = false, QueryStage? FailedStage = null)
 {
     public bool Busy => Outcome == QueryOutcome.Running;
@@ -52,4 +50,40 @@ internal sealed record QueryProgressState(QueryStage Stage, string Title, string
 
     public QueryProgressState Interrupted(string title, string detail) => this with
     { Stage = QueryStage.Finished, Title = title, Detail = detail, Outcome = QueryOutcome.Failed };
+
+    // Stage details shown in the status-ring popover and announced to assistive technology.
+    public string[] StageLabels
+    {
+        get
+        {
+            var names = new[] { "词典", Translation ? "翻译" : "补充", "合并", "完成" };
+            var labels = new string[names.Length];
+            for (int i = 0; i < names.Length; i++)
+            {
+                bool skipped = i == 0 && Translation || i == 1 && !ModelsEnabled || i == 2 && !MergeEnabled;
+                bool active = i == (int)Stage;
+                labels[i] = names[i] + "：" + (skipped ? "跳过" : FailedStage == (QueryStage)i ? "未完成" :
+                    active ? Busy ? "进行中" : Outcome == QueryOutcome.Partial ? "部分完成" : Warning ? "已停止" : "完成" :
+                    i < (int)Stage ? "已结束" : "等待");
+            }
+            return labels;
+        }
+    }
+    public string AccessibleName => Title + "。" + Detail + "。" + string.Join("，", StageLabels);
+}
+
+// One lifecycle per accepted query. Late or regressing updates cannot revive a finished query.
+public sealed class QueryProgressTracker
+{
+    private long generation;
+    public long Generation => generation;
+    public QueryProgressState? Current { get; private set; }
+    public long Begin(QueryProgressState state) { generation++; Current = null; Update(generation, state); return generation; }
+    public void Reset() { generation++; Current = null; }
+    public bool Update(long request, QueryProgressState state)
+    {
+        if (request != generation || Current is { Busy: false } || Current is { } previous && state.Stage < previous.Stage) return false;
+        if (state == Current) return false;
+        Current = state; return true;
+    }
 }

@@ -6,46 +6,28 @@ namespace Lexi;
 
 public partial class MainWindow
 {
-    private DictionaryCoordinator CreateCoordinator()
-    {
-        var primary = LookupModel.Primary(settings);
-        return new(cache, (model, query, evidence, options, token, progress) => model.Provider == "claude"
-            ? (model == primary ? claude : secondaryClaude).LookupAsync(query, evidence, model.Model, token, progress)
-            : codex.LookupAsync(query, evidence, options, token), codex.JudgeSensesAsync);
-    }
+    // Applies a model snapshot through the shared presenter; the published view redraws the card.
+    internal void RenderAnswers(LookupSnapshot snapshot, OnlineEntry? evidence, bool finalized = true) =>
+        session.ApplyAnswers(snapshot, evidence, finalized);
 
-    private static string ModelStatus(LookupSnapshot snapshot) => string.Join(" · ", snapshot.Answers.Select(a => a.Model.Name + (a.Phase switch
-    { ModelPhase.Pending => " 查询中", ModelPhase.Streaming => " 生成中", ModelPhase.Complete => a.Cached ? " 缓存" : " 完成", ModelPhase.Failed => " 未完成", _ => a.Cached ? " 缓存" : " 无缓存" })));
-
-    internal void RenderAnswers(LookupSnapshot snapshot, OnlineEntry? evidence, bool finalized = true)
+    private void RenderAnswerCard(AnswersView? answers)
     {
-        ApplyModelPronunciation(snapshot);
-        ApplyModelWordForms(current.Length > 0 ? current : Queries.LookupKey(snapshot.Answers.FirstOrDefault(a => a.Entry != null)?.Entry?.Word ?? ""), snapshot);
-        ApplyModelEtymology(snapshot);
         AiPanel.Children.Clear();
-        var query = current.Length > 0 ? current : snapshot.Answers.FirstOrDefault(a => a.Entry != null)?.Entry?.Word ?? evidence?.Word ?? "";
-        var uncovered = SpecialistReferences.Uncovered(query, snapshot.Groups, evidence);
-        RenderQuickRead(snapshot, uncovered, finalized);
-        if (snapshot.Groups.Length == 0 && uncovered.Length == 0 && snapshot.Answers.All(a => a.Phase == ModelPhase.Offline)) return;
+        if (answers is null or { Empty: true }) return;
         var card = Card(AiPanel, "", "", true);
-        foreach (var (brief, i) in uncovered.Select((b,i) => (b,i))) card.Children.Add(ReferenceSenseRow(brief, i));
-        foreach (var (group, i) in snapshot.Groups.Select((g, i) => (g, i)))
-            card.Children.Add(SenseRow(group, i + uncovered.Length, evidence));
-        foreach (var answer in snapshot.Answers)
-        {
-            if (answer.Phase == ModelPhase.Failed) card.Children.Add(CompactHint(answer.Model.Name + "：" + answer.Error + (answer.Cached ? "（已保留缓存）" : ""), true));
-            else if (answer.Phase == ModelPhase.Complete && answer.Entry?.Found == false) card.Children.Add(CompactHint(answer.Model.Name + "：" + (string.IsNullOrWhiteSpace(answer.Entry.Note) ? "未返回可靠释义" : answer.Entry.Note)));
-        }
-        var notes = snapshot.Answers.Where(a => a.Entry?.Found == true && !string.IsNullOrWhiteSpace(a.Entry.Note)).ToArray();
-        if (notes.Length > 0)
+        var index = 0;
+        foreach (var reference in answers.References) card.Children.Add(ReferenceSenseRow(reference, index++));
+        foreach (var sense in answers.Senses) card.Children.Add(SenseRow(sense, index++));
+        foreach (var notice in answers.Notices) card.Children.Add(CompactHint(notice.Text, notice.Warning));
+        if (answers.Notes.Length > 0)
         {
             var controls = new WrapPanel(); var details = new StackPanel(); var content = new StackPanel();
-            foreach (var answer in notes) content.Children.Add(CompactHint(answer.Model.Name + "：" + answer.Entry!.Note));
+            foreach (var note in answers.Notes) content.Children.Add(CompactHint(note));
             card.Children.Add(controls); card.Children.Add(details);
             AddDisclosure(controls, details, "lookup:notes", "补充说明", content);
         }
-        if (snapshot.MergeFailed) card.Children.Add(CompactHint(snapshot.MergeNote, true));
-        if (snapshot.Groups.Length > 0)
+        if (answers.MergeWarning.Length > 0) card.Children.Add(CompactHint(answers.MergeWarning, true));
+        if (answers.Originals == OriginalsMode.Collapse)
         {
             if (OnlinePanel.Children.OfType<Expander>().FirstOrDefault() is { Tag: null } onlineOriginal)
             { onlineOriginal.IsExpanded = false; onlineOriginal.Tag = "initially-collapsed"; }
@@ -61,7 +43,7 @@ public partial class MainWindow
                 LocalPanel.Children.Add(new Expander { Header = $"离线词典原文 · {count} 部", Content = originals, Margin = new(0,4,0,4) });
             }
         }
-        else if (!snapshot.Provisional)
+        else if (answers.Originals == OriginalsMode.Expand)
         {
             foreach (var original in LocalPanel.Children.OfType<Expander>().Concat(OnlinePanel.Children.OfType<Expander>())) original.IsExpanded = true;
         }
