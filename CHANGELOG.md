@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.9.16
+
+- Focus the search input immediately on startup, taskbar activation and explicit restore, with an input-priority retry after WPF layout and focus restoration. Declare the input as the window's logical focus target and align native keyboard focus only while the main window is already foreground and enabled.
+- Select existing text for replacement on activation without reselecting text typed before a deferred retry. Cancel pending focus work on mouse interaction, deactivation, minimization and close; keep background windows and modal settings from redirecting keyboard input.
+
 ## 0.9.15
 
 - Read ElevenLabs account voices on the first dropdown expansion, reuse that list within the settings dialog, and provide an explicit “刷新声线列表” action. Keep loading and connection errors beside the voice selector; invalidate results on key edits, reject stale responses, and preserve saved/custom choices without inventing voices for empty accounts.

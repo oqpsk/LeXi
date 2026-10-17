@@ -29,18 +29,22 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        FocusManager.SetFocusedElement(this, SearchBox);
         RenderHistory(history.Entries);
         Theme.ApplyChrome(this);
         windowPlacement = new(this, Path.Combine(App.UserRoot, "window-placement.json"));
         UpdateOnlineButton(); UpdateNavigation(); UpdateCloseAction();
         LocationChanged += (_, _) => EtymologyPopup.IsOpen = false;
         SizeChanged += (_, _) => EtymologyPopup.IsOpen = false;
-        Deactivated += (_, _) => EtymologyPopup.IsOpen = false;
+        Deactivated += (_, _) => { CancelSearchFocus(); EtymologyPopup.IsOpen = false; };
+        ContentRendered += (_, _) => QueueSearchFocus();
+        StateChanged += (_, _) => { if (WindowState == WindowState.Minimized) CancelSearchFocus(); else QueueSearchFocus(); };
+        PreviewMouseDown += (_, _) => CancelSearchFocus();
         ResultsScroll.ScrollChanged += (_, e) => { if (e.VerticalChange != 0) EtymologyPopup.IsOpen = false; };
         dictionaryTask = Task.Run(() => new OfflineLibrary(Path.Combine(App.Root, "data")));
         Loaded += async (_, _) =>
         {
-            SearchBox.Focus();
+            FocusSearch(); QueueSearchFocus();
             UpdatePreparedModel();
             try
             {
@@ -54,16 +58,15 @@ public partial class MainWindow : Window
         {
             if (!quit && settings.MinimizeOnClose && !Dispatcher.HasShutdownStarted) { e.Cancel = true; WindowState = WindowState.Minimized; }
         };
-        Closed += (_, _) => { lookup?.Cancel(); StopSpeech(); speech.Dispose(); pronunciations.Dispose(); claude.Dispose(); secondaryClaude.Dispose(); web.Dispose(); if (dictionaryTask.IsCompletedSuccessfully) dictionaryTask.Result.Dispose(); };
+        Closed += (_, _) => { focusClosed = true; CancelSearchFocus(); lookup?.Cancel(); StopSpeech(); speech.Dispose(); pronunciations.Dispose(); claude.Dispose(); secondaryClaude.Dispose(); web.Dispose(); if (dictionaryTask.IsCompletedSuccessfully) dictionaryTask.Result.Dispose(); };
     }
     public void Restore()
     {
         if (WindowState == WindowState.Minimized) WindowState = windowPlacement.RestoreState;
-        Show(); Activate(); FocusSearch();
+        Show(); Activate(); FocusSearch(); QueueSearchFocus();
     }
-    private void FocusSearch() { SearchBox.Focus(); SearchBox.SelectAll(); }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
-    private void Window_Activated(object? sender, EventArgs e) => Dispatcher.BeginInvoke(FocusSearch);
+    private void Window_Activated(object? sender, EventArgs e) { FocusSearch(); QueueSearchFocus(); }
     private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
