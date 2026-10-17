@@ -77,7 +77,7 @@ public partial class MainWindow
     {
         var generated = snapshot.Groups.Any(g => g.Variants.Any(v => !v.Provisional));
         if (!generated && overviewFromModel && !finalized && snapshot.Provisional)
-        { SetQuickReadCaption(overviewCore ? "TL;DR" : "义项摘录", "缓存预览"); return; }
+        { SetQuickReadCaption("缓存预览"); return; }
         var meanings = QuickRead.Create(snapshot.Groups, uncovered, overviewLocal);
         QuickReadCard.Visibility = meanings.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         overviewFromModel = generated && meanings.Length > 0;
@@ -85,14 +85,13 @@ public partial class MainWindow
         var state = !generated ? "词典摘录" : !finalized || snapshot.Provisional ? "预览" :
             snapshot.MergeFailed || snapshot.Answers.Any(a => a.Phase == ModelPhase.Failed) ? "部分结果" : "已整理";
         overviewCore = meanings.All(m => m.Core);
-        SetQuickReadCaption(overviewCore ? "TL;DR" : generated ? "义项摘录" : "速览", state);
+        SetQuickReadCaption(state);
         QuickReadText.Text = string.Join("；", meanings.Select(m => m.Text));
         QuickReadText.ToolTip = string.Join("\n", meanings.Select(m => m.Label + "：" + m.Text));
     }
-    private void SetQuickReadCaption(string label, string state)
+    private void SetQuickReadCaption(string state)
     {
-        var caption = label + " · " + state;
-        QuickReadGlyph.Text = label == "TL;DR" ? "TL\nDR" : label == "义项摘录" ? "摘\n录" : "速\n览";
+        var caption = "TL;DR · " + state;
         QuickReadState.Text = state;
         QuickReadState.Visibility = state is "预览" or "缓存预览" or "部分结果" ? Visibility.Visible : Visibility.Collapsed;
         var explanation = overviewCore ? "从完整义项中选出的核心含义，不涵盖全部用法。详细释义和参考资料见下方。" :

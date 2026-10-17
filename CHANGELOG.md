@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.9.11
+
+- Keep the TL/DR mark consistent for local excerpts, model previews and final summaries. Replace font-rendered labels with a compact two-by-two vector badge using the shared pale pink and dark letterforms; center it vertically beside single-line and wrapped summary text. Keep provisional and partial-result status separate, with source/core-selection explanations in the tooltip and accessible caption.
+
 ## 0.9.10
 
 - Preview the selected search suggestion in the input while keeping the caret at its end. Up/down browse the original candidates without launching a lookup; typing immediately edits the selected word. Clicking or pressing Tab accepts a suggestion for editing, Enter searches, and Escape restores the input from before browsing. Keep suggestion previews out of query history and saved results.
