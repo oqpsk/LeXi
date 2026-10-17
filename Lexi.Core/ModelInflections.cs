@@ -17,11 +17,11 @@ public static class ModelInflections
     {
         if (entry.WordForms == null) return null; // Legacy cache: enrichment has not run yet.
         if (!entry.Found || Queries.HasChinese(query)) return [];
-        var classes = entry.Senses.Select(s => LexicalLabels.PartOfSpeech(s.PartOfSpeech)).ToHashSet();
+        var classes = entry.Senses.Where(s => !LexicalCoverage.Abbreviation(s)).Select(s => LexicalLabels.PartOfSpeech(s.PartOfSpeech)).ToHashSet();
         var valid = new List<AiWordForms>();
         foreach (var group in entry.WordForms.Take(8))
         {
-            if (group == null || !Spelling(group.Lemma) || group.PartOfSpeech == null || group.Forms == null) continue;
+            if (group == null || Queries.AbbreviationCandidate(query) && group.Lemma != query || !Spelling(group.Lemma) || group.PartOfSpeech == null || group.Forms == null) continue;
             var pos = LexicalLabels.PartOfSpeech(group.PartOfSpeech);
             if (!classes.Contains(pos) || pos is not ("verb" or "noun" or "adjective" or "adverb")) continue;
             var forms = group.Forms.Take(16).Where(f => f != null && f.Kind != null && f.Words != null &&

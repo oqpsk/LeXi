@@ -48,14 +48,14 @@ public static class StreamingEntry
         }
         catch (JsonException) { return null; }
         if (fields != null) AddSense(fields, senses);
-        if (word == null || Queries.Normalize(word) != Queries.Normalize(query) || senses.Count == 0 || senses.Count > 8) return null;
-        return new(query, true, CodexDictionary.PrioritizeCurrent(senses), "", "unverified", Pronunciation.Valid(phonetic) ? phonetic!.Trim() : "");
+        if (word == null || Queries.Normalize(word) != Queries.Normalize(query) || Queries.AbbreviationCandidate(query) && Queries.LookupKey(word) != query || senses.Count == 0 || senses.Count > 8) return null;
+        return new(query, true, CodexDictionary.PrioritizeCurrent(senses), "", "unverified", Pronunciation.Format(phonetic));
     }
 
     private static void AddSense(Dictionary<string, string> fields, List<AiSense> senses)
     {
         string Get(string key) => fields.GetValueOrDefault(key, "");
         if (string.IsNullOrWhiteSpace(Get("chinese")) || string.IsNullOrWhiteSpace(Get("english"))) return;
-        senses.Add(new(Get("partOfSpeech"), Get("english"), Get("chinese"), Get("register"), Get("example"), Get("exampleChinese"), []));
+        senses.Add(new(Get("partOfSpeech"), Get("english"), Get("chinese"), Get("register"), Get("example"), Get("exampleChinese"), [], Get("lexicalForm") == "abbreviation" ? "abbreviation" : "word", Get("expansion")));
     }
 }

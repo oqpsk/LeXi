@@ -20,7 +20,8 @@ public partial class MainWindow
     internal void RenderAnswers(LookupSnapshot snapshot, OnlineEntry? evidence, bool finalized = true)
     {
         ApplyModelPronunciation(snapshot);
-        ApplyModelWordForms(current.Length > 0 ? current : Queries.Normalize(snapshot.Answers.FirstOrDefault(a => a.Entry != null)?.Entry?.Word ?? ""), snapshot);
+        ApplyModelWordForms(current.Length > 0 ? current : Queries.LookupKey(snapshot.Answers.FirstOrDefault(a => a.Entry != null)?.Entry?.Word ?? ""), snapshot);
+        ApplyModelEtymology(snapshot);
         AiPanel.Children.Clear();
         if (snapshot.Groups.Length == 0 && snapshot.Answers.All(a => a.Phase == ModelPhase.Offline)) return;
         var card = Card(AiPanel, "", "", true);
@@ -42,6 +43,7 @@ public partial class MainWindow
         if (snapshot.MergeFailed) card.Children.Add(CompactHint(snapshot.MergeNote, true));
         if (snapshot.Groups.Length > 0)
         {
+            CollapseReferenceBriefs(snapshot, evidence);
             if (OnlinePanel.Children.OfType<Expander>().FirstOrDefault() is { Tag: null } onlineOriginal)
             { onlineOriginal.IsExpanded = false; onlineOriginal.Tag = "initially-collapsed"; }
             // Preserve every dictionary's original text, with a compact default view.

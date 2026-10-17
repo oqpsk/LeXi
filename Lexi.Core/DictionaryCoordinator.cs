@@ -6,7 +6,7 @@ public sealed class DictionaryCoordinator(Cache cache,
     Func<LookupModel, string, OnlineEntry?, AppSettings, CancellationToken, IProgress<AiEntry>, Task<AiEntry>> lookup,
     Func<SenseMergeRequest, AppSettings, CancellationToken, Task<SenseMergePlan>> judge)
 {
-    public const string CacheKind = "ai-v4";
+    public const string CacheKind = "ai-v5";
     public static bool ExpectedFailure(Exception e) => e is InvalidOperationException or TimeoutException or InvalidDataException or
         JsonException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception;
 
@@ -14,9 +14,9 @@ public sealed class DictionaryCoordinator(Cache cache,
     {
         var saved = cache.Read<AiEnvelope>(CacheKind, model.CacheKey(query, settings));
         legacy = saved == null;
-        if (legacy) saved = cache.Read<AiEnvelope>("ai-v3", model.CacheKey(query, settings));
+        if (legacy) saved = cache.Read<AiEnvelope>("ai-v4", model.CacheKey(query, settings)) ?? cache.Read<AiEnvelope>("ai-v3", model.CacheKey(query, settings));
         if (saved == null || saved.Provider != model.Provider || saved.Model != model.Model ||
-            saved.ReasoningEffort != settings.ReasoningEffort || saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence)) return null;
+            saved.ReasoningEffort != settings.ReasoningEffort || (saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence) && !(legacy && query == Queries.Normalize(query) && saved.EvidenceHash == CodexDictionary.LegacyEvidenceHash(evidence)))) return null;
         try { return saved with { Entry = CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(saved.Entry, Json.Options), query, evidence) }; }
         catch (Exception e) when (ExpectedFailure(e)) { return null; }
     }

@@ -15,12 +15,31 @@ public sealed partial class OnlineDictionary : IDisposable
     }
     public async Task<OnlineEntry?> LookupAsync(string query, CancellationToken token)
     {
-        var url = "https://en.wiktionary.org/api/rest_v1/page/definition/" + Uri.EscapeDataString(query);
-        using var response = await client.GetAsync(url, token);
-        if (response.StatusCode == HttpStatusCode.NotFound) return null;
-        response.EnsureSuccessStatusCode();
-        var text = await response.Content.ReadAsStringAsync(token);
-        return Parse(query, text);
+        async Task<OnlineEntry?> Fetch(string spelling)
+        {
+            var url = "https://en.wiktionary.org/api/rest_v1/page/definition/" + Uri.EscapeDataString(spelling);
+            using var response = await client.GetAsync(url, token);
+            if (response.StatusCode == HttpStatusCode.NotFound) return null;
+            response.EnsureSuccessStatusCode();
+            return Parse(spelling, await response.Content.ReadAsStringAsync(token));
+        }
+        var lower = Queries.Normalize(query);
+        if (query == lower) return await Fetch(query);
+        // A failed secondary page must not suppress a usable exact-case result.
+        async Task<(OnlineEntry? Entry, Exception? Error)> TryFetch(string spelling)
+        {
+            try { return (await Fetch(spelling), null); }
+            catch (Exception e) when (e is HttpRequestException or JsonException || e is OperationCanceledException && !token.IsCancellationRequested) { return (null, e); }
+        }
+        var pages = await Task.WhenAll(TryFetch(query), TryFetch(lower));
+        token.ThrowIfCancellationRequested();
+        var entries = pages.Where(p => p.Entry != null).Select(p => p.Entry!).ToArray();
+        if (entries.Length == 0)
+        {
+            if (pages.FirstOrDefault(p => p.Error != null).Error is { } error) throw error;
+            return null;
+        }
+        return new(query, entries.SelectMany(e => e.Senses).Take(40).ToArray(), entries[0].Url, DateTimeOffset.UtcNow);
     }
     public static OnlineEntry? Parse(string query, string json)
     {
@@ -40,7 +59,8 @@ public sealed partial class OnlineDictionary : IDisposable
                 if (definition.Length == 0) continue;
                 var examples = entry.TryGetProperty("examples", out var ex) && ex.ValueKind == JsonValueKind.Array
                     ? ex.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => Plain(x.GetString()!)).Take(2).ToArray() : [];
-                senses.Add(new(pos, definition, examples));
+                senses.Add(new(pos, definition, examples, "Wiktionary",
+                    "https://en.wiktionary.org/wiki/" + Uri.EscapeDataString(query) + (chinese ? "#Chinese" : "#English"), query));
             }
         }
         return senses.Count == 0 ? null : new(query, senses.Take(40).ToArray(),

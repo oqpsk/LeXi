@@ -19,9 +19,9 @@ public partial class MainWindow
         wordFormQuery = query; return true;
     }
     internal void ApplyLocalWordForms(string query, WordFormSet[] entries)
-    { if (!MatchWordFormQuery(query)) return; localWordForms = entries; RefreshWordForms(query); }
+    { if (!MatchWordFormQuery(query)) return; localWordForms = Queries.AbbreviationCandidate(query) ? [] : entries; RefreshWordForms(query); }
     internal void ApplyOnlineWordForms(string query, WordFormSet[] entries)
-    { if (!MatchWordFormQuery(query)) return; onlineWordForms = entries; RefreshWordForms(query); }
+    { if (!MatchWordFormQuery(query)) return; onlineWordForms = Queries.AbbreviationCandidate(query) ? entries.Where(e => e.Lemma == query).ToArray() : entries; RefreshWordForms(query); }
     internal void ApplyModelWordForms(string query, LookupSnapshot snapshot)
     {
         if (query.Length == 0 || !MatchWordFormQuery(query)) return;
@@ -32,7 +32,7 @@ public partial class MainWindow
             // Keep the last complete data while a replacement streams. Partial morphology
             // never becomes visible or cached, even if a provider preview includes it.
             if (answer.Phase == ModelPhase.Streaming) continue;
-            if (answer.Entry is { Found: true, WordForms: not null } entry && Queries.Normalize(entry.Word) == query)
+            if (answer.Entry is { Found: true, WordForms: not null } entry && Queries.Normalize(entry.Word) == Queries.Normalize(query))
             { wordFormAnswers[answer.Model] = entry; changed = true; }
             else if (answer.Entry is { Found: false } || answer.Phase == ModelPhase.Failed && !answer.Cached)
                 changed |= wordFormAnswers.Remove(answer.Model);

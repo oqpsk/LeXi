@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.9.0
+
+- Preserve query case across online lookup, model requests and caches. Resolve exact-case and lowercase Wiktionary pages separately; keep abbreviation expansions visible and prevent merging unrelated expansions or attaching lowercase homograph inflections.
+- Prioritize established cryptoasset, blockchain, cryptography and security meanings without dropping common usages. Add 12 attributed reference briefs with aliases, available offline, and general specialist coverage in both model requests. Raise the per-model sense budget to six and version definition/merge caches.
+- Reject damaged IPA escape sequences, normalize stress and vowel length, and display slash-delimited transcriptions. Read expanded IPA templates from Wiktionary so valid online pronunciations can replace damaged local entries.
+- Add a collapsed etymology disclosure with attributed Wiktionary excerpts and concise Chinese model explanations. Source etymology can join the existing definition request; unsourced historical claims are discouraged and model explanation remains identified.
+- Use serif italic examples, rename source disclosures to “参考资料”, and give secondary controls persistent surfaces, borders and expanded/focus states. Preserve disclosure state and clear metadata between queries and translations.
+
 ## 0.8.2
 
 - Return structured morphology alongside each model's definitions, covering noun/verb/adjective/adverb uses introduced after initial dictionary lookup. Update forms when each model completes; keep partial output out of the display and cache, and preserve complete data during streaming refreshes.

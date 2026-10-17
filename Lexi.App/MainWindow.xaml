@@ -54,6 +54,8 @@
           <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
             <TextBlock x:Name="EntryHeading" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"><Run x:Name="Headword" FontSize="30" FontWeight="SemiBold"/><Run Text="&#160;&#160;"/><Run x:Name="Phonetic" Foreground="{StaticResource Muted}"/><Run x:Name="PhoneticLabel" FontSize="12" Foreground="{StaticResource Muted}"/><InlineUIContainer BaselineAlignment="TextBottom"><Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button></InlineUIContainer></TextBlock>
             <StackPanel x:Name="FormsPanel"/>
+            <StackPanel x:Name="EtymologyPanel"/>
+            <StackPanel x:Name="ReferencePanel"/>
             <StackPanel x:Name="AiPanel"/>
             <StackPanel x:Name="LocalPanel"/>
             <StackPanel x:Name="OnlinePanel"/>

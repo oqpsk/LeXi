@@ -1,0 +1,173 @@
+[
+  {
+    "word": "mixer",
+    "keys": [
+      "mixer",
+      "crypto mixer",
+      "coin mixer",
+      "cryptocurrency mixer",
+      "混币器"
+    ],
+    "domain": "cryptocurrency",
+    "english": "A service or mechanism that obscures links between cryptocurrency transfers.",
+    "chinese": "混币器：用于模糊加密资产转账关联的服务或机制。",
+    "sourceName": "FinCEN · LeXi 摘要",
+    "sourceUrl": "https://www.fincen.gov/news/news-releases/fincen-proposes-new-regulation-enhance-transparency-convertible-virtual-currency",
+    "expansion": ""
+  },
+  {
+    "word": "nonce",
+    "keys": [
+      "nonce",
+      "密码学随机数",
+      "交易序号"
+    ],
+    "domain": "cryptography, blockchain",
+    "english": "A value used once in a cryptographic context; an Ethereum account nonce counts transactions.",
+    "chinese": "密码学中的一次性值；以太坊账户 nonce 是用于防重放的交易计数。",
+    "sourceName": "Ethereum.org · LeXi 摘要",
+    "sourceUrl": "https://ethereum.org/glossary/#nonce",
+    "expansion": ""
+  },
+  {
+    "word": "TEE",
+    "keys": [
+      "TEE",
+      "trusted execution environment",
+      "可信执行环境",
+      "可信环境"
+    ],
+    "domain": "information security, confidential computing",
+    "english": "An isolated execution environment protecting the code and data of trusted applications.",
+    "chinese": "可信执行环境：隔离执行受信任程序并保护其代码和数据的环境。",
+    "sourceName": "GlobalPlatform · LeXi 摘要",
+    "sourceUrl": "https://globalplatform.org/specs-library/tee-system-architecture/",
+    "expansion": "Trusted Execution Environment"
+  },
+  {
+    "word": "enclave",
+    "keys": [
+      "enclave",
+      "secure enclave",
+      "安全隔区"
+    ],
+    "domain": "information security, confidential computing",
+    "english": "An isolated computing compartment for processing sensitive data, as in confidential computing.",
+    "chinese": "安全隔区：用于隔离处理敏感数据的计算区域。",
+    "sourceName": "AWS · LeXi 摘要",
+    "sourceUrl": "https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html",
+    "expansion": ""
+  },
+  {
+    "word": "MPC",
+    "keys": [
+      "MPC",
+      "multi-party computation",
+      "multiparty computation",
+      "多方计算",
+      "安全多方计算"
+    ],
+    "domain": "cryptography",
+    "english": "Joint computation on private inputs without revealing each participant’s input to the others.",
+    "chinese": "多方计算：各方协同计算，同时不向其他参与方披露各自的私密输入。",
+    "sourceName": "Fireblocks · LeXi 摘要",
+    "sourceUrl": "https://www.fireblocks.com/report/what-is-mpc",
+    "expansion": "Multi-Party Computation"
+  },
+  {
+    "word": "MEV",
+    "keys": [
+      "MEV",
+      "maximal extractable value",
+      "最大可提取价值"
+    ],
+    "domain": "blockchain",
+    "english": "Additional value obtainable through transaction inclusion, exclusion or ordering during block production.",
+    "chinese": "最大可提取价值：通过区块中交易的纳入、排除或排序获得的额外价值。",
+    "sourceName": "Ethereum.org · LeXi 摘要",
+    "sourceUrl": "https://ethereum.org/developers/docs/mev/",
+    "expansion": "Maximal Extractable Value"
+  },
+  {
+    "word": "bridge",
+    "keys": [
+      "bridge",
+      "blockchain bridge",
+      "跨链桥"
+    ],
+    "domain": "blockchain",
+    "english": "A mechanism for transferring assets between blockchain networks.",
+    "chinese": "跨链桥：在不同区块链网络间转移资产的机制。",
+    "sourceName": "Ethereum.org · LeXi 摘要",
+    "sourceUrl": "https://ethereum.org/glossary/#bridge",
+    "expansion": ""
+  },
+  {
+    "word": "rollup",
+    "keys": [
+      "rollup",
+      "rollups"
+    ],
+    "domain": "blockchain",
+    "english": "A scaling system executing transactions outside layer 1 and posting data back to it.",
+    "chinese": "一种扩容方案：在一层链之外执行交易，并将数据提交回一层链。",
+    "sourceName": "Ethereum.org · LeXi 摘要",
+    "sourceUrl": "https://ethereum.org/glossary/#rollups",
+    "expansion": ""
+  },
+  {
+    "word": "oracle",
+    "keys": [
+      "oracle",
+      "oracles",
+      "预言机"
+    ],
+    "domain": "blockchain",
+    "english": "A mechanism supplying smart contracts with information from outside their blockchain.",
+    "chinese": "预言机：向智能合约提供链外信息的机制。",
+    "sourceName": "Ethereum.org · LeXi 摘要",
+    "sourceUrl": "https://ethereum.org/developers/docs/oracles/",
+    "expansion": ""
+  },
+  {
+    "word": "gas",
+    "keys": [
+      "gas",
+      "gas fee"
+    ],
+    "domain": "blockchain",
+    "english": "The unit measuring computational work required by Ethereum operations.",
+    "chinese": "Gas：衡量以太坊操作所需计算工作的单位。",
+    "sourceName": "Ethereum.org · LeXi 摘要",
+    "sourceUrl": "https://ethereum.org/glossary/#gas",
+    "expansion": ""
+  },
+  {
+    "word": "staking",
+    "keys": [
+      "staking",
+      "stake",
+      "质押"
+    ],
+    "domain": "blockchain",
+    "english": "Committing cryptocurrency to participate in proof-of-stake network security.",
+    "chinese": "质押：投入加密资产，参与权益证明网络的安全维护。",
+    "sourceName": "Ethereum.org · LeXi 摘要",
+    "sourceUrl": "https://ethereum.org/glossary/#staking",
+    "expansion": ""
+  },
+  {
+    "word": "slashing",
+    "keys": [
+      "slashing",
+      "slash",
+      "罚没"
+    ],
+    "domain": "blockchain",
+    "english": "A validator penalty that removes stake for specified protocol violations.",
+    "chinese": "罚没：验证者违反特定协议规则时，扣除其质押资产的惩罚。",
+    "sourceName": "Ethereum.org · LeXi 摘要",
+    "sourceUrl": "https://ethereum.org/glossary/#slashing",
+    "expansion": ""
+  }
+]

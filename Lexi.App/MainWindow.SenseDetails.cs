@@ -33,11 +33,12 @@ public partial class MainWindow
     {
         var block = CompactText(text, 18);
         block.FontFamily = (FontFamily)FindResource(chinese ? "ChineseExampleFont" : "LexicalFont");
+        block.FontStyle = FontStyles.Italic;
         return block;
     }
 
     private static string Provenance(SenseCandidate candidate) => candidate.Provisional ? "释义仍在生成，来源信息尚未完整。" :
-        candidate.EvidenceStatus == "source_based" ? "模型参考下列词典整理；释义与例句由模型生成。" :
+        candidate.EvidenceStatus == "source_based" ? "模型参考下列资料整理；释义与例句由模型生成。" :
         "这条解释由模型补充，现有词典原文不足以核对全部内容；这不表示释义错误。";
 
     private TextBlock SenseHeading(SenseCandidate candidate, string prefix)
@@ -51,6 +52,7 @@ public partial class MainWindow
         if (form.Length > 0) label.Inlines.Add(new Run("  " + form) { FontFamily = (FontFamily)FindResource("LexicalFont"), FontStyle = FontStyles.Italic, FontSize = 16 });
         var usage = LexicalLabels.Usage(candidate.Sense.Register);
         if (usage.Length > 0) label.Inlines.Add(new Run("  " + usage));
+        if (LexicalCoverage.Abbreviation(candidate.Sense) && !usage.Contains("缩写")) label.Inlines.Add(new Run("  缩写"));
         if (candidate.Provisional) label.Inlines.Add(new Run(" · 生成中"));
         return label;
     }
@@ -67,6 +69,13 @@ public partial class MainWindow
     {
         var sense = candidate.Sense;
         var key = SenseKey(candidate);
+        if (LexicalCoverage.Abbreviation(sense) && sense.Expansion.Length > 0)
+        {
+            var fullForm = CompactText(sense.Expansion, 17);
+            fullForm.FontFamily = (FontFamily)FindResource("LexicalFont");
+            fullForm.Foreground = accentBrush; fullForm.ToolTip = "英文全称";
+            parent.Children.Add(fullForm);
+        }
         parent.Children.Add(CompactText(sense.Chinese, 20));
         parent.Children.Add(CompactText(sense.English, 18));
         var controls = new WrapPanel { Margin = new(0,2,0,0) }; var details = new StackPanel();
@@ -91,8 +100,8 @@ public partial class MainWindow
             link.Click += (_, _) => OpenSource(string.IsNullOrEmpty(cited.SourceUrl) ? evidence.Url : cited.SourceUrl);
             links.Children.Add(link);
         }
-        if (numbers.Length == 0 && !candidate.Provisional) sources.Children.Add(CompactHint("暂无对应词典引文，可对照其他表述或重新生成。"));
-        var sourceLabel = candidate.Provisional ? "来源" : candidate.EvidenceStatus != "source_based" ? "来源 · 模型补充" : $"来源 · {numbers.Length}";
+        if (numbers.Length == 0 && !candidate.Provisional) sources.Children.Add(CompactHint("当前解释来自模型知识，未附可直接核对的资料。"));
+        var sourceLabel = numbers.Length > 0 ? $"参考资料 · {numbers.Length}" : "参考资料";
         AddDisclosure(controls, details, key + ":sources", sourceLabel, sources);
 
         if (alternatives is not { Length: > 0 }) return;

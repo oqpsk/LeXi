@@ -20,27 +20,40 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
             .Select(x => Path.Combine(x, "codex.exe")).FirstOrDefault(File.Exists);
     }
     public static string EvidenceText(OnlineEntry? online) => online == null ? "No external evidence. Use reliable knowledge and mark it unverified." :
-        string.Join("\n", online.Senses.Take(20).Select((s, i) => $"[{i + 1}] {s.SourceName} {s.PartOfSpeech}: {s.Definition}"));
-    public static string EvidenceHash(OnlineEntry? online) => Cache.Hash("bilingual-v3\n" + EvidenceText(online));
+        string.Join("\n", online.Senses.Take(20).Select((s, i) => $"[{i + 1}] {s.SourceName} [{s.Headword}] {s.PartOfSpeech}: {s.Definition}"));
+    public static string EvidenceHash(OnlineEntry? online) => Cache.Hash("bilingual-v4-specialist-case\n" + EvidenceText(online));
+    public static string LegacyEvidenceHash(OnlineEntry? online) => Cache.Hash("bilingual-v3\n" + (online == null ?
+        "No external evidence. Use reliable knowledge and mark it unverified." : string.Join("\n", online.Senses.Take(20).Select((s,i) => $"[{i+1}] {s.SourceName} {s.PartOfSpeech}: {s.Definition}"))));
     public static string DefineRequest(string query, OnlineEntry? evidence)
     {
-        var terminologyOnly = evidence != null && evidence.Senses.All(s => s.PartOfSpeech.StartsWith("terminology pair"));
+        var terminologyOnly = evidence?.Senses is { Length: > 0 } && evidence.Senses.All(s => s.PartOfSpeech.StartsWith("terminology pair"));
         return "Define the complete English or Chinese term. Use established specialist meanings when appropriate. " +
             (terminologyOnly ? "The evidence contains terminology equivalents, not explanatory definitions. Give the dominant technical meaning in ONE sense. Do not invent a functional distinction between synonymous names. Mark explanatory details unverified. " : "") + "\n" +
             JsonSerializer.Serialize(new
             {
-                task = "define", query, maxSenses = terminologyOnly ? 1 : 4,
+                task = "define", query, maxSenses = terminologyOnly ? 1 : 6,
+                inputCase = Queries.AbbreviationCandidate(query) ? "uppercase: check established abbreviations and give their full expansions before lowercase homographs" : "preserve the query spelling",
+                priorityDomains = new[] { "cryptoassets and blockchain", "cryptography", "information security and confidential computing" },
                 priorityEvidence = evidence?.Senses.Select((s, i) => new { sense = s, number = i + 1 })
-                    .Where(s => SenseMerging.IsCurrent(s.sense.PartOfSpeech + " " + s.sense.Definition)).Select(s => s.number).ToArray() ?? [],
-                coverage = "Include established Internet/slang meanings from priorityEvidence before older meanings. Distinguish slang, literal and proper-name senses; preserve common meanings rather than spending the limit on obscure names or language families. Case-insensitive input may still refer to a capitalized meme name. Do not invent a slang meaning when none is known.",
+                    .Where(s => LexicalCoverage.Rank(s.sense.PartOfSpeech + " " + s.sense.Definition) < 2).Select(s => s.number).ToArray() ?? [],
+                coverage = "Independently check established meanings in the priority domains even when general dictionaries omit them, and include known specialist meanings first. Then include current Internet/slang and common everyday meanings. Do not fill the sense budget with only everyday meanings. Distinguish slang, literal and proper-name senses; preserve common meanings rather than spending the limit on obscure names or language families. Case-insensitive input may still refer to a capitalized meme name. Do not invent a slang meaning when none is known.",
+                etymologyEvidence = evidence?.Etymologies ?? [],
                 evidence = EvidenceText(evidence)
             }, Json.Options);
     }
     public static AiEntry ParseAndValidate(string text, string query, OnlineEntry? online, bool requireWordForms = false)
     {
         var entry = JsonSerializer.Deserialize<AiEntry>(text, Json.Options) ?? throw new InvalidDataException("Codex 未返回释义。");
-        if (string.IsNullOrWhiteSpace(entry.Word) || Queries.Normalize(entry.Word) != Queries.Normalize(query) || entry.Senses == null)
+        if (string.IsNullOrWhiteSpace(entry.Word) || Queries.Normalize(entry.Word) != Queries.Normalize(query) || Queries.AbbreviationCandidate(query) && Queries.LookupKey(entry.Word) != query || entry.Senses == null)
             throw new InvalidDataException("Codex 返回了不匹配的词条。");
+        if (requireWordForms)
+        {
+            using var document = JsonDocument.Parse(text);
+            if (!document.RootElement.TryGetProperty("etymology", out var origin) || origin.ValueKind != JsonValueKind.String ||
+                !document.RootElement.TryGetProperty("senses", out var meanings) || meanings.EnumerateArray().Any(s =>
+                    !s.TryGetProperty("lexicalForm", out _) || !s.TryGetProperty("expansion", out _)))
+                throw new InvalidDataException("模型未返回完整的词条信息，请重新生成。");
+        }
         if (requireWordForms && entry.WordForms == null) throw new InvalidDataException("模型未返回词形信息，请重新生成。");
         if (!entry.Found || entry.Senses.Length == 0) return entry with { Found = false, Senses = [], EvidenceStatus = "unknown", WordForms = [] };
         if (entry.Senses.Length > 8) throw new InvalidDataException("Codex 返回的词条过长。");
@@ -48,6 +61,7 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
         {
             if (s == null || string.IsNullOrWhiteSpace(s.English) || string.IsNullOrWhiteSpace(s.Chinese) ||
                 s.PartOfSpeech == null || s.Register == null || s.Example == null || s.ExampleChinese == null || s.Evidence == null ||
+                s.LexicalForm is not ("word" or "abbreviation") || s.Expansion == null || s.Expansion.Length > 200 || s.Expansion.Any(char.IsControl) ||
                 s.Evidence.Any(n => n < 1 || n > (online?.Senses.Length ?? 0)))
                 throw new InvalidDataException("Codex 返回的释义或来源编号无效。");
         }
@@ -55,10 +69,11 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
         var supported = online != null && entry.EvidenceStatus == "source_based" && entry.Senses.All(s =>
             s.Evidence.Any(n => !online.Senses[n - 1].PartOfSpeech.StartsWith("terminology pair")));
         return entry with { EvidenceStatus = supported ? "source_based" : "unverified", Senses = PrioritizeCurrent(entry.Senses),
-            Phonetic = Pronunciation.Valid(entry.Phonetic) ? entry.Phonetic.Trim() : "", WordForms = ModelInflections.Sanitize(query, entry) };
+            Phonetic = Pronunciation.Format(entry.Phonetic), WordForms = ModelInflections.Sanitize(query, entry),
+            Etymology = (entry.Etymology ?? "").Length <= 600 && Queries.HasChinese(entry.Etymology ?? "") ? entry.Etymology ?? "" : "" };
     }
     public static AiSense[] PrioritizeCurrent(IEnumerable<AiSense> senses) => senses.OrderBy(s =>
-        new[] { "slang", "internet", "网络", "俚语" }.Any(label => (s.Register ?? "").Contains(label, StringComparison.OrdinalIgnoreCase)) ? 0 : 1).ToArray();
+        LexicalCoverage.Rank(s.Register ?? "")).ToArray();
     public async Task<AiEntry> LookupAsync(string query, OnlineEntry? online, AppSettings settings, CancellationToken token)
     {
         var result = await RunAsync(DefineRequest(query, online), "dictionary.schema.json", settings, token);

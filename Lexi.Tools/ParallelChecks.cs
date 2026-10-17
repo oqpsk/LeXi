@@ -63,7 +63,7 @@ internal static class ParallelChecks
         Check(facetGroups.Sum(g => g.Variants.Length) == facets.Sum(a => a.Entry!.Senses.Length), "usage grouping retains every original variant and its provenance");
         var singleFacets = facets.Take(1).ToArray();
         Check(SenseMerging.Request("fixture", singleFacets).Pairs.Length == 3, "single-model queries still receive sense comparison");
-        Check(SenseMerging.CacheKind == "sense-merges-v2", "revised grouping never reuses legacy comparison caches");
+        Check(SenseMerging.CacheKind == "sense-merges-v3", "revised grouping never reuses legacy comparison caches");
         foreach (var bad in new[]
         {
             plan with { InputHash = "different query" }, plan with { Pairs = [] },
@@ -80,7 +80,7 @@ internal static class ParallelChecks
         var combined = DictionaryEvidence.Combine("chad", [], manyEvidence)!;
         Check(combined.Senses[0].Definition.Contains("Internet slang"), "modern evidence survives evidence truncation and is prioritized");
         using (var prompt = JsonDocument.Parse(CodexDictionary.DefineRequest("chad", combined).Split('\n').Last()))
-            Check(prompt.RootElement.GetProperty("priorityEvidence")[0].GetInt32() == 1 && prompt.RootElement.GetProperty("maxSenses").GetInt32() == 4, "definition request explicitly requires modern sense coverage");
+            Check(prompt.RootElement.GetProperty("priorityEvidence")[0].GetInt32() == 1 && prompt.RootElement.GetProperty("maxSenses").GetInt32() == 6, "definition request explicitly requires modern sense coverage");
 
         var cache = new Cache(Path.Combine(work, "parallel"));
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
