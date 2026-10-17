@@ -8,7 +8,7 @@ internal enum QueryOutcome { Running, Complete, Partial, Failed }
 // Only the caller that has awaited the whole query may publish a terminal state.
 // A snapshot with two completed models can still be waiting for the sense judge.
 internal sealed record QueryProgressState(QueryStage Stage, string Title, string Detail,
-    QueryOutcome Outcome = QueryOutcome.Running, bool ModelsEnabled = true, bool MergeEnabled = true, bool Translation = false)
+    QueryOutcome Outcome = QueryOutcome.Running, bool ModelsEnabled = true, bool MergeEnabled = true, bool Translation = false, QueryStage? FailedStage = null)
 {
     public bool Busy => Outcome == QueryOutcome.Running;
     public bool Warning => Outcome is QueryOutcome.Partial or QueryOutcome.Failed;
@@ -31,11 +31,12 @@ internal sealed record QueryProgressState(QueryStage Stage, string Title, string
         var failed = snapshot.Answers.Count(a => a.Phase == ModelPhase.Failed);
         var count = snapshot.Groups.Length + referenceCount;
         if (snapshot.MergeFailed) return new(QueryStage.Finished, "合并未完成",
-            $"已保留 {count} 条释义 · 本次查询已结束", QueryOutcome.Partial, MergeEnabled: merge);
+            MergeFailures.Describe(snapshot.MergeFailure) + $"。已保留 {count} 条释义；已停止整理，不会继续等待。可点击底部“重新生成”重试。",
+            QueryOutcome.Partial, MergeEnabled: merge, FailedStage: QueryStage.Merge);
         if (failed > 0) return new(QueryStage.Finished, failed == snapshot.Answers.Length ? "模型补充未完成" : "部分完成",
-            "可用结果已保留 · 本次查询已结束", count > 0 ? QueryOutcome.Partial : QueryOutcome.Failed, MergeEnabled: merge);
+            "可用结果已保留 · 本次查询已结束", count > 0 ? QueryOutcome.Partial : QueryOutcome.Failed, MergeEnabled: merge, FailedStage: QueryStage.Supplement);
         if (sourceIncomplete) return new(QueryStage.Finished, "部分来源未能读取",
-            "可用结果已保留 · 本次查询已结束", QueryOutcome.Partial, MergeEnabled: merge);
+            "可用结果已保留 · 本次查询已结束", QueryOutcome.Partial, MergeEnabled: merge, FailedStage: QueryStage.Dictionary);
         return new(QueryStage.Finished, count > 0 ? $"已完成 · {count} 个义项" : "查询已结束",
             count > 0 ? "结果已稳定，不再自动增减" : "模型未确认释义，可查看词典原文", QueryOutcome.Complete, MergeEnabled: merge);
     }

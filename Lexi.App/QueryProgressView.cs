@@ -68,7 +68,9 @@ public sealed class QueryProgressView : Button
         {
             bool skipped = i == 0 && state.Translation || i == 1 && !state.ModelsEnabled || i == 2 && !state.MergeEnabled;
             bool active = i == (int)state.Stage;
-            var label = skipped ? "跳过" : active ? state.Busy ? "进行中" : state.Warning ? "已结束" : "完成" : i < (int)state.Stage ? "已结束" : "等待";
+            var label = skipped ? "跳过" : state.FailedStage == (QueryStage)i ? "未完成" :
+                active ? state.Busy ? "进行中" : state.Outcome == QueryOutcome.Partial ? "部分完成" : state.Warning ? "已停止" : "完成" :
+                i < (int)state.Stage ? "已结束" : "等待";
             labels.Add(names[i] + "：" + label);
         }
         stages.Text = string.Join("\n", labels);
