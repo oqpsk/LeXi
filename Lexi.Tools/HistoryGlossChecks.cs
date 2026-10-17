@@ -64,8 +64,10 @@ internal static class HistoryGlossChecks
         var offline=await coordinator.LookupAsync("fixture",null,settings,false,CancellationToken.None);
         Check(calls==0 && offline.Groups.Length==1, "older gloss caches remain available offline before equivalent enrichment");
         settings.Online=true;
-        var refreshed=await coordinator.LookupAsync("fixture",null,settings,false,CancellationToken.None);
+        var retained=await coordinator.LookupAsync("fixture",null,settings,false,CancellationToken.None);
+        Check(calls==0 && retained.Answers.Single().Entry!.Senses[0].ChineseTerm=="", "legacy caches stay unchanged online until explicit regeneration");
+        var refreshed=await coordinator.LookupAsync("fixture",null,settings,true,CancellationToken.None);
         await coordinator.LookupAsync("fixture",null,settings,false,CancellationToken.None);
-        Check(calls==1 && refreshed.Answers.Single().Entry!.Senses[0].ChineseTerm=="约定译名", "legacy entries update once online and reuse the enriched cache on repeat queries");
+        Check(calls==1 && refreshed.Answers.Single().Entry!.Senses[0].ChineseTerm=="约定译名", "explicit regeneration enriches legacy results and subsequent queries reuse them");
     }
 }

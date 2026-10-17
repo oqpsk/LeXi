@@ -26,6 +26,12 @@ public partial class MainWindow
         AiPanel.Children.Clear(); LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); ResetWordForms(); ResultsScroll.ScrollToTop();
         var initialProgress = QueryProgressState.Translating();
         var request = QueryProgress.Begin(initialProgress);
+        if (SavedResults.TranslationResult(text, target, force) is { } saved)
+        {
+            RenderTranslation(saved.Entry, true, model: saved.Model);
+            timing.MarkFirst(); LookupStatus.Text = timing.Finish("已显示缓存翻译 · 重新生成可更新", "首段译文");
+            QueryProgress.Update(request, QueryProgressState.Translated(true)); return;
+        }
         var cached = cache.Read<TranslationEnvelope>("translations-v1", key);
         if (cached != null && !force)
         {
@@ -33,6 +39,8 @@ public partial class MainWindow
             {
                 var validated = Translation.Parse(JsonSerializer.Serialize(cached.Entry, Json.Options), text, target);
                 RenderTranslation(validated, true); timing.MarkFirst(); LookupStatus.Text = timing.Finish("已显示缓存翻译", "首段译文");
+                await SaveTranslationAsync(text, target, validated, LookupModel.Primary(settings), token);
+                if (token.IsCancellationRequested) return;
                 QueryProgress.Update(request, QueryProgressState.Translated(true)); return;
             }
             catch (InvalidDataException) { }
@@ -62,6 +70,8 @@ public partial class MainWindow
             RenderTranslation(entry, false); timing.MarkFirst();
             await TryCacheAsync("translations-v1", key, new TranslationEnvelope(entry, DateTimeOffset.UtcNow));
             token.ThrowIfCancellationRequested();
+            await SaveTranslationAsync(text, target, entry, LookupModel.Primary(settings), token);
+            token.ThrowIfCancellationRequested();
             LookupStatus.Text = timing.Finish("翻译完成", "首段译文");
             QueryProgress.Update(request, QueryProgressState.Translated());
         }
@@ -79,10 +89,10 @@ public partial class MainWindow
         finally { finished = true; }
     }
     private string ProviderName => settings.Provider == "claude" ? "Claude" : "Codex";
-    private void RenderTranslation(TranslationEntry entry, bool cached, bool streaming = false)
+    private void RenderTranslation(TranslationEntry entry, bool cached, bool streaming = false, LookupModel? model = null)
     {
         AiPanel.Children.Clear();
-        var card = Card(AiPanel, "翻译", ProviderName + (cached ? " · 缓存" : streaming ? " · 生成中" : ""), true);
+        var card = Card(AiPanel, "翻译", (model?.Name ?? ProviderName) + (cached ? " · 缓存" : streaming ? " · 生成中" : ""), true);
         card.Children.Add(Hint(streaming ? "生成中的内容尚未完成" : "AI 翻译"));
         foreach (var paragraph in entry.Paragraphs) { var block = Selectable(paragraph, 18); block.Margin = new(0,4,0,14); card.Children.Add(block); }
         if (!string.IsNullOrWhiteSpace(entry.Note)) card.Children.Add(Hint(entry.Note));

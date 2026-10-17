@@ -51,6 +51,7 @@ internal static partial class Program
         CheckQuickRead(main);
         CheckHistory(main);
         CheckWindowNavigation(main, settings);
+        CheckPaletteAndSavedView(app, main, settings);
         CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)
@@ -60,7 +61,7 @@ internal static partial class Program
         Check(AppContext.TryGetSwitch("Switch.System.Windows.Controls.Text.UseAdornerForTextboxSelectionRendering", out var adorner) && !adorner,
             "selection uses the text renderer instead of an opaque overlay");
         var boxes = Descendants((DependencyObject)main.Content).OfType<TextBox>().Concat(panel.Children.OfType<TextBox>()).ToArray();
-        Check(boxes.Length >= 3 && boxes.All(b => b.SelectionOpacity > 0 && b.SelectionOpacity <= 0.5 &&
+        Check(boxes.Length >= 3 && boxes.All(b => b.SelectionOpacity == 1 &&
             b.SelectionTextBrush is SolidColorBrush ink && b.SelectionBrush is SolidColorBrush selection && Contrast(ink.Color, selection.Color) >= 4.5),
             "editable and read-only selections retain contrasting text");
         foreach (var name in new[] { "SearchIcon", "CloseIcon", "EnterIcon", "SettingsIcon", "ChevronRightIcon", "ChevronDownIcon" })

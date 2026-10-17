@@ -88,10 +88,10 @@ internal static partial class Program
         Check(fits, "status ring fits the query row and retains full stage information in its tooltip");
         var accent = ((SolidColorBrush)app.FindResource("Accent")).Color;
         var selection = ((SolidColorBrush)app.FindResource("Selection")).Color;
-        var ink = ((SolidColorBrush)app.FindResource("Ink")).Color;
+        var ink = ((SolidColorBrush)app.FindResource("Canvas")).Color;
         Check(accent.R > accent.B && accent.B > accent.G && selection.R > selection.B && selection.B > selection.G &&
             Contrast(ink, selection) >= 4.5 && Contrast(accent, ((SolidColorBrush)app.FindResource("Surface")).Color) >= 4.5,
-            "pink accent and rose selection retain readable foreground contrast");
+            "pale pink accent and selection retain readable foreground contrast");
         Check(AutomationProperties.GetLiveSetting(view) == AutomationLiveSetting.Polite &&
             states.All(s => !s.Detail.Contains('%') && !s.Detail.Contains("秒")), "progress offers polite stage announcements without fabricated percentages or estimates");
         Console.WriteLine($"{count} query-progress checks passed without displaying windows");

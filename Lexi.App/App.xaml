@@ -12,9 +12,12 @@
     <SolidColorBrush x:Key="Stroke" Color="#36383F"/>
     <SolidColorBrush x:Key="Ink" Color="#EDEEF1"/>
     <SolidColorBrush x:Key="Muted" Color="#ADB0BA"/>
-    <SolidColorBrush x:Key="Accent" Color="#FFADD2"/>
-    <SolidColorBrush x:Key="AccentSurface" Color="#583044"/>
-    <SolidColorBrush x:Key="Selection" Color="#9D3E72"/>
+    <Color x:Key="AccentColor">#FFADD2</Color>
+    <SolidColorBrush x:Key="Accent" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="AccentSurface" Color="{StaticResource AccentColor}" Opacity="0.13"/>
+    <SolidColorBrush x:Key="AccentSoft" Color="{StaticResource AccentColor}" Opacity="0.08"/>
+    <SolidColorBrush x:Key="AccentBorder" Color="{StaticResource AccentColor}" Opacity="0.5"/>
+    <SolidColorBrush x:Key="Selection" Color="{StaticResource AccentColor}"/>
     <SolidColorBrush x:Key="Warning" Color="#DDBD82"/>
     <Geometry x:Key="SearchIcon">M 10,3 A 7,7 0 1 0 10,17 A 7,7 0 1 0 10,3 M 15,15 L 21,21</Geometry>
     <Geometry x:Key="CloseIcon">M 5,5 L 19,19 M 19,5 L 5,19</Geometry>
@@ -55,6 +58,20 @@
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="Background" Value="{StaticResource Accent}"/><Setter Property="Foreground" Value="{StaticResource Canvas}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}" BorderBrush="{TemplateBinding Foreground}" BorderThickness="0">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.9"/></Trigger>
+          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.8"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderThickness" Value="1"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.4"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
     <Style x:Key="LexicalIconToggle" TargetType="ToggleButton">
       <Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Cursor" Value="Hand"/>
       <Setter Property="ToolTipService.InitialShowDelay" Value="250"/>
@@ -64,7 +81,7 @@
         </Border>
         <ControlTemplate.Triggers>
           <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="{StaticResource Hover}"/></Trigger>
-          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource Accent}"/><Setter TargetName="Surface" Property="Background" Value="#22FFADD2"/></Trigger>
+          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource Accent}"/><Setter TargetName="Surface" Property="Background" Value="{StaticResource AccentSurface}"/></Trigger>
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource Accent}"/></Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
@@ -102,7 +119,7 @@
           </StackPanel>
         </Border>
         <ControlTemplate.Triggers>
-          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Arrow" Property="Data" Value="{StaticResource ChevronDownIcon}"/><Setter Property="Foreground" Value="{StaticResource Accent}"/><Setter TargetName="Head" Property="Background" Value="#22FFADD2"/><Setter TargetName="Head" Property="BorderBrush" Value="#80FFADD2"/></Trigger>
+          <Trigger Property="IsChecked" Value="True"><Setter TargetName="Arrow" Property="Data" Value="{StaticResource ChevronDownIcon}"/><Setter Property="Foreground" Value="{StaticResource Accent}"/><Setter TargetName="Head" Property="Background" Value="{StaticResource AccentSurface}"/><Setter TargetName="Head" Property="BorderBrush" Value="{StaticResource AccentBorder}"/></Trigger>
           <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Head" Property="Background" Value="{StaticResource Hover}"/></Trigger>
           <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Head" Property="BorderBrush" Value="{StaticResource Accent}"/></Trigger>
           <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
@@ -120,8 +137,8 @@
       <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="CaretBrush" Value="{StaticResource Ink}"/>
       <Setter Property="Background" Value="{StaticResource Surface}"/><Setter Property="BorderBrush" Value="{StaticResource Stroke}"/>
       <Setter Property="BorderThickness" Value="1"/><Setter Property="VerticalContentAlignment" Value="Center"/>
-      <Setter Property="SelectionBrush" Value="{StaticResource Selection}"/><Setter Property="SelectionOpacity" Value="0.5"/>
-      <Setter Property="SelectionTextBrush" Value="{StaticResource Ink}"/>
+      <Setter Property="SelectionBrush" Value="{StaticResource Selection}"/><Setter Property="SelectionOpacity" Value="1"/>
+      <Setter Property="SelectionTextBrush" Value="{StaticResource Canvas}"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
         <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
           <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>

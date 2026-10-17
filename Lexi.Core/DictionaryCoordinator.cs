@@ -56,7 +56,7 @@ public sealed class DictionaryCoordinator(Cache cache,
             try
             {
                 token.ThrowIfCancellationRequested();
-                if (!settings.Online || !force && !loaded[i].Legacy && saved[i] != null && DateTimeOffset.UtcNow - saved[i]!.GeneratedAt < TimeSpan.FromDays(7))
+                if (!settings.Online || !force && saved[i] != null)
                 {
                     lock (sync) { answers[i] = answers[i] with { Phase = settings.Online ? ModelPhase.Complete : ModelPhase.Offline }; closed[i] = true; Publish(); }
                     return;
@@ -120,7 +120,7 @@ public sealed class DictionaryCoordinator(Cache cache,
     private async Task Write<T>(string kind, string key, T value, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        try { await cache.WriteAsync(kind, key, value); }
+        try { await cache.WriteAsync(kind, key, value, token); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }

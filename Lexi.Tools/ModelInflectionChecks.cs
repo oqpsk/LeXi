@@ -52,8 +52,10 @@ internal static class ModelInflectionChecks
         var coordinator = new DictionaryCoordinator(cache, (_, _, _, _, _, _) => { calls++; return Task.FromResult(entry); },
             (_, _, _) => throw new Exception("No additional judge call should be needed for morphology"));
         Check(coordinator.Cached("glim", null, settings).Answers.Single().Entry?.Found == true, "legacy definitions remain available before morphology enrichment");
-        var result = await coordinator.LookupAsync("glim", null, settings, false, CancellationToken.None);
-        Check(calls == 1 && result.Answers.Single().Entry?.WordForms?.Length == 2, "fresh legacy caches refresh once online to acquire generic morphology");
+        var retained = await coordinator.LookupAsync("glim", null, settings, false, CancellationToken.None);
+        Check(calls == 0 && retained.Answers.Single().Entry?.WordForms == null, "legacy morphology caches remain unchanged without explicit refresh");
+        var result = await coordinator.LookupAsync("glim", null, settings, true, CancellationToken.None);
+        Check(calls == 1 && result.Answers.Single().Entry?.WordForms?.Length == 2, "explicit refresh acquires generic morphology for a legacy definition");
         await coordinator.LookupAsync("glim", null, settings, false, CancellationToken.None);
         Check(calls == 1, "the enriched model cache avoids repeated provider calls");
         settings.Online = false;

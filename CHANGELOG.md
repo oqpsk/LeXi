@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.9.6
+
+- Unify pink accents around the logo's pale pink (#FFADD2). Use the same color for primary buttons and text selection with dark readable text; derive translucent cards and disclosure states from that color. Align the upper-right actions into two consistent columns.
+- Persist completed dictionary views, including final grouping, provider attribution, pronunciation, morphology and etymology. Revisit them without network requests or automatic expiry, including after model/lookup settings change. Only explicit regeneration replaces saved content; incomplete streaming is never saved, and failed refreshes retain the previous saved result.
+- Give complete translations the same manual-refresh behavior and retain the producing model's identity. Reuse valid legacy caches without automatic age/version refresh, while keeping dictionary and translation identities separate.
+
 ## 0.9.5
 
 - Add session back/forward navigation, Alt+Left/Right shortcuts, destination tooltips and scroll restoration. Preserve query case, translation paragraphs and routing, reuse the existing cache pipeline, and keep recent-history deletion separate from the visit trail. A new query after going back clears the forward branch; refreshes do not duplicate visits.

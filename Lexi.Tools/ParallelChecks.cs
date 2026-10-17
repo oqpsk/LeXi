@@ -8,6 +8,7 @@ internal static class ParallelChecks
         await ModelInflectionChecks.Run(root);
         await HistoryGlossChecks.Run(root);
         NavigationChecks.Run(root);
+        await SavedQueryChecks.Run(root);
         var work = Path.Combine(root, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(work);
         int count = 0;
