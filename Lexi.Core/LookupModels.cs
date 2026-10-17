@@ -13,9 +13,13 @@ public sealed record LookupModel(string Provider, string Model)
         : new(settings.SecondaryProvider, settings.SecondaryModel);
     public static LookupModel[] Selected(AppSettings settings) =>
         (settings.ParallelLookup ? new[] { Primary(settings), Secondary(settings) } : [Primary(settings)]).Distinct().ToArray();
-    public string CacheKey(string query, AppSettings settings) => JsonSerializer.Serialize(new
-    { query, Provider, Model, settings.ReasoningEffort, settings.ServiceTier }, Json.Options);
+    public string CacheKey(string query, AppSettings settings) =>
+        JsonSerializer.Serialize(new ModelCacheKey(query, Provider, Model, settings.ReasoningEffort, settings.ServiceTier), Json.Options);
 }
+
+// The named shapes below replace anonymous objects so JSON can be generated ahead of time; their
+// property order and names keep existing cache keys and hashes byte-for-byte unchanged.
+internal sealed record ModelCacheKey(string Query, string Provider, string Model, string ReasoningEffort, string ServiceTier);
 
 public enum ModelPhase { Pending, Streaming, Complete, Failed, Offline }
 public sealed record ModelAnswer(LookupModel Model, ModelPhase Phase, AiEntry? Entry = null, bool Cached = false, string Error = "");
