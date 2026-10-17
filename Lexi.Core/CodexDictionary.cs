@@ -38,6 +38,7 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
                     .Where(s => LexicalCoverage.Rank(s.sense.PartOfSpeech + " " + s.sense.Definition) < 2).Select(s => s.number).ToArray() ?? [],
                 coverage = "Independently check established meanings in the priority domains even when general dictionaries omit them, and include known specialist meanings first. Then include current Internet/slang and common everyday meanings. Do not fill the sense budget with only everyday meanings. Distinguish slang, literal and proper-name senses; preserve common meanings rather than spending the limit on obscure names or language families. Case-insensitive input may still refer to a capitalized meme name. Do not invent a slang meaning when none is known.",
                 overview = "Mark coreMeaning independently of coverage order: identify the central meaning of the whole term, normally one, at most two. Preferred domains ensure coverage; they must not displace the word's core concept with a peripheral person or specialized reuse.",
+                translation = "Keep the established Chinese name in chineseTerm, at the start of chinese, and at the start of the short gloss. The translation takes priority over a descriptive paraphrase; never invent an unfamiliar name.",
                 etymologyEvidence = evidence?.Etymologies ?? [],
                 evidence = EvidenceText(evidence)
             }, Json.Options);
@@ -52,7 +53,8 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
             using var document = JsonDocument.Parse(text);
             if (!document.RootElement.TryGetProperty("etymology", out var origin) || origin.ValueKind != JsonValueKind.String ||
                 !document.RootElement.TryGetProperty("senses", out var meanings) || meanings.EnumerateArray().Any(s =>
-                    !s.TryGetProperty("lexicalForm", out _) || !s.TryGetProperty("expansion", out _)))
+                    !s.TryGetProperty("lexicalForm", out _) || !s.TryGetProperty("expansion", out _) ||
+                    !s.TryGetProperty("chineseTerm", out var term) || term.ValueKind != JsonValueKind.String))
                 throw new InvalidDataException("模型未返回完整的词条信息，请重新生成。");
         }
         if (requireWordForms && entry.WordForms == null) throw new InvalidDataException("模型未返回词形信息，请重新生成。");
@@ -69,7 +71,7 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
         // Source-based is a provenance label, never a claim that AI correctness was verified.
         var supported = online != null && entry.EvidenceStatus == "source_based" && entry.Senses.All(s =>
             s.Evidence.Any(n => !online.Senses[n - 1].PartOfSpeech.StartsWith("terminology pair")));
-        return entry with { EvidenceStatus = supported ? "source_based" : "unverified", Senses = PrioritizeCurrent(entry.Senses.Select(s => s with { Gloss = QuickRead.ValidGloss(s.Gloss) })),
+        return entry with { EvidenceStatus = supported ? "source_based" : "unverified", Senses = PrioritizeCurrent(entry.Senses.Select(s => s with { Gloss = QuickRead.ValidGloss(s.Gloss), ChineseTerm = QuickRead.ValidGloss(s.ChineseTerm) })),
             Phonetic = Pronunciation.Format(entry.Phonetic), WordForms = ModelInflections.Sanitize(query, entry),
             Etymology = (entry.Etymology ?? "").Length <= 600 && Queries.HasChinese(entry.Etymology ?? "") ? entry.Etymology ?? "" : "" };
     }

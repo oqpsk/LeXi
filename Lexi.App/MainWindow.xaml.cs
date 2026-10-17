@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        RenderHistory(history.Entries);
         Theme.ApplyChrome(this);
         UpdateOnlineButton();
         LocationChanged += (_, _) => EtymologyPopup.IsOpen = false;
@@ -78,6 +79,7 @@ public partial class MainWindow : Window
     {
         if (Placeholder == null) return;
         Placeholder.Visibility = string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+        if (!suppressSuggestions && string.IsNullOrWhiteSpace(SearchBox.Text) && current.Length > 0) ShowHistory(false);
         if (suppressSuggestions || !settings.OfflineEnabled || dictionaryTask?.IsCompletedSuccessfully != true) return;
         var suggestions = dictionaryTask.Result.Suggest(SearchBox.Text, settings);
         Suggestions.ItemsSource = suggestions;
@@ -94,7 +96,6 @@ public partial class MainWindow : Window
     private async void Suggestions_KeyDown(object sender, KeyEventArgs e)
     { if (e.Key == Key.Enter && Suggestions.SelectedItem is string text) { e.Handled = true; SetQuery(text); await SearchAsync(text); } }
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync(SearchBox.Text);
-    private async void Example_Click(object sender, RoutedEventArgs e) { var text = (string)((Button)sender).Tag; SetQuery(text); await SearchAsync(text); }
     private async void Refresh_Click(object sender, RoutedEventArgs e) { if (current.Length > 0) await SearchAsync(current, true); }
     private void SetQuery(string query)
     { suppressSuggestions = true; SearchBox.Text = query; suppressSuggestions = false; Suggestions.Visibility = Visibility.Collapsed; }
@@ -159,7 +160,9 @@ public partial class MainWindow : Window
         var timing = new LookupTiming();
         var knownTerm = raw.Length <= 100 && !raw.Contains('\n') && dictionaryTask.IsCompletedSuccessfully &&
             dictionaryTask.Result.Lookup(Queries.Normalize(raw), settings).Length > 0;
-        if (Queries.IsText(raw, knownTerm))
+        var translating = Queries.IsText(raw, knownTerm);
+        history.Record(raw, translating);
+        if (translating)
         { await TranslateTextAsync(raw.Trim(), force, timing); return; }
         var query = Queries.LookupKey(raw);
         StopSpeech();

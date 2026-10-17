@@ -76,7 +76,7 @@ public partial class MainWindow
             fullForm.Foreground = accentBrush; fullForm.ToolTip = "英文全称";
             parent.Children.Add(fullForm);
         }
-        parent.Children.Add(CompactText(sense.Chinese, 20));
+        parent.Children.Add(CompactText(QuickRead.ChineseDefinition(sense), 20));
         parent.Children.Add(CompactText(sense.English, 18));
         var controls = new WrapPanel { Margin = new(0,2,0,0) }; var details = new StackPanel();
         parent.Children.Add(controls); parent.Children.Add(details);

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.9.4
+
+- Put conventional Chinese translations first in quick-read glosses and full definitions. Supply the equivalent as structured metadata, retain it when the summary budget is tight, and keep the existing core-meaning selection. Refresh old model caches once online while retaining them as offline/initial fallbacks; no additional summary request.
+- Replace startup examples with local query history. Keep the 30 most recent word/text submissions, preserve case and translation paragraphs, support one-click requery and individual deletion, and persist history independently of definition caches. Clear the search box or select the footer xi to return to history.
+
 ## 0.9.3
 
 - Show first-result latency and total query duration in the footer. Include routing, cached/offline results, model completion, sense judgment and pronunciation; apply the same timing to translation and terminal failures.

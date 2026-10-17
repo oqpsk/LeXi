@@ -28,28 +28,9 @@
           <StackPanel x:Name="Welcome">
             <TextBlock Text="随手查，随时懂。" FontSize="26" FontWeight="SemiBold" Margin="4,13,0,8"/>
             <TextBlock Text="词语看释义，文本看翻译。" Foreground="{StaticResource Muted}" FontSize="16" Margin="4,0,0,30"/>
-            <TextBlock Text="试着查一下" Foreground="{StaticResource Muted}" FontSize="13" Margin="4,0,0,10"/>
-            <Button Tag="telegraph" Click="Example_Click" HorizontalContentAlignment="Stretch" Padding="12" Margin="0,0,0,5">
-              <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="Aa" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{StaticResource Accent}"/></Border>
-                <TextBlock Grid.Column="1" Text="telegraph" FontSize="17" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="英英 · 英汉" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Center"/>
-              </Grid>
-            </Button>
-            <Button Tag="车钟" Click="Example_Click" HorizontalContentAlignment="Stretch" Padding="12" Margin="0,0,0,5">
-              <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="词" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{StaticResource Accent}"/></Border>
-                <TextBlock Grid.Column="1" Text="车钟" FontSize="17" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="专业术语" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Center"/>
-              </Grid>
-            </Button>
-            <Button Tag="The ship is ready to depart." Click="Example_Click" HorizontalContentAlignment="Stretch" Padding="12">
-              <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="38"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border Background="{StaticResource Surface}" Width="28" Height="28" CornerRadius="6"><TextBlock Text="译" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{StaticResource Accent}"/></Border>
-                <TextBlock Grid.Column="1" Text="The ship is ready to depart." FontSize="17" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="2" Text="文本翻译" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Center"/>
-              </Grid>
-            </Button>
+            <TextBlock Text="查询历史" Foreground="{StaticResource Muted}" FontSize="14" Margin="4,0,0,10"/>
+            <TextBlock x:Name="HistoryMessage" Text="暂无查询历史。查过的词语和文本会显示在这里。" Foreground="{StaticResource Muted}" FontSize="15" Margin="4,4,0,12"/>
+            <StackPanel x:Name="HistoryList"/>
           </StackPanel>
           <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
             <TextBlock x:Name="EntryHeading" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"><Run x:Name="Headword" FontSize="30" FontWeight="SemiBold"/><Run Text="&#160;&#160;"/><Run x:Name="Phonetic" Foreground="{StaticResource Muted}"/><Run x:Name="PhoneticLabel" FontSize="12" Foreground="{StaticResource Muted}"/><InlineUIContainer BaselineAlignment="TextBottom"><Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button></InlineUIContainer><InlineUIContainer BaselineAlignment="TextBottom"><ToggleButton x:Name="EtymologyButton" Style="{StaticResource LexicalIconToggle}" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="语源 · 词的来历" AutomationProperties.Name="展开或收起语源"><Path Data="{StaticResource RosettaIcon}" Style="{StaticResource IconPath}"/></ToggleButton></InlineUIContainer></TextBlock>
@@ -80,7 +61,7 @@
       <Border x:Name="StatusBar" Grid.Row="3" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="14,6">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <Border Background="{StaticResource LogoSurface}" Width="20" Height="20" CornerRadius="5" VerticalAlignment="Center" ToolTip="LeXi"><TextBlock Text="ξ" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+          <Button x:Name="HistoryHomeButton" Style="{StaticResource IconButton}" Click="HistoryHome_Click" ToolTip="查询历史" AutomationProperties.Name="返回查询历史"><Border Background="{StaticResource LogoSurface}" Width="20" Height="20" CornerRadius="5"><TextBlock Text="ξ" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Button>
           <TextBlock x:Name="LookupStatus" Grid.Column="1" Text="正在准备词库…" FontSize="13" Margin="10,0,12,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.LiveSetting="Polite"/>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
             <Button x:Name="RefreshButton" Content="重新生成" Click="Refresh_Click" Height="32" Padding="10,4" Margin="0,0,10,0" FontSize="13" Background="{StaticResource Surface}" BorderBrush="#565861" BorderThickness="1" Visibility="Collapsed" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="重新生成当前查询"/>

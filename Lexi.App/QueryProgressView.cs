@@ -45,6 +45,9 @@ public sealed class QueryProgressView : Button
         Unloaded += (_, _) => { information.IsOpen = false; StopAnimation(); };
     }
 
+    internal void Reset()
+    { generation++; Current = null; Visibility = Visibility.Hidden; information.IsOpen = false; StopAnimation(); }
+
     internal long Begin(QueryProgressState state)
     { generation++; Current = null; Update(generation, state); return generation; }
 
