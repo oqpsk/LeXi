@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.9.2
+
+- Use a uniformly rounded TL;DR card without a left accent rule. Preserve the existing tint, spacing and lookup behavior.
+
 ## 0.9.1
 
 - Add a compact pink-tinted TL;DR above definitions. Reuse short glosses from the same definition request, with complete-text fallbacks for old caches and offline entries; keep preview, partial and final states explicit without another model call.
