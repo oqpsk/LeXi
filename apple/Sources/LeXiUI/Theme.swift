@@ -8,15 +8,45 @@ public enum LexiTheme {
     // The one brand pink (#FFADD2). Solid pink fills always carry dark text.
     public static let pink = Color(nsColor: NSColor(srgbRed: 1, green: 0xAD / 255.0, blue: 0xD2 / 255.0, alpha: 1))
     public static func lexical(_ size: CGFloat, weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .serif) }
-    // A neutral window background. macOS tints the standard window background with the wallpaper's
-    // color (in dark mode especially); LeXi keeps its windows neutral so glass and text stay grey.
-    public static let windowBackground = Color(nsColor: NSColor(name: "LexiWindowBackground") { appearance in
-        let match = appearance.bestMatch(from: [.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua])
-        return match == .darkAqua || match == .accessibilityHighContrastDarkAqua
-            ? NSColor(srgbRed: 0.118, green: 0.118, blue: 0.125, alpha: 1)
-            : NSColor(srgbRed: 0.965, green: 0.965, blue: 0.972, alpha: 1)
-    })
     public static func chineseExample(_ size: CGFloat) -> Font { .custom("Songti SC", size: size) }
+}
+
+// Every LeXi window is a pane of Liquid Glass, like Control Center: the desktop shows through,
+// blurred and refracted, as light or dark glass that follows the appearance (and takes on the
+// wallpaper's color, as system glass does). With Reduce Transparency the system makes it frostier and more opaque.
+struct WindowGlass: NSViewRepresentable {
+    func makeNSView(context: Context) -> WindowGlassView { WindowGlassView() }
+    func updateNSView(_ view: WindowGlassView, context: Context) {}
+}
+
+final class WindowGlassView: NSView {
+    let glass = NSGlassEffectView()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        glass.style = .regular
+        glass.frame = bounds
+        glass.autoresizingMask = [.width, .height]
+        addSubview(glass)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    // The glass reaches the desktop only through a transparent window.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else { return }
+        window.isOpaque = false
+        window.backgroundColor = .clear
+    }
+}
+
+extension View {
+    // Glass behind the whole window, with the toolbar left clear so the same pane runs to the top.
+    func glassWindow() -> some View {
+        containerBackground(for: .window) { WindowGlass() }
+            .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+    }
 }
 
 // Light, dark or the system appearance, for every LeXi window. Stored in the app's preferences.
