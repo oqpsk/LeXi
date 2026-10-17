@@ -56,6 +56,6 @@ public static class StreamingEntry
     {
         string Get(string key) => fields.GetValueOrDefault(key, "");
         if (string.IsNullOrWhiteSpace(Get("chinese")) || string.IsNullOrWhiteSpace(Get("english"))) return;
-        senses.Add(new(Get("partOfSpeech"), Get("english"), Get("chinese"), Get("register"), Get("example"), Get("exampleChinese"), [], Get("lexicalForm") == "abbreviation" ? "abbreviation" : "word", Get("expansion")));
+        senses.Add(new(Get("partOfSpeech"), Get("english"), Get("chinese"), Get("register"), Get("example"), Get("exampleChinese"), [], Get("lexicalForm") == "abbreviation" ? "abbreviation" : "word", Get("expansion"), ChineseTerm: QuickRead.ValidGloss(Get("chineseTerm"))));
     }
 }

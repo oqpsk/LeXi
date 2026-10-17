@@ -15,6 +15,25 @@ public static class QuickRead
         var sentence = value.Split(['。', '\n'], 2)[0].Trim();
         return sentence.Length <= 60 ? sentence : "";
     }
+    // Render only a supplied equivalent; never guess a translation from word parts.
+    public static string ChineseDefinition(AiSense sense)
+    {
+        var term = ValidGloss(sense.ChineseTerm);
+        return term.Length == 0 || sense.Chinese.TrimStart().StartsWith(term, StringComparison.Ordinal) ?
+            sense.Chinese : term + "；" + sense.Chinese;
+    }
+    public static string SummaryText(AiSense sense, string alternateTerm = "")
+    {
+        var term = ValidGloss(sense.ChineseTerm);
+        if (term.Length == 0) term = ValidGloss(alternateTerm);
+        var text = ValidGloss(sense.Gloss);
+        if (text.Length == 0) text = Excerpt(sense.Chinese);
+        if (term.Length == 0) return text;
+        if (text.Length == 0) return term;
+        var combined = text.StartsWith(term, StringComparison.Ordinal) ? text : term + "：" + text;
+        // Keep the name instead of clipping an explanation mid-clause.
+        return combined.Length <= 32 ? combined : term;
+    }
     public static QuickMeaning[] Create(SenseGroup[] groups, SpecialistReference[] uncovered, LocalHit[] local)
     {
         var complete = groups.Where(g => g.Variants.Any(v => !v.Provisional)).ToArray();
@@ -30,8 +49,8 @@ public static class QuickRead
         {
             var candidate = group.Variants.First(v => !v.Provisional);
             var sense = candidate.Sense;
-            var text = ValidGloss(sense.Gloss);
-            if (text.Length == 0) text = Excerpt(sense.Chinese);
+            var alternateTerm = group.Variants.Where(v => !v.Provisional).Select(v => ValidGloss(v.Sense.ChineseTerm)).FirstOrDefault(t => t.Length > 0) ?? "";
+            var text = SummaryText(sense, alternateTerm);
             var label = LexicalLabels.Usage(sense.Register);
             choices.Add(new(text, label.Length > 0 ? label : LexicalLabels.PartOfSpeech(sense.PartOfSpeech), core));
         }

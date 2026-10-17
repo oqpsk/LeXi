@@ -49,6 +49,7 @@ internal static partial class Program
         CheckModelMorphology(main);
         CheckLexicalDetails(main);
         CheckQuickRead(main);
+        CheckHistory(main);
         CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)

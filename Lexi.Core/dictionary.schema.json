@@ -53,11 +53,15 @@
           },
           "gloss": {
             "type": "string",
-            "description": "简体中文速记释义，通常4至18字，最多32字。只概括本义项，保留关键区别、否定与语气，不增加解释中没有的内容。"
+            "description": "最多32字的简体中文速览。先保留常用中文译名，再按需用短句解释；字数不足时优先保留译名。没有约定译名才只用解释。保留关键区别、否定与语气。"
           },
           "coreMeaning": {
             "type": "boolean",
             "description": "True only for the central meaning(s) a reader should learn first, normally one, at most two per entry. Determine independently of domain coverage preferences and output order."
+          },
+          "chineseTerm": {
+            "type": "string",
+            "description": "本义项的常用简体中文译名，最多32字；无可靠约定译名则为空。chinese 和 gloss 应保留此译名在开头，先给译名再简短解释。"
           }
         },
         "required": [
@@ -71,7 +75,8 @@
           "lexicalForm",
           "expansion",
           "gloss",
-          "coreMeaning"
+          "coreMeaning",
+          "chineseTerm"
         ]
       }
     },
