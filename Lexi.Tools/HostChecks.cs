@@ -11,7 +11,9 @@ using Lexi.Host;
 // streaming and cancellation, then the built host as a separate process.
 internal static class HostChecks
 {
-    public static async Task Run(string fixture, string root, string hostAssembly)
+    // fixtureOutput, when given, receives the protocol views this check produced so front-end
+    // tests decode real host output (apple/Tests/LeXiKitTests/Fixtures/views.json).
+    public static async Task Run(string fixture, string root, string hostAssembly, string? fixtureOutput = null)
     {
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
@@ -74,6 +76,11 @@ internal static class HostChecks
             Check(translationViews.Last().GetProperty("translation").GetProperty("paragraphs").GetArrayLength() == 2 &&
                 translationViews.Any(v => v.GetProperty("translation") is { ValueKind: JsonValueKind.Object } t && !t.GetProperty("complete").GetBoolean()),
                 "translation previews stream before the complete paragraphs");
+            if (fixtureOutput != null)
+                File.WriteAllText(fixtureOutput, JsonSerializer.Serialize(new { dictionary = final, translation = translationViews.Last(),
+                    preview = translationViews.First(v => v.GetProperty("translation").ValueKind == JsonValueKind.Object && !v.GetProperty("translation").GetProperty("complete").GetBoolean()),
+                    streaming = views.First(v => v.GetProperty("progress") is { ValueKind: JsonValueKind.Object } p && p.GetProperty("busy").GetBoolean() && v.GetProperty("answers").ValueKind == JsonValueKind.Object),
+                    home = ready.GetProperty("view") }, new JsonSerializerOptions(HostServer.Options) { WriteIndented = true }) + "\n");
             var history = (await client.Call("history.list")).GetProperty("result").GetProperty("entries");
             Check(history[0].GetProperty("kind").GetString() == "翻译" && history[0].GetProperty("preview").GetString() == "The ship is ready. Keep 42 intact." &&
                 (await client.Call("history.remove", new { query = history[0].GetProperty("query").GetString(), translation = true })).GetProperty("result").GetProperty("removed").GetBoolean(),

@@ -143,7 +143,7 @@ else if (args[0] == "live")
 else if (args[0] == "extended-check") ExtendedChecks.Run(args[1]);
 else if (args[0] == "platform-check") PlatformChecks.Run(args[1]);
 else if (args[0] == "session-check") await SessionChecks.Run(args[1], args[2]);
-else if (args[0] == "host-check") await HostChecks.Run(args[1], args[2], args[3]);
+else if (args[0] == "host-check") await HostChecks.Run(args[1], args[2], args[3], args.ElementAtOrDefault(4));
 else if (args[0] == "parallel-check") await ParallelChecks.Run(args[1]);
 else if (args[0] == "parallel-live") await ParallelLive.Run(args[1], args[2], args[3], args.Skip(4));
 else if (args[0] == "inspect-library")
