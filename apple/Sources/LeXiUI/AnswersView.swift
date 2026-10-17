@@ -21,7 +21,8 @@ struct AnswersCard: View {
                 }
             }
             ForEach(Array(answers.notices.enumerated()), id: \.offset) { _, notice in
-                Text(notice.text).font(.callout).foregroundStyle(notice.warning ? LexiTheme.warm : .secondary).padding(.top, 6)
+                Label(notice.text, systemImage: notice.warning ? "exclamationmark.triangle" : "info.circle")
+                    .font(.callout).foregroundStyle(notice.warning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary)).padding(.top, 8)
             }
             if !answers.notes.isEmpty {
                 Disclosure(label: "补充说明", key: "lookup:notes", store: store) {
@@ -30,13 +31,12 @@ struct AnswersCard: View {
                 .padding(.top, 6)
             }
             if !answers.mergeWarning.isEmpty {
-                Text(answers.mergeWarning).font(.callout).foregroundStyle(LexiTheme.warm).padding(.top, 6)
+                Label(answers.mergeWarning, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(.orange).padding(.top, 8)
             }
         }
-        .padding(.horizontal, 18).padding(.vertical, 16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LexiTheme.panel, in: .rect(cornerRadius: 12))
-        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(LexiTheme.stroke) }
+        .contentGroup()
     }
 }
 
@@ -45,7 +45,7 @@ private struct Row<Content: View>: View {
     @ViewBuilder let content: Content
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !first { Divider().padding(.vertical, 10) }
+            if !first { Divider().padding(.vertical, 12) }
             content
         }
     }
@@ -54,13 +54,13 @@ private struct Row<Content: View>: View {
 struct SenseHeadingText: View {
     let heading: SenseHeading
     var body: some View {
-        var text = Text(heading.prefix + "  ").foregroundStyle(LexiTheme.accentText)
-        text = Text("\(text)\(Text(heading.partOfSpeech).font(LexiTheme.lexical(17)).italic().foregroundStyle(LexiTheme.warm))")
+        var text = Text(heading.prefix + "  ").monospacedDigit().foregroundStyle(.tertiary)
+        text = Text("\(text)\(Text(heading.partOfSpeech).font(LexiTheme.lexical(16)).italic().foregroundStyle(.secondary))")
         if !heading.form.isEmpty { text = Text("\(text)\(Text("  " + heading.form).font(LexiTheme.lexical(14)).italic())") }
         if !heading.usage.isEmpty { text = Text("\(text)\(Text("  " + heading.usage))") }
         if heading.abbreviation { text = Text("\(text)\(Text("  缩写"))") }
         if heading.provisional { text = Text("\(text)\(Text(" · 生成中"))") }
-        return text.font(.callout).foregroundStyle(.secondary).help(heading.tooltip)
+        return text.font(.subheadline).foregroundStyle(.secondary).help(heading.tooltip)
     }
 }
 
@@ -71,10 +71,10 @@ struct SenseContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if !sense.expansion.isEmpty {
-                Text(sense.expansion).font(LexiTheme.lexical(15)).foregroundStyle(LexiTheme.accentText).help("英文全称").textSelection(.enabled)
+                Text(sense.expansion).font(LexiTheme.lexical(15)).foregroundStyle(.secondary).help("英文全称").textSelection(.enabled)
             }
-            Text(sense.chinese).font(.system(size: 18)).lineSpacing(3).textSelection(.enabled)
-            Text(sense.english).font(.system(size: 16)).lineSpacing(2).textSelection(.enabled)
+            Text(sense.chinese).font(.system(size: 17)).lineSpacing(3).textSelection(.enabled)
+            Text(sense.english).font(.system(size: 15)).lineSpacing(2).foregroundStyle(.secondary).textSelection(.enabled)
             DisclosureBar(sense: sense, store: store)
         }
     }
@@ -145,9 +145,9 @@ struct ReferenceRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(reference.caption).font(.callout).foregroundStyle(.secondary)
-            if !reference.expansion.isEmpty { Text(reference.expansion).font(LexiTheme.lexical(15)).foregroundStyle(LexiTheme.accentText) }
-            Text(reference.chinese).font(.system(size: 18)).textSelection(.enabled)
-            Text(reference.english).font(.system(size: 16)).textSelection(.enabled)
+            if !reference.expansion.isEmpty { Text(reference.expansion).font(LexiTheme.lexical(15)).foregroundStyle(.secondary) }
+            Text(reference.chinese).font(.system(size: 17)).textSelection(.enabled)
+            Text(reference.english).font(.system(size: 15)).foregroundStyle(.secondary).textSelection(.enabled)
             Disclosure(label: "参考资料", key: reference.key, store: store) {
                 Text(reference.sourceNote).font(.callout).foregroundStyle(.secondary)
                 SourceLink(reference.sourceName, url: reference.sourceUrl)
@@ -174,10 +174,12 @@ struct DisclosureButton: View {
     let open: Bool
     let toggle: (Bool) -> Void
     var body: some View {
-        Button { toggle(!open) } label: {
-            Label(label, systemImage: open ? "chevron.down" : "chevron.right").labelStyle(LeadingIcon())
+        Button { withAnimation(.snappy) { toggle(!open) } } label: {
+            Label(label, systemImage: "chevron.right").labelStyle(LeadingIcon(open: open))
         }
-        .buttonStyle(DisclosureStyle(open: open))
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.small)
         .help((open ? "收起" : "展开") + label)
         .accessibilityLabel(label)
         .accessibilityValue(open ? "已展开" : "已收起")
@@ -185,8 +187,9 @@ struct DisclosureButton: View {
 }
 
 private struct LeadingIcon: LabelStyle {
+    let open: Bool
     func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) { configuration.icon.imageScale(.small); configuration.title }
+        HStack(spacing: 4) { configuration.icon.imageScale(.small).rotationEffect(.degrees(open ? 90 : 0)); configuration.title }
     }
 }
 
@@ -194,8 +197,8 @@ struct DetailBody<Content: View>: View {
     @ViewBuilder let content: Content
     var body: some View {
         VStack(alignment: .leading, spacing: 4) { content }
-            .padding(.leading, 10)
-            .overlay(alignment: .leading) { Rectangle().fill(.separator).frame(width: 2) }
+            .padding(.leading, 12)
+            .overlay(alignment: .leading) { Capsule().fill(.quaternary).frame(width: 3) }
             .padding(.vertical, 2)
     }
 }
@@ -206,19 +209,30 @@ struct LocalSourcesView: View {
     @Bindable var store: LexiStore
     var body: some View {
         if !view.localHint.isEmpty {
-            Text(view.localHint).font(.callout).foregroundStyle(.secondary)
+            Label(view.localHint, systemImage: "books.vertical").font(.callout).foregroundStyle(.secondary)
         } else if !view.local.isEmpty {
             if store.localWrapped {
-                DisclosureGroup("离线词典原文 · \(view.local.count) 部", isExpanded: $store.localExpanded) { cards.padding(.top, 6) }
+                DisclosureGroup(isExpanded: $store.localExpanded) { cards.padding(.top, 8) } label: {
+                    Text("离线词典原文 · \(view.local.count) 部").font(.headline)
+                }
             } else {
-                cards
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("离线词典原文").font(.headline)
+                    cards
+                }
             }
         }
     }
     private var cards: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(view.local) { source in LocalSourceCard(source: source) }
+            ForEach(Array(view.local.enumerated()), id: \.element.id) { index, source in
+                if index > 0 { Divider().padding(.vertical, 12) }
+                LocalSourceCard(source: source)
+            }
         }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentGroup()
     }
 }
 
@@ -227,22 +241,20 @@ struct LocalSourceCard: View {
     @State private var showOriginal = false
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(source.name).font(.headline)
+            HStack(alignment: .firstTextBaseline) {
+                Text(source.name).font(.subheadline.weight(.semibold))
                 Spacer()
-                Text("离线原文").font(.caption).foregroundStyle(.secondary)
+                SourceLink("词典来源", url: source.sourceUrl)
             }
             if !source.headword.isEmpty { Text(source.headword).font(.callout).foregroundStyle(.secondary) }
-            if !source.chinese.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text(source.chinese).font(.system(size: 16)).textSelection(.enabled) }
-            if !source.english.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text(source.english).font(.system(size: 16)).textSelection(.enabled) }
+            if !source.chinese.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text(source.chinese).font(.system(size: 15)).textSelection(.enabled) }
+            if !source.english.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text(source.english).font(.system(size: 15)).foregroundStyle(.secondary).textSelection(.enabled) }
             if !source.original.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                DisclosureGroup("完整原始条目", isExpanded: $showOriginal) { Text(source.original).textSelection(.enabled).padding(.top, 4) }
+                DisclosureGroup("完整原始条目", isExpanded: $showOriginal) { Text(source.original).font(.callout).textSelection(.enabled).padding(.top, 4) }
+                    .font(.callout)
             }
-            SourceLink("词典来源", url: source.sourceUrl)
-            Text(source.attribution).font(.caption).foregroundStyle(.secondary)
+            Text(source.attribution).font(.caption).foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 12)
-        .overlay(alignment: .bottom) { Divider() }
     }
 }
 
@@ -251,23 +263,33 @@ struct OnlineSourceView: View {
     @Bindable var store: LexiStore
     var body: some View {
         if let online = view.online {
-            DisclosureGroup(online.header, isExpanded: $store.onlineExpanded) {
+            DisclosureGroup(isExpanded: $store.onlineExpanded) {
                 VStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(online.senses.enumerated()), id: \.offset) { _, sense in
-                        Text(sense.label).foregroundStyle(LexiTheme.accentText).padding(.top, 6)
-                        Text(sense.definition).font(.system(size: 16)).textSelection(.enabled)
+                    ForEach(Array(online.senses.enumerated()), id: \.offset) { index, sense in
+                        if index > 0 { Spacer().frame(height: 8) }
+                        Text(sense.label).font(.subheadline).foregroundStyle(.secondary)
+                        Text(sense.definition).font(.system(size: 15)).textSelection(.enabled)
                         ForEach(Array(sense.examples.enumerated()), id: \.offset) { _, example in
-                            Text(example.text).font(example.chinese ? LexiTheme.chineseExample(15) : LexiTheme.lexical(15)).italic()
+                            Text(example.text).font(example.chinese ? LexiTheme.chineseExample(14) : LexiTheme.lexical(14)).italic()
                                 .foregroundStyle(.secondary).textSelection(.enabled)
                         }
                     }
-                    SourceLink("查看 Wiktionary 来源", url: online.url).padding(.top, 6)
-                    Text(online.footer).font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Text(online.footer).font(.caption).foregroundStyle(.tertiary)
+                        Spacer()
+                        SourceLink("Wiktionary", url: online.url)
+                    }
+                    .padding(.top, 10)
                 }
-                .padding(.top, 6)
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentGroup()
+                .padding(.top, 8)
+            } label: {
+                Text(online.header).font(.headline)
             }
         } else if !view.onlineHint.isEmpty {
-            Text(view.onlineHint).font(.callout).foregroundStyle(.secondary)
+            Label(view.onlineHint, systemImage: "globe").font(.callout).foregroundStyle(.secondary)
         }
     }
 }

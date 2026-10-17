@@ -2,21 +2,35 @@ import AppKit
 import LeXiKit
 import SwiftUI
 
-// macOS settings apply as soon as they change. Lexi.Core validates each change with the same
-// rules and messages as the Windows dialog; rejected changes leave the saved settings intact.
+// macOS settings in the System Settings style. Changes apply immediately; Lexi.Core validates each
+// one with the same rules and messages as the Windows dialog, and a rejected change leaves the
+// saved settings intact. Controls use the system accent color.
 public struct SettingsView: View {
     @Bindable var store: LexiStore
     public init(store: LexiStore) { self.store = store }
 
     public var body: some View {
         TabView {
-            Tab("查询与模型", systemImage: "text.magnifyingglass") { QuerySettings(store: store) }
-            Tab("离线词典", systemImage: "books.vertical") { DictionarySettings(store: store) }
-            Tab("账号连接", systemImage: "person.badge.key") { ConnectionSettings(store: store) }
+            Tab("查询", systemImage: "text.magnifyingglass") { QuerySettings(store: store) }
+            Tab("词典", systemImage: "books.vertical") { DictionarySettings(store: store) }
+            Tab("账号", systemImage: "person.crop.circle") { ConnectionSettings(store: store) }
             Tab("发音", systemImage: "speaker.wave.2") { SpeechSettings() }
         }
-        .frame(width: 560, height: 520)
+        .frame(width: 600, height: 560)
         .task { await store.refreshSettings() }
+    }
+}
+
+// A setting's name with a short secondary explanation underneath, as in System Settings.
+struct SettingLabel: View {
+    let title: String
+    let detail: String
+    init(_ title: String, _ detail: String) { self.title = title; self.detail = detail }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+            Text(detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -29,31 +43,41 @@ struct QuerySettings: View {
             let settings = payload.settings
             Form {
                 Section {
-                    toggle("在线补充", settings.online, "online")
-                    toggle("自动补充双语释义", settings.autoAi, "autoAi")
-                } footer: {
-                    Note("使用本机 Claude Code / Codex 的订阅登录。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。查过的内容直接使用缓存。切换模型后，点击“重新生成”才会更新已有结果。")
+                    toggle(SettingLabel("在线补充", "使用 Wiktionary 与模型补充释义；关闭后只查本地词库和已保存的结果。"), settings.online, "online")
+                    toggle(SettingLabel("自动补充双语释义", "查词时自动请模型补充；关闭后可点“重新生成”手动获取。"), settings.autoAi, "autoAi")
                 }
                 Section {
-                    modelPicker("主要模型 · 查词与翻译", payload.models, selected: settings.provider + ":" + settings.model) { choice in
+                    modelPicker(SettingLabel("主要模型", "用于查词与文本翻译"), payload.models, selected: settings.provider + ":" + settings.model) { choice in
                         ["provider": .string(choice.provider), "model": .string(choice.id)]
                     }
-                    toggle("双模型同时查词", settings.parallelLookup, "parallelLookup")
-                    modelPicker("第二个查询模型", payload.models, selected: secondaryKey(settings)) { choice in
+                    toggle(SettingLabel("双模型同时查词", "两个模型独立查词，先返回的释义先显示"), settings.parallelLookup, "parallelLookup")
+                    modelPicker(SettingLabel("第二个查询模型", "须与主要模型不同"), payload.models, selected: secondaryKey(settings)) { choice in
                         ["secondaryProvider": .string(choice.provider), "secondaryModel": .string(choice.id)]
                     }
                     .disabled(!settings.parallelLookup)
-                    toggle("自动整理同类义项（包含单模型内部）", settings.mergeSenses, "mergeSenses")
-                    modelPicker("义项判断模型 · 使用 Codex 订阅", payload.judgeModels, selected: "codex:" + settings.judgeModel) { choice in
+                } header: {
+                    Text("查询模型")
+                } footer: {
+                    Note("使用本机 Codex 与 Claude Code 的订阅登录。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Claude 关闭额外思考，Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。")
+                }
+                Section {
+                    toggle(SettingLabel("自动整理同类义项", "合并重复的说法，包含单个模型内部"), settings.mergeSenses, "mergeSenses")
+                    modelPicker(SettingLabel("义项判断模型", "使用 Codex 订阅"), payload.judgeModels, selected: "codex:" + settings.judgeModel) { choice in
                         ["judgeModel": .string(choice.id)]
                     }
                     .disabled(!settings.mergeSenses)
-                    if let error { Text(error).foregroundStyle(LexiTheme.warm) }
+                } header: {
+                    Text("义项整理")
                 } footer: {
-                    Note("同一词义的细分用法可归为一组，优先展示涵盖更完整的原文；其他表述保留在“用法细分”中。不同含义和分歧仍分开。Claude 关闭额外思考，释义生成后立即显示。Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。")
+                    Note("同一词义的细分用法归为一组，优先展示涵盖更完整的原文；其他表述保留在“用法细分”中。不同含义和不确定的区别仍分开。")
                 }
-                Section {
-                    Note("Return 查询 · Shift-Return 换行 · Esc 收起建议\n⌘L 再查一个 · ⌘R 重新生成 · ⌘[ 后退 · ⌘] 前进 · ⌘Y 查询历史 · ⌘, 设置")
+                if let error {
+                    Section { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
+                }
+                Section("键盘快捷键") {
+                    ForEach(Self.shortcuts, id: \.0) { action, keys in
+                        LabeledContent(action) { Text(keys).foregroundStyle(.secondary).monospaced() }
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -62,6 +86,9 @@ struct QuerySettings: View {
         }
     }
 
+    private static let shortcuts = [("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
+        ("重新生成", "⌘R"), ("后退 / 前进", "⌘[  ⌘]"), ("查询历史", "⌘Y"), ("设置", "⌘,")]
+
     // The secondary model defaults to the other service's fast model, as in Lexi.Core.
     private func secondaryKey(_ settings: AppSettings) -> String {
         settings.secondaryProvider.isEmpty
@@ -69,17 +96,17 @@ struct QuerySettings: View {
             : settings.secondaryProvider + ":" + settings.secondaryModel
     }
 
-    private func toggle(_ label: String, _ value: Bool, _ key: String) -> some View {
-        Toggle(label, isOn: Binding(get: { value }, set: { apply([key: .bool($0)]) }))
+    private func toggle(_ label: SettingLabel, _ value: Bool, _ key: String) -> some View {
+        Toggle(isOn: Binding(get: { value }, set: { apply([key: .bool($0)]) })) { label }
     }
 
-    private func modelPicker(_ label: String, _ choices: [ModelChoice], selected: String,
+    private func modelPicker(_ label: SettingLabel, _ choices: [ModelChoice], selected: String,
                              change: @escaping (ModelChoice) -> [String: SettingValue]) -> some View {
-        Picker(label, selection: Binding(get: { selected }, set: { key in
+        Picker(selection: Binding(get: { selected }, set: { key in
             if let choice = choices.first(where: { $0.key == key }) { apply(change(choice)) }
         })) {
             ForEach(choices, id: \.key) { Text($0.label).tag($0.key) }
-        }
+        } label: { label }
     }
 
     private func apply(_ changes: [String: SettingValue]) {
@@ -94,34 +121,44 @@ struct DictionarySettings: View {
         Form {
             if let payload = store.settings {
                 Section {
-                    Toggle("启用离线查询", isOn: Binding(get: { payload.settings.offlineEnabled },
-                        set: { value in Task { await store.update(["offlineEnabled": .bool(value)]) } }))
-                } footer: { Note("启用的词典用于本地查询与输入建议。取消勾选即可停用，词库文件会保留。") }
+                    Toggle(isOn: Binding(get: { payload.settings.offlineEnabled },
+                        set: { value in Task { await store.update(["offlineEnabled": .bool(value)]) } })) {
+                        SettingLabel("离线查询", "启用的词典用于本地查询与输入建议")
+                    }
+                }
                 if let list = store.dictionaries {
-                    Section("已安装 \(list.dictionaries.filter(\.available).count) 部词典") {
-                        ForEach(list.dictionaries) { dictionary in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Toggle(dictionary.name, isOn: Binding(
-                                    get: { dictionary.available && !payload.settings.disabledDictionaries.contains(dictionary.id) },
-                                    set: { enabled in
-                                        var disabled = payload.settings.disabledDictionaries.filter { $0 != dictionary.id }
-                                        if !enabled { disabled.append(dictionary.id) }
-                                        Task { await store.update(["disabledDictionaries": .strings(disabled)]) }
-                                    }))
-                                .disabled(!dictionary.available)
-                                Text(dictionary.languages).font(.callout)
-                                Text("\(dictionary.status) · \(dictionary.entryCount.formatted()) 个检索词条 · \(ByteCountFormatter.string(fromByteCount: dictionary.bytes, countStyle: .file))")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                Text("\(dictionary.attribution) · 版本：\(dictionary.version) · 许可：\(dictionary.license)").font(.caption).foregroundStyle(.secondary)
-                                SourceLink("项目来源", url: dictionary.sourceUrl)
-                            }
-                            .padding(.vertical, 4)
+                    Section {
+                        if list.dictionaries.isEmpty {
+                            Text("尚未安装离线词典").foregroundStyle(.secondary)
                         }
+                        ForEach(list.dictionaries) { dictionary in
+                            Toggle(isOn: Binding(
+                                get: { dictionary.available && !payload.settings.disabledDictionaries.contains(dictionary.id) },
+                                set: { enabled in
+                                    var disabled = payload.settings.disabledDictionaries.filter { $0 != dictionary.id }
+                                    if !enabled { disabled.append(dictionary.id) }
+                                    Task { await store.update(["disabledDictionaries": .strings(disabled)]) }
+                                })) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(dictionary.name)
+                                    Text("\(dictionary.languages) · \(dictionary.entryCount.formatted()) 个检索词条 · \(ByteCountFormatter.string(fromByteCount: dictionary.bytes, countStyle: .file))")
+                                        .font(.callout).foregroundStyle(.secondary)
+                                    HStack(spacing: 8) {
+                                        Text("\(dictionary.attribution) · \(dictionary.version.isEmpty ? "" : "版本 \(dictionary.version) · ")\(dictionary.license)")
+                                            .font(.caption).foregroundStyle(.tertiary)
+                                        SourceLink("来源", url: dictionary.sourceUrl).font(.caption)
+                                    }
+                                }
+                            }
+                            .disabled(!dictionary.available)
+                        }
+                    } header: {
+                        Text("已安装 \(list.dictionaries.filter(\.available).count) 部词典")
+                    } footer: {
+                        Note("取消勾选即可停用，词库文件会保留。安装词库需要 PowerShell 7 和 .NET 10 SDK，例如 pwsh ./scripts/Install-Dictionary.ps1 -AppDirectory \"$HOME/Library/Application Support/LeXi\"，安装后重新打开 LeXi。")
                     }
                     Section {
                         Button("在访达中显示词库文件夹") { revealFolder(list.folder) }
-                    } footer: {
-                        Note("词库安装脚本需要 PowerShell 7 和 .NET 10 SDK，例如：pwsh ./scripts/Install-Dictionary.ps1 -AppDirectory \"$HOME/Library/Application Support/LeXi\"。安装后重新打开 LeXi。Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。")
                     }
                 }
             }
@@ -143,17 +180,21 @@ struct ConnectionSettings: View {
     var body: some View {
         Form {
             Section {
-                Note("在官方登录页完成 OAuth 授权，LeXi 使用同一台电脑上的登录状态。主要模型、第二模型和义项判断共用对应账号。登录会即时生效，并与官方客户端共用账号。")
+                ProviderRow(store: store, provider: "codex", title: "ChatGPT · Codex", symbol: "sparkles", install: "https://learn.chatgpt.com/docs/cli")
+                LabeledContent {
+                    HStack {
+                        TextField("自动检测", text: $codexPath)
+                            .labelsHidden()
+                            .onSubmit { Task { await store.update(["codexPath": .string(codexPath.trimmingCharacters(in: .whitespaces))]) } }
+                        Button("选择…") { choose() }
+                    }
+                } label: { SettingLabel("程序路径", "留空时自动查找命令行与 ChatGPT 应用中的 Codex") }
             }
-            ProviderRow(store: store, provider: "codex", title: "ChatGPT · Codex", install: "https://learn.chatgpt.com/docs/cli")
             Section {
-                HStack {
-                    TextField("Codex 程序路径（留空自动检测）", text: $codexPath)
-                        .onSubmit { Task { await store.update(["codexPath": .string(codexPath.trimmingCharacters(in: .whitespaces))]) } }
-                    Button("选择程序…") { choose() }
-                }
+                ProviderRow(store: store, provider: "claude", title: "Claude", symbol: "asterisk", install: "https://code.claude.com/docs/en/setup")
+            } footer: {
+                Note("在官方登录页完成授权，LeXi 使用同一台电脑上的登录状态，不读取令牌。登录会即时生效并与官方客户端共用账号；主要模型、第二模型和义项判断共用对应账号。")
             }
-            ProviderRow(store: store, provider: "claude", title: "Claude", install: "https://code.claude.com/docs/en/setup")
         }
         .formStyle(.grouped)
         .onAppear { codexPath = store.settings?.settings.codexPath ?? "" }
@@ -172,27 +213,44 @@ struct ProviderRow: View {
     @Bindable var store: LexiStore
     let provider: String
     let title: String
+    let symbol: String
     let install: String
-    @State private var status = "等待检查登录状态"
-    @State private var installed = false
+    @State private var status = "正在检查…"
+    @State private var state: LoginStatus?
     @State private var busy = false
 
     var body: some View {
-        Section(title) {
-            Text(status).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently)
-            HStack {
-                Button("登录 / 重新连接") { Task { await login() } }.disabled(busy || !installed)
-                    .accessibilityLabel(provider == "codex" ? "登录 ChatGPT 订阅" : "登录 Claude 订阅")
-                Button("检查状态") { Task { await refresh() } }.disabled(busy)
+        HStack(spacing: 12) {
+            Image(systemName: symbol).font(.title2).foregroundStyle(.secondary).frame(width: 30)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.headline)
+                HStack(spacing: 6) {
+                    Circle().fill(dot).frame(width: 7, height: 7)
+                    Text(status).font(.callout).foregroundStyle(.secondary).accessibilityAddTraits(.updatesFrequently)
+                }
+            }
+            Spacer()
+            if state?.installed == false {
                 SourceLink("安装说明", url: install)
+            } else {
+                Button("检查") { Task { await refresh() } }.disabled(busy)
+                Button(state?.signedIn == true ? "重新登录…" : "登录…") { Task { await login() } }
+                    .disabled(busy || state?.installed != true)
+                    .accessibilityLabel(provider == "codex" ? "登录 ChatGPT 订阅" : "登录 Claude 订阅")
             }
         }
+        .padding(.vertical, 4)
         .task { await refresh() }
+    }
+
+    private var dot: Color {
+        guard let state else { return .secondary }
+        return state.signedIn ? .green : state.installed ? .orange : .secondary
     }
 
     private func refresh() async {
         busy = true; status = "正在检查…"
-        if let result = await store.connectionStatus(provider) { status = result.message; installed = result.installed }
+        if let result = await store.connectionStatus(provider) { status = result.message; state = result }
         else { status = "无法确认登录状态，请稍后重试" }
         busy = false
     }
@@ -203,7 +261,7 @@ struct ProviderRow: View {
         guard let command = await store.loginCommand(provider) else { status = "请先安装官方客户端，或检查程序路径"; return }
         do {
             try TerminalLauncher.open(command, name: "LeXi-login-\(provider)")
-            status = "已打开官方登录，请在终端与浏览器中完成授权，然后点击“检查状态”"
+            status = "已在“终端”中打开官方登录，完成后点“检查”"
         } catch {
             status = "无法打开官方登录，请检查客户端安装或程序路径"
         }
@@ -214,8 +272,11 @@ struct SpeechSettings: View {
     var body: some View {
         Form {
             Section {
-                Note("点击词条旁的扬声器朗读当前输入，再次点击停止。macOS 使用系统声线，按文字语言自动选择中文或英文声线，不需要 API Key。可在“系统设置 → 辅助功能 → 朗读内容”中下载更多声线。")
-                Note("OpenAI、Grok 与 ElevenLabs 在线语音目前仅 Windows 版提供，macOS 版计划使用钥匙串保存密钥。")
+                LabeledContent {
+                    Text("按文字语言自动选择").foregroundStyle(.secondary)
+                } label: { SettingLabel("系统声线", "点击词条旁的扬声器朗读，再次点击停止") }
+            } footer: {
+                Note("可在“系统设置 → 辅助功能 → 朗读内容”中下载更多声线。OpenAI、Grok 与 ElevenLabs 在线语音目前仅 Windows 版提供。")
             }
         }
         .formStyle(.grouped)

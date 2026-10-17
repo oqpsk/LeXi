@@ -22,22 +22,20 @@ public struct MainView: View {
     public init(store: LexiStore) { self.store = store }
 
     public var body: some View {
-        // Results scroll beneath the glass query bar and footer; the window itself is translucent,
-        // like the Windows acrylic window, and falls back to opaque with Reduce Transparency.
+        // Apple's layering: results are the content; the query capsule, the bottom controls and
+        // the toolbar are Liquid Glass floating above them, with soft scroll edges.
         ScrollView {
-            content.padding(.horizontal, 22).padding(.vertical, 14)
+            content.padding(.horizontal, 24).padding(.vertical, 12)
         }
         .scrollPosition($position)
         .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, value in offset = value }
         .scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
         .safeAreaBar(edge: .top) {
             SearchBar(store: store, text: $text, programmatic: $programmatic, focused: $searchFocused, submit: submit)
-                .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 10)
+                .padding(.horizontal, 20).padding(.top, 2).padding(.bottom, 10)
         }
-        .safeAreaBar(edge: .bottom) { footer }
-        .containerBackground(.thinMaterial, for: .window)
+        .safeAreaBar(edge: .bottom) { bottomBar }
         .toolbar { toolbar }
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .navigationTitle("LeXi")
         .frame(minWidth: 540, minHeight: 420)
         .onChange(of: store.view.request) { _, _ in pageChanged() }
@@ -65,32 +63,35 @@ public struct MainView: View {
     private var online: Bool { store.settings?.settings.online ?? true }
     private var canRegenerate: Bool { store.view.kind != .home && store.view.canRegenerate && online }
 
-    // The Windows bottom bar: brand mark (query history), status, regeneration and the online switch.
-    private var footer: some View {
+    // Status on the leading side; regeneration and the online mode as grouped glass controls.
+    private var bottomBar: some View {
         HStack(spacing: 12) {
-            Button(action: goHome) { BrandMark(size: 24) }
-                .buttonStyle(.plain)
-                .help("查询历史 · ⌘Y")
-                .accessibilityLabel("查询历史")
             Text(store.view.status)
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)
                 .help(store.view.status)
                 .accessibilityLabel("查询状态：" + store.view.status)
             Spacer(minLength: 8)
-            if store.view.kind != .home {
-                Button("重新生成", action: regenerate)
-                    .buttonStyle(.glass)
-                    .disabled(!canRegenerate)
-                    .help(store.settings?.controls.regenerateTooltip ?? "")
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    if store.view.kind != .home {
+                        Button(action: regenerate) { Label("重新生成", systemImage: "arrow.clockwise") }
+                            .disabled(!canRegenerate)
+                            .help(store.settings?.controls.regenerateTooltip ?? "")
+                    }
+                    // A two-state mode, shown by its icon and label; neutral glass in both states.
+                    Button { Task { await store.setOnline(!online) } } label: {
+                        Label(store.settings?.controls.onlineLabel ?? "在线补充", systemImage: online ? "globe" : "network.slash")
+                    }
+                    .help(store.settings?.controls.onlineTooltip ?? "")
+                    .accessibilityAddTraits(.isToggle)
+                    .accessibilityValue(online ? "已开启" : "已关闭")
+                }
+                .buttonStyle(.glass)
+                .labelStyle(.titleAndIcon)
             }
-            Toggle(store.settings?.controls.onlineLabel ?? "在线补充", isOn: Binding(
-                get: { online }, set: { value in Task { await store.setOnline(value) } }))
-                .toggleStyle(.switch)
-                .tint(LexiTheme.pink)
-                .help(store.settings?.controls.onlineTooltip ?? "")
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 20).padding(.vertical, 10)
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
@@ -103,7 +104,8 @@ public struct MainView: View {
                 .disabled(!navigation.canForward)
                 .help(navigation.canForward ? "前进 · \(navigation.forwardLabel) · ⌘]" : "前进 · ⌘]")
         }
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button(action: goHome) { Label("查询历史", systemImage: "clock") }.help("查询历史 · ⌘Y")
             SettingsLink { Label("设置", systemImage: "gearshape") }.help("设置 · ⌘,")
         }
     }

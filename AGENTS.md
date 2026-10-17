@@ -56,9 +56,8 @@ Rules are grouped by where they apply. Shared behavior belongs to `Lexi.Core` an
 ## macOS interface (apple/, SwiftUI)
 
 - SwiftUI with Liquid Glass, minimum macOS 26. Follow the macOS Human Interface Guidelines for menus, shortcuts, settings, windows and accessibility; do not imitate WPF layouts.
-- Follow the Windows layout with macOS conventions: toolbar navigation and settings, the query row with status ring and submit, results, and a bottom bar with the brand mark (history), status, regeneration and the online switch.
-- The window background is a translucent material, like the Windows acrylic, and becomes opaque with Reduce Transparency. The query row and bottom bar are Liquid Glass bars that results scroll beneath; popovers and toolbar items use glass. Definitions sit on calm panels, never on glass.
-- Pink marks brand and state only: sense numbers, the current word form, the TL;DR badge and card, the completion check, the online switch, the brand mark and suggestion highlight. Buttons, disclosures and links stay neutral; Settings follow the system accent.
+- Use Apple's design language, not the Windows look: the same features and information, laid out with macOS 26 conventions. Toolbar glass items for back/forward, history and settings; a floating Liquid Glass query capsule; grouped glass controls at the bottom for regeneration and the online mode; results as content scrolling beneath them on grouped surfaces with continuous corners.
+- System colors throughout, adapting to light, dark and the user's accent. Pink appears only as the brand TL;DR mark and card; controls, links, sense numbers and state symbols use system styles. Settings follow System Settings: grouped forms, short labels with secondary explanations.
 - The app bundles a self-contained `Lexi.Host` and talks to it over JSON lines. Render Host views as received and reject stale revisions. Incompatible protocol changes raise `HostServer.Protocol` and update docs/host-protocol.md and host-check in the same PR.
 - User data lives in `~/Library/Application Support/LeXi`. Local speech uses system voices; speech keys use the Keychain.
 - Keep window state with the system's restoration. The app is a regular windowed app; closing the window does not quit it.

@@ -28,7 +28,7 @@ LEXI_HOST="$PWD/.cache/host-publish/lexi-host" swift test --package-path apple
 ```
 
 - `LeXiKit`：协议模型、`HostClient`（启动 Host、按 id 匹配响应、按顺序转交视图、取消请求）与 `LexiStore`（丢弃旧版本视图，保存每次查询的展开状态）。
-- `LeXiUI`：SwiftUI 界面，布局对应 Windows 版。窗口背景半透明，查询栏与底栏是结果在其下滚动的 Liquid Glass；释义位于面板上。粉色只用于品牌与状态（序号、当前词形、TL;DR、完成标记、在线开关、标志），按钮与展开项保持中性，实色粉底配深色文字。
+- `LeXiUI`：SwiftUI 界面，采用 Apple 设计语言：Liquid Glass 查询胶囊、工具栏与底部控件浮在结果之上，结果位于连续圆角的分组区域；颜色使用系统颜色与强调色，粉色只用于 TL;DR。设置窗口沿用系统设置的分组表单。
 - `LeXi`：应用入口、菜单命令与设置窗口。
 
 测试使用 `host-check` 生成的真实 Host 输出（`Tests/LeXiKitTests/Fixtures/views.json`），并在提供 `LEXI_HOST` 或已存在 `.cache/host-publish/lexi-host` 时，用离线测试词库启动真实 Host。界面检查只在内存中布局结果视图，不显示窗口、不模拟输入、不截屏。Core 的视图字段变化后，用下面的命令重新生成样例：

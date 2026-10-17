@@ -21,10 +21,10 @@ public struct SearchBar: View {
 
     public var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            Image(systemName: "magnifyingglass").font(.system(size: 17)).foregroundStyle(.secondary).accessibilityHidden(true)
-            TextField("输入单词、短语或待翻译文本", text: $text, axis: .vertical)
+            Image(systemName: "magnifyingglass").font(.system(size: 17, weight: .medium)).foregroundStyle(.secondary).accessibilityHidden(true)
+            TextField("查词或翻译", text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.system(size: 20))
+                .font(.system(size: 19))
                 .lineLimit(1...6)
                 .focused(focused)
                 // Keys belong to the input method while it is composing (pinyin, zhuyin…).
@@ -49,8 +49,9 @@ public struct SearchBar: View {
                 .help("查询 · Return")
                 .accessibilityLabel("查询")
         }
-        .padding(.horizontal, 16).padding(.vertical, 11)
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 18))
+        .padding(.horizontal, 18).padding(.vertical, 12)
+        // A Spotlight-like capsule that grows into a rounded rectangle for multi-line text.
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24, style: .continuous))
         .overlay(alignment: .bottomLeading) {
             // Hangs below the bar however many lines the input has; only while typing in it.
             if focused.wrappedValue && !store.suggestions.isEmpty {
@@ -70,7 +71,7 @@ public struct SearchBar: View {
                 Button { selection = index; accept(); focused.wrappedValue = true } label: {
                     Text(word).font(LexiTheme.lexical(16)).frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(selection == index ? LexiTheme.pink.opacity(0.24) : .clear, in: .rect(cornerRadius: 8))
+                        .background(selection == index ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 10, style: .continuous))
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
@@ -78,7 +79,7 @@ public struct SearchBar: View {
         }
         .padding(6)
         .frame(width: 320, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .glassEffect(.regular, in: .rect(cornerRadius: 18, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("输入建议")
         .accessibilityHint("上下方向键预览，Tab 选用，Return 查询，Escape 还原")
@@ -141,7 +142,7 @@ struct StatusRing: View {
                 Group {
                     if progress.busy { ProgressView().controlSize(.small) }
                     else { Image(systemName: progress.warning ? "exclamationmark.circle" : "checkmark.circle")
-                        .foregroundStyle(progress.warning ? LexiTheme.warm : LexiTheme.accentText) }
+                        .foregroundStyle(progress.warning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary)) }
                 }
                 .frame(width: 20, height: 20)
             }
@@ -150,7 +151,7 @@ struct StatusRing: View {
             .accessibilityLabel(progress.accessibleName)
             .popover(isPresented: $showDetails, arrowEdge: .bottom) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(progress.title).font(.headline).foregroundStyle(progress.warning ? LexiTheme.warm : LexiTheme.accentText)
+                    Text(progress.title).font(.headline).foregroundStyle(progress.warning ? AnyShapeStyle(.orange) : AnyShapeStyle(.primary))
                     Text(progress.detail).font(.callout).foregroundStyle(.secondary).frame(maxWidth: 300, alignment: .leading)
                     Text(progress.stageLabels.joined(separator: "\n")).font(.caption).foregroundStyle(.secondary)
                 }
