@@ -8,6 +8,14 @@ public enum LexiTheme {
     // The one brand pink (#FFADD2). Solid pink fills always carry dark text.
     public static let pink = Color(nsColor: NSColor(srgbRed: 1, green: 0xAD / 255.0, blue: 0xD2 / 255.0, alpha: 1))
     public static func lexical(_ size: CGFloat, weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .serif) }
+    // A neutral window background. macOS tints the standard window background with the wallpaper's
+    // color (in dark mode especially); LeXi keeps its windows neutral so glass and text stay grey.
+    public static let windowBackground = Color(nsColor: NSColor(name: "LexiWindowBackground") { appearance in
+        let match = appearance.bestMatch(from: [.aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua])
+        return match == .darkAqua || match == .accessibilityHighContrastDarkAqua
+            ? NSColor(srgbRed: 0.118, green: 0.118, blue: 0.125, alpha: 1)
+            : NSColor(srgbRed: 0.965, green: 0.965, blue: 0.972, alpha: 1)
+    })
     public static func chineseExample(_ size: CGFloat) -> Font { .custom("Songti SC", size: size) }
 }
 

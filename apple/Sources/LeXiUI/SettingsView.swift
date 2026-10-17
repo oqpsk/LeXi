@@ -17,6 +17,9 @@ public struct SettingsView: View {
             Tab("发音", systemImage: "speaker.wave.2") { SpeechSettings(store: store) }
         }
         .frame(width: 600, height: 560)
+        // Neutral like the query window: the forms keep their grouped rows on the same untinted base.
+        .scrollContentBackground(.hidden)
+        .containerBackground(LexiTheme.windowBackground, for: .window)
         .task { await store.refreshSettings() }
     }
 }
