@@ -28,6 +28,16 @@ internal static partial class Program
         }
         var app = new App(); app.InitializeComponent();
         var main = new MainWindow();
+        var input = (TextBox)main.FindName("SearchBox");
+        if (System.Windows.Input.FocusManager.GetFocusedElement(main) != input)
+            throw new Exception("The initial logical focus target must be the search input.");
+        Console.WriteLine("PASS: search input is the initial logical focus target without displaying a window.");
+        input.Text = "synthetic"; input.Select(3, 0);
+        main.FocusSearch();
+        if (input.SelectionStart != 3 || input.SelectionLength != 0 || input.IsKeyboardFocused)
+            throw new Exception("An inactive hidden main window must not redirect focus or alter the draft selection.");
+        Console.WriteLine("PASS: focus restoration leaves inactive windows and draft selection alone.");
+        input.Clear();
         Measure((FrameworkElement)main.Content, 558, 398);
         Measure((FrameworkElement)main.Content, 718, 618);
         Measure((FrameworkElement)main.Content, 1078, 798);
