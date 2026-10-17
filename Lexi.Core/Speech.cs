@@ -18,8 +18,9 @@ public sealed record SpeechOptions(string Provider, string Model, string Voice)
 
 public static class SpeechCatalog
 {
-    // Local synthesis belongs to each front end: Windows SAPI voices or macOS system voices.
-    public static SpeechModel Local { get; } = OperatingSystem.IsMacOS() ? new("macos", "avspeech", "macOS 本地发音") : new("windows", "sapi", "Windows 本地发音");
+    // Local synthesis belongs to each front end: Windows SAPI voices, or macOS and iOS system voices.
+    public static SpeechModel Local { get; } = OperatingSystem.IsIOS() ? new("ios", "avspeech", "iOS 本地发音")
+        : OperatingSystem.IsMacOS() ? new("macos", "avspeech", "macOS 本地发音") : new("windows", "sapi", "Windows 本地发音");
     public static bool IsLocal(string provider) => provider == Local.Provider;
     public static SpeechModel[] Models => [Local, new("openai", "gpt-4o-mini-tts", "OpenAI · GPT-4o mini TTS"),
         new("openai", "tts-1", "OpenAI · TTS-1"), new("openai", "tts-1-hd", "OpenAI · TTS-1 HD"), new("xai", "grok-tts", "Grok · TTS"),
@@ -54,7 +55,7 @@ public static class SpeechCatalog
     // Local synthesis saved on the other platform stays local here; its voice IDs belong to that system.
     public static void AdoptLocal(AppSettings settings)
     {
-        if (settings.SpeechProvider is not ("windows" or "macos") || IsLocal(settings.SpeechProvider)) return;
+        if (settings.SpeechProvider is not ("windows" or "macos" or "ios") || IsLocal(settings.SpeechProvider)) return;
         settings.SpeechProvider = Local.Provider; settings.SpeechModel = Local.Id; settings.SpeechVoice = "auto"; settings.SpeechVoiceName = "";
     }
 }
