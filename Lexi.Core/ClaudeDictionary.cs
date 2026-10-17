@@ -12,25 +12,6 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
     private bool disposed;
     private string? desiredModel;
 
-    public static (string Exe, string? Script)? FindExecutable()
-    {
-        var native = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "bin", "claude.exe");
-        if (File.Exists(native)) return (native, null);
-        var cli = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "npm", "node_modules", "@anthropic-ai", "claude-code", "cli.js");
-        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
-        {
-            var exe = Path.Combine(directory.Trim('"'), "claude.exe");
-            if (File.Exists(exe)) return (exe, null);
-        }
-        if (!File.Exists(cli)) return null;
-        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
-        {
-            var node = Path.Combine(directory.Trim('"'), "node.exe");
-            if (File.Exists(node)) return (node, cli);
-        }
-        return null;
-    }
-
     public void Prepare(string model)
     {
         lock (sync)
@@ -48,15 +29,12 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
 
     private Worker Start(string model)
     {
-        var executable = FindExecutable() ?? throw new InvalidOperationException("未找到 Claude Code。请先安装并使用订阅登录。");
+        var tool = ToolLocator.Claude() ?? throw new InvalidOperationException("未找到 Claude Code。请先安装并使用订阅登录。");
         var dir = Path.Combine(userRoot, "claude-work"); Directory.CreateDirectory(dir);
-        var info = new ProcessStartInfo(executable.Exe)
-        {
-            UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true,
-            RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = dir,
-            StandardInputEncoding = new UTF8Encoding(false), StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
-        };
-        if (executable.Script != null) info.ArgumentList.Add(executable.Script);
+        var info = tool.StartInfo();
+        info.UseShellExecute = false; info.CreateNoWindow = true; info.RedirectStandardInput = true;
+        info.RedirectStandardOutput = true; info.RedirectStandardError = true; info.WorkingDirectory = dir;
+        info.StandardInputEncoding = new UTF8Encoding(false); info.StandardOutputEncoding = Encoding.UTF8; info.StandardErrorEncoding = Encoding.UTF8;
         var instructions = File.ReadAllText(Path.Combine(assetFolder, "dictionary.instructions.txt"));
         var schema = File.ReadAllText(Path.Combine(assetFolder, "dictionary.schema.json"));
         var translationSchema = File.ReadAllText(Path.Combine(assetFolder, "translation.schema.json"));

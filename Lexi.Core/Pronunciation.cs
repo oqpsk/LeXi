@@ -16,7 +16,7 @@ public sealed partial class Pronunciation : IDisposable
         client = handler == null ? new() : new(handler);
         client.Timeout = TimeSpan.FromSeconds(5);
         client.MaxResponseContentBufferSize = 2 * 1024 * 1024;
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("LeXiDictionary/0.9 (Windows dictionary)");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("LeXiDictionary/0.9 (desktop dictionary)");
     }
     public async Task<PronunciationEntry?> LookupAsync(string word, CancellationToken token)
     {

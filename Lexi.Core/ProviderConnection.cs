@@ -10,14 +10,12 @@ public static class ProviderConnection
     public static ProcessStartInfo? Command(string provider, string codexPath, bool login)
     {
         if (provider is not ("codex" or "claude")) throw new ArgumentException("Unknown provider");
-        var executable = provider == "codex" ? CodexDictionary.FindExecutable(codexPath) : ClaudeDictionary.FindExecutable()?.Exe;
-        if (executable == null) return null;
-        var info = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = !login,
-            RedirectStandardOutput = !login, RedirectStandardError = !login };
+        var tool = provider == "codex" ? ToolLocator.Codex(codexPath) : ToolLocator.Claude();
+        if (tool == null) return null;
+        var info = tool.StartInfo();
+        info.UseShellExecute = false; info.CreateNoWindow = !login; info.RedirectStandardOutput = !login; info.RedirectStandardError = !login;
         if (provider == "claude")
         {
-            var script = ClaudeDictionary.FindExecutable()?.Script;
-            if (script != null) info.ArgumentList.Add(script);
             info.ArgumentList.Add("auth");
             // Match the subscription-backed dictionary worker, without reading any credential files.
             foreach (var key in new[] { "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN" }) info.Environment.Remove(key);
