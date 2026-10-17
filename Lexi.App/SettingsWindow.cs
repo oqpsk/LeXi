@@ -6,7 +6,7 @@ using Lexi.Core;
 
 namespace Lexi;
 
-public sealed class SettingsWindow : Window
+public sealed partial class SettingsWindow : Window
 {
     private static Brush Muted => Theme.Brush("Muted");
     private static Brush Accent => Theme.Brush("Accent");
@@ -54,11 +54,11 @@ public sealed class SettingsWindow : Window
         var secondaryPanel = new StackPanel(); general.Children.Add(secondaryPanel);
         secondaryPanel.Children.Add(Text("第二个查询模型"));
         var secondary = ModelSelector(secondChoice, choices); secondaryPanel.Children.Add(secondary);
-        var merge = new CheckBox { Content = "自动合并同义项", IsChecked = settings.MergeSenses, Margin = new(0,6,0,12) }; secondaryPanel.Children.Add(merge);
-        var judgePanel = new StackPanel(); secondaryPanel.Children.Add(judgePanel);
+        var merge = new CheckBox { Content = "自动整理同类义项（包含单模型内部）", IsChecked = settings.MergeSenses, Margin = new(0,6,0,12) }; general.Children.Add(merge);
+        var judgePanel = new StackPanel(); general.Children.Add(judgePanel);
         judgePanel.Children.Add(Text("义项判断模型 · 使用 Codex 订阅"));
         var judge = ModelSelector(new("codex", settings.JudgeModel), choices.Where(c => c.Provider == "codex").ToArray()); judgePanel.Children.Add(judge);
-        secondaryPanel.Children.Add(Text("判断为同义时优先显示主要模型的表述，可展开查看另一份。独有含义和分歧保留；判断失败时保留全部结果。模型一致不代表词典来源已核验。", 14, Muted));
+        general.Children.Add(Text("同一词义的细分用法可归为一组，优先展示涵盖更完整的原文；其他表述保留在“用法细分”中。不同含义和分歧仍分开。", 14, Muted));
         void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true; }
         parallel.Checked += (_, _) => UpdateParallelControls(); parallel.Unchecked += (_, _) => UpdateParallelControls();
         merge.Checked += (_, _) => UpdateParallelControls(); merge.Unchecked += (_, _) => UpdateParallelControls(); UpdateParallelControls();
@@ -100,11 +100,13 @@ public sealed class SettingsWindow : Window
         }
         dictionaries.Children.Add(Text("取消勾选并保存即可停用，词库文件会保留。", 14,Muted));
         dictionaries.Children.Add(Text("Wiktionary 与 AI 属于在线补充，可在“查询与模型”中配置。", 14,Muted));
+        var saveSpeech = AddSpeechTab(tabs, settings);
         save.Click += (_, _) =>
         {
             var primaryValue = (ModelChoice)model.SelectedItem; var secondaryValue = (ModelChoice)secondary.SelectedItem;
             if (parallel.IsChecked == true && primaryValue.Provider == secondaryValue.Provider && primaryValue.Id == secondaryValue.Id)
             { modelError.Text = "请选择两个不同的查询模型。"; modelError.Visibility = Visibility.Visible; modelError.BringIntoView(); return; }
+            if (!saveSpeech()) return;
             settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
             settings.OfflineEnabled = master.IsChecked == true;
             settings.DisabledDictionaries = toggles.Where(t => t.Toggle.IsChecked != true).Select(t => t.Dictionary.Id).ToArray();

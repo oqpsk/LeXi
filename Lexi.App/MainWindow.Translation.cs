@@ -11,6 +11,8 @@ public partial class MainWindow
 {
     private async Task TranslateTextAsync(string text, bool force)
     {
+        StopSpeech();
+        speechText = text;
         lookup?.Cancel(); lookup?.Dispose(); lookup = new();
         var token = lookup.Token;
         current = text; SetQuery(text);

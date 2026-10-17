@@ -4,6 +4,7 @@
   "properties": {
     "word": {"type": "string"},
     "found": {"type": "boolean"},
+    "phonetic": {"type": "string"},
     "senses": {"type": "array", "items": {
       "type": "object", "additionalProperties": false,
       "properties": {
@@ -20,5 +21,5 @@
     "note": {"type": "string"},
     "evidenceStatus": {"type": "string", "enum": ["source_based", "unverified", "unknown"]}
   },
-  "required": ["word", "found", "senses", "note", "evidenceStatus"]
+  "required": ["word", "found", "phonetic", "senses", "note", "evidenceStatus"]
 }

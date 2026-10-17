@@ -48,7 +48,7 @@ public partial class MainWindow : Window
         {
             if (!quit && !Dispatcher.HasShutdownStarted) { e.Cancel = true; WindowState = WindowState.Minimized; }
         };
-        Closed += (_, _) => { lookup?.Cancel(); claude.Dispose(); secondaryClaude.Dispose(); web.Dispose(); if (dictionaryTask.IsCompletedSuccessfully) dictionaryTask.Result.Dispose(); };
+        Closed += (_, _) => { lookup?.Cancel(); StopSpeech(); speech.Dispose(); pronunciations.Dispose(); claude.Dispose(); secondaryClaude.Dispose(); web.Dispose(); if (dictionaryTask.IsCompletedSuccessfully) dictionaryTask.Result.Dispose(); };
     }
     public void Restore()
     {
@@ -119,6 +119,7 @@ public partial class MainWindow : Window
     }
     private async void Settings_Click(object sender, RoutedEventArgs e)
     {
+        StopSpeech();
         var previous = JsonSerializer.Serialize(settings, Json.Options);
         var dialog = new SettingsWindow(settings, dictionaryTask.IsCompletedSuccessfully ? dictionaryTask.Result.Dictionaries : DictionaryCatalog.InspectAll(Path.Combine(App.Root, "data"))) { Owner = this };
         if (dialog.ShowDialog() == true)
@@ -143,18 +144,20 @@ public partial class MainWindow : Window
         if (Queries.IsText(raw, knownTerm))
         { await TranslateTextAsync(raw.Trim(), force); return; }
         var query = Queries.Normalize(raw);
+        StopSpeech();
         lookup?.Cancel(); lookup?.Dispose(); lookup = new();
+        speechText = raw.Trim();
         var token = lookup.Token;
         current = query;
         ResetSenseDetails();
         SetQuery(raw.Trim());
         Welcome.Visibility = Visibility.Collapsed; EntryPanel.Visibility = Visibility.Visible;
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
-        Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = "";
+        Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = ""; Phonetic.ToolTip = null; sourcePronunciation = false;
         LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear();
         ResultsScroll.ScrollToTop(); LookupStatus.Text = "查询本地词库…";
         var modelsEnabled = settings.Online && (settings.AutoAi || force);
-        var mergeEnabled = modelsEnabled && settings.MergeSenses && LookupModel.Selected(settings).Length > 1;
+        var mergeEnabled = modelsEnabled && settings.MergeSenses;
         var initialProgress = QueryProgressState.Dictionary(modelsEnabled, mergeEnabled);
         var request = QueryProgress.Begin(initialProgress);
         var watch = Stopwatch.StartNew();
@@ -175,6 +178,7 @@ public partial class MainWindow : Window
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }
             token.ThrowIfCancellationRequested();
             RenderLocal(local, query);
+            var pronunciationTask = LoadPronunciationAsync(query, local, token, force);
             var online = cache.Read<OnlineEntry>("online-v2", query);
             if (online != null) RenderOnline(online, true);
             var evidence = DictionaryEvidence.Combine(query, local, online);
@@ -209,6 +213,7 @@ public partial class MainWindow : Window
             if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence, !modelsEnabled);
             if (!modelsEnabled)
             {
+                await pronunciationTask; token.ThrowIfCancellationRequested();
                 LookupStatus.Text = Status(notes, "查询完成 · 点击“重新生成”获取双语释义");
                 QueryProgress.Update(request, QueryProgressState.SourcesFinished(false, sourceIncomplete)); return;
             }
@@ -226,6 +231,7 @@ public partial class MainWindow : Window
                     LookupStatus.Text = snapshot.Merging ? "释义已显示 · 正在合并同义项…" : ModelStatus(snapshot);
                 });
                 var result = await coordinator.LookupAsync(query, evidence, settings, force, token, progress);
+                await pronunciationTask;
                 token.ThrowIfCancellationRequested();
                 finished = true;
                 if (result.Groups.Length > 0) firstDefinitionMs ??= watch.ElapsedMilliseconds;

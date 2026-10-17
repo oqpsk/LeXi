@@ -41,6 +41,7 @@ internal static partial class Program
         CheckParallelResults(main, settings);
         CheckDensity(main);
         CheckQueryProgress(app, main);
+        CheckSpeechPresentation(main, settings);
         CheckNativeFrame();
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)

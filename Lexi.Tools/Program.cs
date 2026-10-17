@@ -5,7 +5,8 @@ using Microsoft.VisualBasic.FileIO;
 using Lexi.Core;
 
 if (args.Length < 1) throw new ArgumentException("build-data <csv> <folder> | check <folder> [--fixture] | stream-check | live <folder> <assets> <cache> <word> [model] | bench-claude <assets> <work-folder> <words...> | cancel-check <assets> <work-folder>");
-if (args[0] == "build-data")
+if (args[0] == "speech-check") await SpeechChecks.Run();
+else if (args[0] == "build-data")
 {
     Directory.CreateDirectory(args[2]);
     var entries = new Dictionary<string, LocalEntry>(StringComparer.Ordinal);

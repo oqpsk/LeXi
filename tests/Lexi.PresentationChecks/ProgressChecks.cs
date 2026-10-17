@@ -15,8 +15,8 @@ internal static partial class Program
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
         var view = (QueryProgressView)main.FindName("QueryProgress");
         var scroll = (ScrollViewer)main.FindName("ResultsScroll");
-        Check(view.Visibility == Visibility.Collapsed && view.Parent == scroll.Parent && Grid.GetRow(view) < Grid.GetRow(scroll),
-            "query progress is initially hidden and stays outside the scrolling results");
+        Check(view.Visibility == Visibility.Hidden && view.Parent is StackPanel && !Contents(scroll).Contains(view) && !Theme.CanDragFrom(view),
+            "diamond progress reserves space beside the query controls and never starts a window drag");
         var primary = new LookupModel("codex", "gpt-6.1-sol"); var secondary = new LookupModel("claude", "haiku");
         AiSense Sense(int i) => new("noun", "Synthetic meaning " + i, "合成释义 " + i, "standard", "Example.", "例句。", []);
         AiEntry Entry(params int[] values) => new("fixture", true, values.Select(Sense).ToArray(), "", "unverified");
@@ -80,17 +80,12 @@ internal static partial class Program
         foreach (var state in states)
         {
             view.Begin(state); Measure((FrameworkElement)main.Content, 558, 398);
-            foreach (var text in Contents(view, true).OfType<TextBlock>())
-            {
-                var line = new FormattedText(new TextRange(text.ContentStart, text.ContentEnd).Text, CultureInfo.GetCultureInfo("zh-CN"), FlowDirection.LeftToRight,
-                    new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch), text.FontSize, Brushes.White, 1);
-                fits &= line.Width <= text.ActualWidth + 1;
-                if (line.Width > text.ActualWidth + 1) Console.WriteLine($"LAYOUT: {state.Title}; '{line.Text}'; text {line.Width:0.0}, available {text.ActualWidth:0.0}");
-            }
-            fits &= view.ActualHeight <= 56 && scroll.ActualHeight > 150;
-            if (view.ActualHeight > 56 || scroll.ActualHeight <= 150) Console.WriteLine($"LAYOUT: {state.Title}; strip {view.ActualHeight}, results {scroll.ActualHeight}");
+            var tooltip = (ToolTip)view.ToolTip;
+            fits &= Contents(tooltip).OfType<TextBlock>().Any(t => t.Text.Contains(state.Detail)) &&
+                Contents(view.Content as DependencyObject ?? view).OfType<System.Windows.Shapes.Ellipse>().Count() == 4 &&
+                view.ActualHeight <= 32 && view.ActualWidth <= 32 && scroll.ActualHeight > 200;
         }
-        Check(fits, "every progress state fits the minimum window without truncation or taking more than 56 DIP");
+        Check(fits, "four-dot progress fits the query row and retains full state information in its tooltip");
         var accent = ((SolidColorBrush)app.FindResource("Accent")).Color;
         var selection = ((SolidColorBrush)app.FindResource("Selection")).Color;
         var ink = ((SolidColorBrush)app.FindResource("Ink")).Color;
