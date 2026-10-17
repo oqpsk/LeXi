@@ -22,7 +22,7 @@ public partial class MainWindow
             if (token.IsCancellationRequested || current != query) return;
             var values = entry.Ipa.Where(p => !string.IsNullOrWhiteSpace(p) && Pronunciation.Valid(p)).ToArray();
             if (values.Length == 0) return;
-            sourcePronunciation = true; Phonetic.Text = string.Join(" · ", values);
+            sourcePronunciation = true; Phonetic.Text = string.Join(" · ", values); PhoneticLabel.Text = ""; PhoneticLabel.ToolTip = null;
             Phonetic.ToolTip = "Wiktionary 音标 · CC BY-SA 4.0\n" + entry.SourceUrl;
         }
         if (cached?.Word == query && cached.Ipa is { Length: > 0 }) Apply(cached);
@@ -42,7 +42,8 @@ public partial class MainWindow
         if (sourcePronunciation) return;
         var answer = snapshot.Answers.FirstOrDefault(a => a.Entry is { Found: true } && !string.IsNullOrWhiteSpace(a.Entry.Phonetic));
         if (answer?.Entry is not { } entry || !Pronunciation.Valid(entry.Phonetic)) return;
-        Phonetic.Text = entry.Phonetic + " · AI";
+        Phonetic.Text = entry.Phonetic; PhoneticLabel.Text = "  AI";
         Phonetic.ToolTip = answer.Model.Name + " 提供的音标 · 未经词典来源核验";
+        PhoneticLabel.ToolTip = Phonetic.ToolTip;
     }
 }

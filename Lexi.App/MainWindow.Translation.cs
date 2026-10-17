@@ -23,6 +23,7 @@ public partial class MainWindow
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
         Headword.Text = "翻译"; Headword.FontSize = 28;
         Phonetic.Text = target == "zh" ? "英文 → 中文" : "中文 → English";
+        Phonetic.ToolTip = null; PhoneticLabel.Text = ""; PhoneticLabel.ToolTip = null;
         AiPanel.Children.Clear(); LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); ResultsScroll.ScrollToTop();
         var initialProgress = QueryProgressState.Translating();
         var request = QueryProgress.Begin(initialProgress);

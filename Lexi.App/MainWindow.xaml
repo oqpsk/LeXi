@@ -14,12 +14,11 @@
             <TextBox x:Name="SearchBox" FontSize="21" BorderThickness="0" Background="Transparent" Padding="0,12" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="50" MaxHeight="160" VerticalScrollBarVisibility="Auto" TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_KeyDown" AutomationProperties.Name="输入单词、短语或待翻译文本"/>
             <TextBlock x:Name="Placeholder" Text="查一个词，或翻译一段文字…" IsHitTestVisible="False" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="20"/>
           </Grid>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-            <local:QueryProgressView x:Name="QueryProgress" Margin="0,0,8,0"/>
-            <Button Click="Search_Click" Width="30" Height="26" Padding="0" Background="{StaticResource Surface}" BorderThickness="1" ToolTip="查询" AutomationProperties.Name="查询"><Path Data="{StaticResource EnterIcon}" Style="{StaticResource IconPath}" Width="13" Height="13"/></Button>
-            <Border Width="1" Height="20" Background="{StaticResource Stroke}" Margin="12,0,7,0"/>
-            <Button Style="{StaticResource IconButton}" Click="Settings_Click" ToolTip="设置 · Ctrl+," AutomationProperties.Name="设置"><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource IconPath}"/></Button>
-            <Button Style="{StaticResource IconButton}" Click="Hide_Click" ToolTip="收起 · Esc" AutomationProperties.Name="收起窗口"><Path Data="{StaticResource CloseIcon}" Style="{StaticResource IconPath}" Width="13" Height="13"/></Button>
+          <StackPanel x:Name="SearchActions" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+            <local:QueryProgressView x:Name="QueryProgress" Margin="0,0,4,0"/>
+            <Button Style="{StaticResource IconButton}" Click="Search_Click" Margin="0,0,4,0" ToolTip="查询 · Enter" AutomationProperties.Name="查询"><Path Data="{StaticResource EnterIcon}" Style="{StaticResource IconPath}"/></Button>
+            <Button Style="{StaticResource IconButton}" Click="Settings_Click" Margin="0,0,4,0" ToolTip="设置 · Ctrl+," AutomationProperties.Name="设置"><Path Data="{StaticResource SettingsIcon}" Style="{StaticResource IconPath}"/></Button>
+            <Button Style="{StaticResource IconButton}" Click="Hide_Click" ToolTip="收起 · Esc" AutomationProperties.Name="收起窗口"><Path Data="{StaticResource CloseIcon}" Style="{StaticResource IconPath}"/></Button>
           </StackPanel>
         </Grid>
       </Border>
@@ -53,11 +52,7 @@
             </Button>
           </StackPanel>
           <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
-            <WrapPanel Margin="0,0,0,10">
-              <TextBlock x:Name="Headword" FontSize="30" FontWeight="SemiBold" Margin="0,0,12,0"/>
-              <TextBlock x:Name="Phonetic" Foreground="{StaticResource Muted}" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,0,3"/>
-              <Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="8,0,0,0" VerticalAlignment="Center" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button>
-            </WrapPanel>
+            <TextBlock x:Name="EntryHeading" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"><Run x:Name="Headword" FontSize="30" FontWeight="SemiBold"/><Run Text="&#160;&#160;"/><Run x:Name="Phonetic" Foreground="{StaticResource Muted}"/><Run x:Name="PhoneticLabel" FontSize="12" Foreground="{StaticResource Muted}"/><InlineUIContainer BaselineAlignment="TextBottom"><Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button></InlineUIContainer></TextBlock>
             <StackPanel x:Name="AiPanel"/>
             <StackPanel x:Name="LocalPanel"/>
             <StackPanel x:Name="OnlinePanel"/>

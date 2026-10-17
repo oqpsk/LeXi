@@ -16,7 +16,7 @@ internal static partial class Program
         var view = (QueryProgressView)main.FindName("QueryProgress");
         var scroll = (ScrollViewer)main.FindName("ResultsScroll");
         Check(view.Visibility == Visibility.Hidden && view.Parent is StackPanel && !Contents(scroll).Contains(view) && !Theme.CanDragFrom(view),
-            "diamond progress reserves space beside the query controls and never starts a window drag");
+            "compact progress reserves space beside the query controls and never starts a window drag");
         var primary = new LookupModel("codex", "gpt-6.1-sol"); var secondary = new LookupModel("claude", "haiku");
         AiSense Sense(int i) => new("noun", "Synthetic meaning " + i, "合成释义 " + i, "standard", "Example.", "例句。", []);
         AiEntry Entry(params int[] values) => new("fixture", true, values.Select(Sense).ToArray(), "", "unverified");
@@ -82,10 +82,10 @@ internal static partial class Program
             view.Begin(state); Measure((FrameworkElement)main.Content, 558, 398);
             var tooltip = (ToolTip)view.ToolTip;
             fits &= Contents(tooltip).OfType<TextBlock>().Any(t => t.Text.Contains(state.Detail)) &&
-                Contents(view.Content as DependencyObject ?? view).OfType<System.Windows.Shapes.Ellipse>().Count() == 4 &&
+                view.Content is FrameworkElement glyph && glyph.Width == 18 && glyph.Height == 18 &&
                 view.ActualHeight <= 32 && view.ActualWidth <= 32 && scroll.ActualHeight > 200;
         }
-        Check(fits, "four-dot progress fits the query row and retains full state information in its tooltip");
+        Check(fits, "status ring fits the query row and retains full stage information in its tooltip");
         var accent = ((SolidColorBrush)app.FindResource("Accent")).Color;
         var selection = ((SolidColorBrush)app.FindResource("Selection")).Color;
         var ink = ((SolidColorBrush)app.FindResource("Ink")).Color;
