@@ -43,7 +43,7 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
             "--no-chrome", "--no-session-persistence", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
             "--system-prompt", instructions + "\nFor define, use this JSON schema:\n" + schema + "\nFor translate, use this JSON schema:\n" + translationSchema }) info.ArgumentList.Add(arg);
         // Only the official CLI handles subscription credentials. Lexi never reads or copies tokens.
-        foreach (var key in new[] { "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN" }) info.Environment.Remove(key);
+        foreach (var key in ProviderConnection.ClaudeClearedVariables) info.Environment.Remove(key);
         info.Environment["MAX_THINKING_TOKENS"] = "0";
         return new Worker(info, model);
     }

@@ -1,6 +1,6 @@
 # 功能对照
 
-LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）共用 `Lexi.Core` 的查询、缓存、合并、来源、进度与状态文字。两端功能和行为一致，外观各自遵循平台规范。
+LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）共用 `Lexi.Core` 的查询、缓存、合并、来源、进度与状态文字。Windows 直接引用 Core；macOS 通过内置的 `Lexi.Host`（[协议](docs/host-protocol.md)）调用同一份 Core。两端功能和行为一致，外观各自遵循平台规范。
 
 改变用户可见的功能或行为时，在同一个 PR 中更新本表：写明共享实现、两端入口，或另一平台的临时缺口。平台专属功能写出对应实现；没有对应时写“不适用”并说明原因。
 
@@ -32,7 +32,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 
 | 功能 | 共享行为（Lexi.Core） | Windows | macOS |
 |---|---|---|---|
-| 查询与模型设置 | `AppSettings`、`QuerySession.SettingsSaved` | 已实现 | 计划 |
+| 查询与模型设置 | `AppSettings`、`ModelCatalog`（模型选项与校验）、`QuerySession.SettingsSaved` | 已实现 | 计划 |
 | 离线词典启停与信息 | `DictionaryCatalog` | 已实现：设置 → 离线词典 | 计划 |
 | 官方客户端登录与状态 | `ProviderConnection`、`ToolLocator`（不依赖 shell PATH） | 已实现：设置 → 账号连接 | 计划 |
 | 本地发音 | `SpeechCatalog` | 已实现：Windows SAPI 声线 | 计划：系统声线 |

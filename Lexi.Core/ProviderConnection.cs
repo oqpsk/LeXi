@@ -7,6 +7,9 @@ public sealed record LoginStatus(bool Installed, bool SignedIn, string Message);
 
 public static class ProviderConnection
 {
+    // Variables that would make Claude Code bypass the subscription login; removed from every client launch.
+    public static readonly string[] ClaudeClearedVariables = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"];
+
     public static ProcessStartInfo? Command(string provider, string codexPath, bool login)
     {
         if (provider is not ("codex" or "claude")) throw new ArgumentException("Unknown provider");
@@ -18,7 +21,7 @@ public static class ProviderConnection
         {
             info.ArgumentList.Add("auth");
             // Match the subscription-backed dictionary worker, without reading any credential files.
-            foreach (var key in new[] { "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN" }) info.Environment.Remove(key);
+            foreach (var key in ClaudeClearedVariables) info.Environment.Remove(key);
         }
         info.ArgumentList.Add(login ? "login" : provider == "codex" ? "login" : "status");
         if (!login && provider == "codex") info.ArgumentList.Add("status");

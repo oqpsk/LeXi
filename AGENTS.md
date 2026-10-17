@@ -57,6 +57,6 @@ Rules are grouped by where they apply. Shared behavior belongs to `Lexi.Core` an
 
 - SwiftUI with Liquid Glass, minimum macOS 26. Follow the macOS Human Interface Guidelines for menus, shortcuts, settings, windows and accessibility; do not imitate WPF layouts.
 - Use glass only for the toolbar, controls and popovers. Result text sits on normal backgrounds. Pink is an accent, not a surface.
-- The app bundles a self-contained `Lexi.Host` and talks to it over JSON lines. Keep the protocol versioned; render Host views as received and reject stale revisions.
+- The app bundles a self-contained `Lexi.Host` and talks to it over JSON lines. Render Host views as received and reject stale revisions. Incompatible protocol changes raise `HostServer.Protocol` and update docs/host-protocol.md and host-check in the same PR.
 - User data lives in `~/Library/Application Support/LeXi`. Local speech uses system voices; speech keys use the Keychain.
 - Keep window state with the system's restoration. The app is a regular windowed app; closing the window does not quit it.

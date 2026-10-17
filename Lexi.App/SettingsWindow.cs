@@ -11,7 +11,6 @@ public sealed partial class SettingsWindow : Window
     private static Brush Muted => Theme.Brush("Muted");
     private static Brush Accent => Theme.Brush("Accent");
     private static TextBlock Text(string text, double size = 15, Brush? color = null) => new() { Text = text, FontSize = size, Foreground = color ?? Theme.Brush("Ink"), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,10) };
-    private sealed record ModelChoice(string Label, string Id, string Provider = "codex") { public override string ToString() => Label; }
     public SettingsWindow(AppSettings settings, InstalledDictionary[] installed) : this(settings, installed, null) { }
     internal SettingsWindow(AppSettings settings, InstalledDictionary[] installed, SpeechClient? speechMetadata)
     {
@@ -42,10 +41,8 @@ public sealed partial class SettingsWindow : Window
         general.Children.Add(Text("使用本机 Claude Code / Codex 的订阅登录。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。", 14, Muted));
         general.Children.Add(Text("查过的内容直接使用缓存。切换模型后，点击“重新生成”才会更新已有结果。", 14, Muted));
         var label = Text("主要模型 · 查词与翻译"); label.Margin = new(0,13,0,8); general.Children.Add(label);
-        var choices = new List<ModelChoice> { new("Claude Haiku · 流式显示", "haiku", "claude"), new("GPT-6 Luna · Fast", "gpt-6-luna"), new("GPT-6.1 Sol · Fast", "gpt-6.1-sol"), new("Codex 默认 · Fast", "") };
+        var choices = ModelCatalog.Choices(settings);
         var primaryChoice = LookupModel.Primary(settings); var secondChoice = LookupModel.Secondary(settings);
-        foreach (var selected in new[] { primaryChoice, secondChoice, new LookupModel("codex", settings.JudgeModel) })
-            if (!choices.Any(x => x.Id == selected.Model && x.Provider == selected.Provider)) choices.Add(new(selected.Name, selected.Model, selected.Provider));
         ComboBox ModelSelector(LookupModel selected, IEnumerable<ModelChoice> available) => new()
         {
             ItemsSource = available, IsSynchronizedWithCurrentItem = false,
@@ -60,7 +57,7 @@ public sealed partial class SettingsWindow : Window
         var merge = new CheckBox { Content = "自动整理同类义项（包含单模型内部）", IsChecked = settings.MergeSenses, Margin = new(0,6,0,12) }; general.Children.Add(merge);
         var judgePanel = new StackPanel(); general.Children.Add(judgePanel);
         judgePanel.Children.Add(Text("义项判断模型 · 使用 Codex 订阅"));
-        var judge = ModelSelector(new("codex", settings.JudgeModel), choices.Where(c => c.Provider == "codex").ToArray()); judgePanel.Children.Add(judge);
+        var judge = ModelSelector(new("codex", settings.JudgeModel), ModelCatalog.JudgeChoices(choices)); judgePanel.Children.Add(judge);
         general.Children.Add(Text("同一词义的细分用法可归为一组，优先展示涵盖更完整的原文；其他表述保留在“用法细分”中。不同含义和分歧仍分开。", 14, Muted));
         void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true; }
         parallel.Checked += (_, _) => UpdateParallelControls(); parallel.Unchecked += (_, _) => UpdateParallelControls();
@@ -113,8 +110,10 @@ public sealed partial class SettingsWindow : Window
         save.Click += (_, _) =>
         {
             var primaryValue = (ModelChoice)model.SelectedItem; var secondaryValue = (ModelChoice)secondary.SelectedItem;
-            if (parallel.IsChecked == true && primaryValue.Provider == secondaryValue.Provider && primaryValue.Id == secondaryValue.Id)
-            { modelError.Text = "请选择两个不同的查询模型。"; modelError.Visibility = Visibility.Visible; modelError.BringIntoView(); return; }
+            var candidate = settings.ForModel(new(primaryValue.Provider, primaryValue.Id));
+            candidate.ParallelLookup = parallel.IsChecked == true; candidate.SecondaryProvider = secondaryValue.Provider; candidate.SecondaryModel = secondaryValue.Id;
+            if (ModelCatalog.Validate(candidate) is { } invalid)
+            { modelError.Text = invalid; modelError.Visibility = Visibility.Visible; modelError.BringIntoView(); return; }
             if (!saveSpeech()) return;
             settings.MinimizeOnClose = closeBehavior.SelectedIndex == 0;
             settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
@@ -125,7 +124,7 @@ public sealed partial class SettingsWindow : Window
             settings.ParallelLookup = parallel.IsChecked == true; settings.MergeSenses = merge.IsChecked == true;
             settings.SecondaryProvider = secondaryValue.Provider; settings.SecondaryModel = secondaryValue.Id;
             settings.JudgeModel = ((ModelChoice)judge.SelectedItem).Id;
-            settings.ReasoningEffort = "low"; settings.ServiceTier = "fast"; DialogResult = true;
+            ModelCatalog.ApplyFixedOptions(settings); DialogResult = true;
         };
     }
     private static void Open(string target)

@@ -1,0 +1,67 @@
+# Lexi.Host 协议
+
+`lexi-host` 把 `Lexi.Core` 的查询、翻译、建议、历史与设置提供给原生前端（目前是 macOS 应用）。前端不重新实现查询逻辑，只渲染 Host 发来的视图。
+
+## 启动
+
+```
+lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模型说明与结构目录>]
+```
+
+未指定时使用 `LexiPaths`：macOS 为 `~/Library/Application Support/LeXi`（词库在其中的 `data`），资源目录为程序旁的 `assets`。`--version` 输出版本号。参数错误时退出码为 2，用户目录无法创建时为 3。
+
+标准输入和标准输出各传输 UTF-8 JSON，每行一条消息。标准输出只包含协议消息；诊断信息写入标准错误，不包含查询文本、账号或密钥。标准输入关闭或收到 `shutdown` 后，Host 结束正在进行的请求并退出。
+
+## 消息
+
+请求必须带 `id`（数字或字符串）和 `method`，`params` 可省略：
+
+```json
+{"id": 7, "method": "query.submit", "params": {"text": "serendipity"}}
+```
+
+每个请求恰好得到一条响应，`result` 与 `error` 二选一。多个请求可以并行，响应顺序不保证与请求一致：
+
+```json
+{"id": 7, "result": {"request": 3, "revision": 41}}
+{"id": 8, "error": {"code": "invalid_settings", "message": "请选择两个不同的查询模型。"}}
+```
+
+错误代码：`parse_error`、`invalid_request`、`method_not_found`、`invalid_params`、`invalid_settings`（`message` 可直接显示）、`cancelled`、`internal_error`（只包含错误类别）。无法确定 `id` 的错误使用 `"id": null`。
+
+查询状态通过事件推送，每次 Core 发布新视图时发送一条：
+
+```json
+{"event": "view", "data": { "request": 3, "revision": 41, "kind": "dictionary", "...": "..." }}
+```
+
+`data` 是完整的 `QueryView`（字段见 `Lexi.Core/QueryViews.cs`），字段名为 camelCase，枚举为 camelCase 字符串。`revision` 在整个会话中递增；前端丢弃不大于已显示 `revision` 的视图。`request` 变化表示新的查询页面。`progress` 为 `null` 表示没有进行中的查询；`progressGeneration` 变化表示新的进度周期。视图中的文字、来源说明、阶段和状态都已由 Core 决定，前端不再推断。
+
+## 方法
+
+| 方法 | 参数 | 结果 |
+|---|---|---|
+| `initialize` | — | `protocol`、`version`、`platform`、`paths`、当前 `view`、`settings`（同 `settings.get`）。等待离线词库加载 |
+| `query.submit` | `text`，可选 `force`、`scroll` | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送 |
+| `query.regenerate` | — | 跳过已保存结果重新查询当前页面 |
+| `query.navigate` | `direction`（-1 或 1），可选 `scroll` | `{page, view}`；`page` 为 `null` 表示已到边界 |
+| `query.home` | 可选 `scroll` | 返回查询历史页面 |
+| `query.cancel` | — | 停止当前查询，保留已显示内容 |
+| `query.view` | — | 当前 `QueryView` |
+| `suggest` | `text` | `{suggestions}` |
+| `history.list` | — | `{entries: [{query, translation, queriedAt, preview, kind}], error}` |
+| `history.remove` | `query`、`translation` | `{removed, history}` |
+| `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |
+| `settings.update` | `settings`（只含要修改的字段） | 与 Windows 设置相同的校验，保存后返回 `settings.get` 的内容 |
+| `settings.setOnline` | `online` | 切换在线补充并返回设置 |
+| `dictionaries.list` | — | `{dictionaries, folder}` |
+| `connection.status` | `provider`（`codex` 或 `claude`），可选 `codexPath` | `{installed, signedIn, message}`，只含经过清理的摘要 |
+| `connection.loginCommand` | `provider`，可选 `codexPath` | `{fileName, arguments, path, clearEnvironment}` 或 `null`。前端仅在用户点击后在终端中运行，并清除 `clearEnvironment` 中的变量 |
+| `cancel` | `id` | 取消仍在运行的请求，`{cancelled}` |
+| `shutdown` | — | 等待其余请求结束后最后响应，然后退出 |
+
+## 兼容
+
+不兼容的变化提高 `HostServer.Protocol`。前端在 `initialize` 后检查 `protocol`，不一致时提示重新安装。新增字段和方法不改变版本号；前端忽略未知字段。
+
+`host-check` 在进程内用合成模型检查流式视图、取消、错误和设置，并分别以 `dotnet` 和单文件发布形式启动 Host 检查标准输出与退出行为。

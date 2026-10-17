@@ -3,6 +3,7 @@
     "path": "Lexi.sln",
     "projects": [
       "Lexi.Core\\Lexi.Core.csproj",
+      "Lexi.Host\\Lexi.Host.csproj",
       "Lexi.Tools\\Lexi.Tools.csproj"
     ]
   }
