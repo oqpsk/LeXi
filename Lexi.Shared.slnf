@@ -1,0 +1,9 @@
+{
+  "solution": {
+    "path": "Lexi.sln",
+    "projects": [
+      "Lexi.Core\\Lexi.Core.csproj",
+      "Lexi.Tools\\Lexi.Tools.csproj"
+    ]
+  }
+}
