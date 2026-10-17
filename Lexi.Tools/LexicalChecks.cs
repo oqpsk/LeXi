@@ -70,7 +70,35 @@ internal static class LexicalChecks
             "late optional etymology does not invalidate already usable definition caches");
         try { CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(inflected with { Word="tee" },Json.Options),"TEE",null); Check(false,"wrong-case acronym"); }
         catch (InvalidDataException) { Check(true,"a lowercase model response cannot replace an uppercase acronym entry"); }
+        CheckQuickRead(Check);
         Console.WriteLine($"{count} lexical coverage checks passed");
+    }
+    private static void CheckQuickRead(Action<bool,string> check)
+    {
+        var brief = SpecialistReferences.Lookup("TEE").Single();
+        var evidence = DictionaryEvidence.Combine("TEE",[],null)!;
+        var model = new LookupModel("codex","fixture");
+        var sense = new AiSense("noun",brief.English,brief.Chinese,brief.Domain,"","",[1],"abbreviation",brief.Expansion,"可信执行环境");
+        var candidate = new SenseCandidate("m0s0",model,sense,"source_based",false);
+        SenseGroup[] groups = [new([candidate])];
+        check(SpecialistReferences.Uncovered("TEE",groups,evidence).Length==0, "completed cited professional senses replace the corresponding fallback");
+        check(SpecialistReferences.Uncovered("TEE",[new([candidate with {Provisional=true}])],evidence).Length==1, "partial model output cannot discard sourced fallback meanings");
+        check(!SpecialistReferences.Covered(brief,[new([candidate with { Sense=sense with { Expansion="Transesophageal Echocardiography" } }])],evidence), "an unrelated abbreviation cannot consume a brief even with a mistaken citation");
+        check(!SpecialistReferences.Covered(brief,[new([candidate with { Sense=sense with { Evidence=[] } }])],evidence), "unsupported model content does not silently discard a source brief");
+        var alternate = candidate with { Id="m1s0", Sense=sense with {Evidence=[]} };
+        check(SpecialistReferences.Covered(brief,[new([alternate,candidate])],evidence), "merged alternatives retain a reference even when the representative has no citation");
+        check(QuickRead.Create(groups,[],[]).Single().Text=="可信执行环境", "overview reuses the completed sense gloss");
+        check(QuickRead.Create([new([candidate with {Provisional=true}])],[],[]).Length==0, "streaming fragments never enter the overview");
+        check(QuickRead.Create([new([candidate with {Sense=sense with {Gloss=""}}])],[],[]).Single().Text==brief.Chinese.TrimEnd('。'), "legacy caches retain a complete-text overview fallback");
+        check(QuickRead.ValidGloss(new string('词',33))=="" && QuickRead.ValidGloss("English only")=="" && QuickRead.ValidGloss("词\n语")=="", "invalid glosses are ignored without failing valid definitions");
+        check(QuickRead.Excerpt(new string('词',70)+"不能省略的限制。")=="", "long definitions are never clipped mid-clause to fabricate a short meaning");
+        var other = candidate with { Id="m0s1",Sense=sense with {Gloss="经食道超声心动图",Expansion="Transesophageal Echocardiography"} };
+        check(QuickRead.Create([groups[0],new([other])],[],[]).Length==2, "polysemous overviews can preserve two different full meanings");
+        var before = new SenseMergeRequest("TEE",[candidate with {Sense=sense with {Gloss=""}}],[]);
+        var after = new SenseMergeRequest("TEE",[candidate],[]);
+        check(before.InputHash==after.InputHash, "presentation-only glosses do not invalidate existing sense-judge caches");
+        var parsed=CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(new AiEntry("TEE",true,[sense],"","source_based"),Json.Options),"TEE",evidence);
+        check(parsed.Senses[0].Gloss==sense.Gloss, "short glosses survive provider validation and cache round trips");
     }
     private sealed class Handler(Func<HttpRequestMessage,CancellationToken,Task<HttpResponseMessage>> send) : HttpMessageHandler
     { protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token) => send(request,token); }

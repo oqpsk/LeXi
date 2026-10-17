@@ -30,6 +30,10 @@ public partial class MainWindow : Window
         InitializeComponent();
         Theme.ApplyChrome(this);
         UpdateOnlineButton();
+        LocationChanged += (_, _) => EtymologyPopup.IsOpen = false;
+        SizeChanged += (_, _) => EtymologyPopup.IsOpen = false;
+        Deactivated += (_, _) => EtymologyPopup.IsOpen = false;
+        ResultsScroll.ScrollChanged += (_, e) => { if (e.VerticalChange != 0) EtymologyPopup.IsOpen = false; };
         dictionaryTask = Task.Run(() => new OfflineLibrary(Path.Combine(App.Root, "data")));
         Loaded += async (_, _) =>
         {
@@ -61,7 +65,8 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Escape)
         {
-            if (Suggestions.Visibility == Visibility.Visible) Suggestions.Visibility = Visibility.Collapsed;
+            if (EtymologyPopup.IsOpen) DismissEtymology();
+            else if (Suggestions.Visibility == Visibility.Visible) Suggestions.Visibility = Visibility.Collapsed;
             else WindowState = WindowState.Minimized;
             e.Handled = true;
         }
@@ -191,7 +196,7 @@ public partial class MainWindow : Window
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }
             token.ThrowIfCancellationRequested();
-            RenderLocal(local, query); RenderReferenceBriefs(query);
+            RenderLocal(local, query); BeginLexicalOverview(query, local);
             var pronunciationTask = LoadPronunciationAsync(query, local, token, force);
             var online = cache.Read<OnlineEntry>("online-v3", query);
             var legacyOnline = online == null;
@@ -224,9 +229,8 @@ public partial class MainWindow : Window
             if (online != null) RenderOnline(online, fresh || DateTimeOffset.UtcNow - online.FetchedAt > TimeSpan.FromMinutes(1));
             else { OnlinePanel.Children.Clear(); if (local.Length == 0) OnlinePanel.Children.Add(Hint("Wiktionary 暂无可用词条。")); }
             evidence = DictionaryEvidence.Combine(query, local, online, sourceEtymologies);
-            AiPanel.Children.Clear();
             cachedAnswers = coordinator.Cached(query, evidence, settings);
-            if (cachedAnswers.Groups.Length > 0) RenderAnswers(cachedAnswers, evidence, !modelsEnabled);
+            RenderAnswers(cachedAnswers, evidence, !modelsEnabled);
             if (!modelsEnabled)
             {
                 await pronunciationTask; token.ThrowIfCancellationRequested();
@@ -252,7 +256,7 @@ public partial class MainWindow : Window
                 finished = true;
                 if (result.Groups.Length > 0) firstDefinitionMs ??= watch.ElapsedMilliseconds;
                 RenderAnswers(result, evidence);
-                QueryProgress.Update(request, QueryProgressState.Finished(result, mergeEnabled, sourceIncomplete));
+                QueryProgress.Update(request, QueryProgressState.Finished(result, mergeEnabled, sourceIncomplete, SpecialistReferences.Uncovered(query, result.Groups, evidence).Length));
                 var failures = result.Answers.Count(a => a.Phase == ModelPhase.Failed);
                 var status = failures > 0 ? $"{failures} 个模型未完成 · 其余结果已保留" : "查询完成";
                 if (!string.IsNullOrEmpty(result.MergeNote)) status += " · " + result.MergeNote;

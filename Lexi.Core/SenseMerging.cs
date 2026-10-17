@@ -14,7 +14,19 @@ public sealed record SenseVerdict(string A, string B, string Relation, double Co
 public sealed record SenseMergePlan(string InputHash, SenseVerdict[] Pairs);
 public sealed record SenseMergeRequest(string Query, SenseCandidate[] Candidates, SensePair[] Pairs)
 {
-    public string InputHash => Cache.Hash(JsonSerializer.Serialize(new { version = 3, Query, Candidates, Pairs }, Json.Options));
+    // Gloss is display metadata. Keep the pre-gloss judgment identity for old caches.
+    public string InputHash => Cache.Hash(JsonSerializer.Serialize(new
+    {
+        version = 3, Query,
+        Candidates = Candidates.Select(c => new
+        {
+            c.Id, c.Model,
+            Sense = new { c.Sense.PartOfSpeech, c.Sense.English, c.Sense.Chinese, c.Sense.Register,
+                c.Sense.Example, c.Sense.ExampleChinese, c.Sense.Evidence, c.Sense.LexicalForm, c.Sense.Expansion },
+            c.EvidenceStatus, c.Provisional
+        }),
+        Pairs
+    }, Json.Options));
     public string Prompt => JsonSerializer.Serialize(new
     {
         task = "compare_senses", inputHash = InputHash, query = Query,

@@ -91,7 +91,8 @@ public partial class MainWindow
         var sources = new StackPanel();
         sources.Children.Add(CompactHint(candidate.Model.Name + " · " + Provenance(candidate)));
         sources.Children.Add(CompactHint("原始用法标签：" + candidate.Sense.PartOfSpeech + " · " + candidate.Sense.Register));
-        var numbers = candidate.Provisional || evidence == null ? [] : sense.Evidence.Distinct().Where(n => n >= 1 && n <= evidence.Senses.Length).ToArray();
+        var numbers = candidate.Provisional || evidence == null ? [] : new[] { candidate }.Concat(alternatives ?? [])
+            .Where(v => !v.Provisional).SelectMany(v => v.Sense.Evidence).Distinct().Where(n => n >= 1 && n <= evidence.Senses.Length).ToArray();
         var links = new WrapPanel(); sources.Children.Add(links);
         foreach (var number in numbers)
         {
@@ -99,10 +100,19 @@ public partial class MainWindow
             var link = new Button { Content = $"[{number}] {cited.SourceName} ↗", FontSize = 14, Foreground = muted, Padding = new(0,3,12,3), ToolTip = cited.Definition };
             link.Click += (_, _) => OpenSource(string.IsNullOrEmpty(cited.SourceUrl) ? evidence.Url : cited.SourceUrl);
             links.Children.Add(link);
+            foreach (var brief in SpecialistReferences.Cited(cited))
+            {
+                sources.Children.Add(CompactHint(brief.SourceName + " · LeXi 参考摘要"));
+                sources.Children.Add(CompactText(brief.Chinese, 16));
+                sources.Children.Add(CompactText(brief.English, 16));
+            }
         }
         if (numbers.Length == 0 && !candidate.Provisional) sources.Children.Add(CompactHint("当前解释来自模型知识，未附可直接核对的资料。"));
+        if (alternatives?.Length > 0) sources.Children.Add(CompactHint("资料链接包含同义项的其他表述所引用的内容。"));
         var sourceLabel = numbers.Length > 0 ? $"参考资料 · {numbers.Length}" : "参考资料";
-        AddDisclosure(controls, details, key + ":sources", sourceLabel, sources);
+        var keepReferenceOpen = numbers.Any(n => SpecialistReferences.Cited(evidence!.Senses[n - 1])
+            .Any(brief => senseDetails.GetValueOrDefault("reference:" + brief.Word)));
+        AddDisclosure(controls, details, key + ":sources", sourceLabel, sources, keepReferenceOpen);
 
         if (alternatives is not { Length: > 0 }) return;
         var originals = new StackPanel();

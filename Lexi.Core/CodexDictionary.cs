@@ -68,7 +68,7 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
         // Source-based is a provenance label, never a claim that AI correctness was verified.
         var supported = online != null && entry.EvidenceStatus == "source_based" && entry.Senses.All(s =>
             s.Evidence.Any(n => !online.Senses[n - 1].PartOfSpeech.StartsWith("terminology pair")));
-        return entry with { EvidenceStatus = supported ? "source_based" : "unverified", Senses = PrioritizeCurrent(entry.Senses),
+        return entry with { EvidenceStatus = supported ? "source_based" : "unverified", Senses = PrioritizeCurrent(entry.Senses.Select(s => s with { Gloss = QuickRead.ValidGloss(s.Gloss) })),
             Phonetic = Pronunciation.Format(entry.Phonetic), WordForms = ModelInflections.Sanitize(query, entry),
             Etymology = (entry.Etymology ?? "").Length <= 600 && Queries.HasChinese(entry.Etymology ?? "") ? entry.Etymology ?? "" : "" };
     }
