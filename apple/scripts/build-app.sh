@@ -39,4 +39,6 @@ cp -R "$root/licenses" "$app/Contents/Resources/licenses"
 # the hardened runtime and notarization (apple/README.md).
 codesign --force --sign - "$app/Contents/Helpers/lexi-host"
 codesign --force --sign - "$app"
+# A bundle rebuilt at the same path can keep a stale LaunchServices record, so `open` would not start it.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$app"
 echo "Built $app ($version, $arch)"
