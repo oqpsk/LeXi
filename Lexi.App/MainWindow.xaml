@@ -63,7 +63,7 @@
       <Border x:Name="StatusBar" Grid.Row="3" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="14,6">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <Border Background="{StaticResource AccentSurface}" Width="20" Height="20" CornerRadius="5" VerticalAlignment="Center" ToolTip="LeXi"><TextBlock Text="ξ" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+          <Border Background="{StaticResource LogoSurface}" Width="20" Height="20" CornerRadius="5" VerticalAlignment="Center" ToolTip="LeXi"><TextBlock Text="ξ" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
           <TextBlock x:Name="LookupStatus" Grid.Column="1" Text="正在准备词库…" FontSize="13" Margin="10,0,12,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.LiveSetting="Polite"/>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
             <Button x:Name="RefreshButton" Content="重新生成" Click="Refresh_Click" Height="32" Padding="10,4" Margin="0,0,10,0" FontSize="13" Background="{StaticResource Surface}" BorderBrush="#565861" BorderThickness="1" Visibility="Collapsed" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="重新生成当前查询"/>

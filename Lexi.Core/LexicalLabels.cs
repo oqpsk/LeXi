@@ -7,33 +7,33 @@ public static class LexicalLabels
     public static string PartOfSpeech(string raw)
     {
         var text = raw.Trim().ToLowerInvariant();
-        if (text.Contains("proper noun")) return "专有名词";
-        if (text.Contains("adverb") || Regex.IsMatch(text, @"^adv\.?$")) return "副词";
-        if (text.Contains("pronoun") || Regex.IsMatch(text, @"^pron\.?$")) return "代词";
-        if (text.Contains("adjective") || Regex.IsMatch(text, @"^(adj|a)\.?$")) return "形容词";
-        if (text.Contains("verb") || Regex.IsMatch(text, @"^v[ti]?\.?$")) return "动词";
-        if (text.Contains("noun") || Regex.IsMatch(text, @"^n\.?$")) return "名词";
-        if (text.Contains("preposition") || text is "prep" or "prep.") return "介词";
-        if (text.Contains("conjunction") || text is "conj" or "conj.") return "连词";
-        if (text.Contains("interjection") || text is "int" or "int.") return "感叹词";
-        if (text.Contains("phrase")) return "短语";
-        if (text.Contains("determiner")) return "限定词";
-        if (text.Contains("prefix")) return "前缀";
-        if (text.Contains("suffix")) return "后缀";
-        if (text.Contains("abbreviation") || text.Contains("acronym")) return "缩写";
-        if (text.Contains("participle") || text.Contains("gerund")) return "动词形式";
-        return Queries.HasChinese(raw) ? raw : "词语";
+        if (text.Contains("proper noun") || text.Contains("专有名词")) return "proper noun";
+        if (text.Contains("adverb") || text.Contains("副词") || Regex.IsMatch(text, @"^adv\.?$")) return "adverb";
+        if (text.Contains("pronoun") || text.Contains("代词") || Regex.IsMatch(text, @"^pron\.?$")) return "pronoun";
+        if (text.Contains("adjective") || text.Contains("形容词") || Regex.IsMatch(text, @"^(adj|a)\.?$")) return "adjective";
+        if (text.Contains("verb") || text.Contains("动词") || Regex.IsMatch(text, @"^v[ti]?\.?$")) return "verb";
+        if (text.Contains("noun") || text.Contains("名词") || Regex.IsMatch(text, @"^n\.?$")) return "noun";
+        if (text.Contains("preposition") || text == "介词" || text is "prep" or "prep.") return "preposition";
+        if (text.Contains("conjunction") || text == "连词" || text is "conj" or "conj.") return "conjunction";
+        if (text.Contains("interjection") || text == "感叹词" || text is "int" or "int.") return "interjection";
+        if (text.Contains("phrase") || text == "短语") return "phrase";
+        if (text.Contains("determiner") || text == "限定词") return "determiner";
+        if (text.Contains("prefix") || text == "前缀") return "prefix";
+        if (text.Contains("suffix") || text == "后缀") return "suffix";
+        if (text.Contains("abbreviation") || text.Contains("acronym") || text == "缩写") return "abbreviation";
+        if (text.Contains("participle") || text.Contains("gerund")) return "verb form";
+        return "term";
     }
     public static string Form(string raw)
     {
         var text = raw.ToLowerInvariant();
         var labels = new List<string>();
-        if (text.Contains("gerund")) labels.Add("动名词");
-        if (text.Contains("present participle")) labels.Add("现在分词");
-        if (text.Contains("past participle")) labels.Add("过去分词");
-        if (text.Contains("past tense")) labels.Add("过去式");
-        if (text.Contains("intransitive")) labels.Add("不及物");
-        else if (text.Contains("transitive")) labels.Add("及物");
+        if (text.Contains("gerund")) labels.Add("gerund");
+        if (text.Contains("present participle")) labels.Add("present participle");
+        if (text.Contains("past participle")) labels.Add("past participle");
+        if (text.Contains("past tense")) labels.Add("past tense");
+        if (text.Contains("intransitive")) labels.Add("intransitive");
+        else if (text.Contains("transitive")) labels.Add("transitive");
         return string.Join(" / ", labels);
     }
     public static string Usage(string raw)

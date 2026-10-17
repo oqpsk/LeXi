@@ -25,8 +25,8 @@ internal static partial class Program
         main.RenderAnswers(new(answers, SenseMerging.Group(answers)), null);
         var ai = (Panel)main.FindName("AiPanel");
         var runs = Contents(ai, true).OfType<TextBlock>().SelectMany(t => t.Inlines.OfType<Run>()).ToArray();
-        var wordClasses = runs.Where(r => r.Text is "动词" or "名词").ToArray();
-        Check(wordClasses.Length == 2 && wordClasses.All(r => r.FontSize >= 16 && r.FontWeight == FontWeights.SemiBold &&
+        var wordClasses = runs.Where(r => r.Text is "verb" or "noun").ToArray();
+        Check(wordClasses.Length == 2 && wordClasses.All(r => r.FontSize >= 16 && r.FontStyle == FontStyles.Italic && r.FontFamily.Source.Contains("Georgia") &&
             r.Foreground is SolidColorBrush b && b.Color == ((SolidColorBrush)Theme.Brush("Warning")).Color),
             "noun and verb senses have prominent warm-colored word-class labels");
         Check(runs.All(r => !r.Text.Contains("未核验") && !r.Text.Contains("standard")) &&
@@ -35,9 +35,20 @@ internal static partial class Program
         main.RenderWordForms("went", [new("go", [new("p","过去式",["went"]),new("d","过去分词",["gone"]),new("i","现在分词",["going"]),new("3","第三人称单数",["goes"])], "Synthetic source","https://example.org/forms")]);
         main.RenderAnswers(new(answers, SenseMerging.Group(answers)), null);
         var forms = (Panel)main.FindName("FormsPanel");
-        Check(Contents(forms, true).OfType<TextBox>().Any(t => t.Text == "gone") &&
-            Contents(forms, true).OfType<TextBlock>().Any(t => t.Text.Contains("went → go")),
+        Check(Contents(forms, true).OfType<TextBlock>().SelectMany(t => t.Inlines.OfType<Run>()).Any(r => r.Text == "gone") &&
+            Contents(forms, true).OfType<TextBlock>().SelectMany(t => t.Inlines.OfType<Run>()).Any(r => r.Text.Contains("went → go")),
             "recorded inflections remain visible when model results replace the definition card");
+        Check(!Contents(ai, true).OfType<TextBlock>().Any(t => t.Text == "双语释义") &&
+            !Contents(forms, true).OfType<TextBlock>().Any(t => t.Text == "词形变化"), "dictionary context does not consume rows with redundant section titles");
+        foreach (var width in new[] { 558, 718, 1078 })
+        {
+            Measure((FrameworkElement)main.Content, width, 618);
+            var cells = Contents(forms, true).OfType<TextBlock>().ToArray();
+            Check(cells.All(t => t.Inlines.OfType<Run>().Count() == 2 && t.Inlines.OfType<Run>().Last().FontFamily.Source.Contains("Georgia") &&
+                t.Inlines.OfType<Run>().All(r => r.BaselineAlignment == BaselineAlignment.Baseline) && t.ContextMenu?.Items.Count == 1 &&
+                t.TranslatePoint(new Point(t.ActualWidth, 0), forms).X <= forms.ActualWidth + 1),
+                $"word-form labels and serif spellings share baselines and wrap within {width} DIP without losing copy access");
+        }
         main.RenderWordForms("unknown", []);
         Check(forms.Children.Count == 0, "missing forms clear the previous word's inflections");
         var tabs = Contents(settings).OfType<TabControl>().Single();

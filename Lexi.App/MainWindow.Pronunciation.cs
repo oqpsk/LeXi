@@ -14,25 +14,28 @@ public partial class MainWindow
     {
         sourcePronunciation = !string.IsNullOrWhiteSpace(Phonetic.Text);
         if (sourcePronunciation)
-        { Phonetic.ToolTip = "音标来源：" + local.First(h => !string.IsNullOrWhiteSpace(h.Entry.Phonetic)).Dictionary.Name; return; }
+        { Phonetic.ToolTip = "音标来源：" + local.First(h => !string.IsNullOrWhiteSpace(h.Entry.Phonetic)).Dictionary.Name; }
         if (Queries.HasChinese(query)) return;
-        var cached = cache.Read<PronunciationEntry>("pronunciations-v1", query);
+        var cached = cache.Read<PronunciationEntry>("pronunciations-v2", query);
         void Apply(PronunciationEntry entry)
         {
             if (token.IsCancellationRequested || current != query) return;
+            if (entry.Forms is { Length: > 0 }) ApplyOnlineWordForms(query, entry.Forms);
+            if (sourcePronunciation) return;
             var values = entry.Ipa.Where(p => !string.IsNullOrWhiteSpace(p) && Pronunciation.Valid(p)).ToArray();
             if (values.Length == 0) return;
             sourcePronunciation = true; Phonetic.Text = string.Join(" · ", values); PhoneticLabel.Text = ""; PhoneticLabel.ToolTip = null;
             Phonetic.ToolTip = "Wiktionary 音标 · CC BY-SA 4.0\n" + entry.SourceUrl;
         }
-        if (cached?.Word == query && cached.Ipa is { Length: > 0 }) Apply(cached);
-        if (!settings.Online || !force && sourcePronunciation && DateTimeOffset.UtcNow - cached!.FetchedAt < TimeSpan.FromDays(30)) return;
+        if (cached?.Word == query) Apply(cached);
+        else if (cache.Read<PronunciationEntry>("pronunciations-v1", query) is { } legacy && legacy.Word == query) Apply(legacy);
+        if (!settings.Online || !force && cached?.Word == query && DateTimeOffset.UtcNow - cached.FetchedAt < TimeSpan.FromDays(30)) return;
         try
         {
             var entry = await pronunciations.LookupAsync(query, token);
             if (entry == null) return;
             token.ThrowIfCancellationRequested(); Apply(entry);
-            await TryCacheAsync("pronunciations-v1", query, entry);
+            await TryCacheAsync("pronunciations-v2", query, entry);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or JsonException or OperationCanceledException) { }
     }

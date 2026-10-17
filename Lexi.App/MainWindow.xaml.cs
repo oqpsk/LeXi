@@ -167,7 +167,7 @@ public partial class MainWindow : Window
         RefreshButton.Visibility = Visibility.Visible; RefreshButton.IsEnabled = settings.Online;
         Headword.Text = raw.Trim(); Headword.FontSize = 30; Phonetic.Text = ""; Phonetic.ToolTip = null;
         PhoneticLabel.Text = ""; PhoneticLabel.ToolTip = null; sourcePronunciation = false;
-        LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear(); FormsPanel.Children.Clear();
+        LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); AiPanel.Children.Clear(); ResetWordForms();
         ResultsScroll.ScrollToTop(); LookupStatus.Text = "查询本地词库…";
         var modelsEnabled = settings.Online && (settings.AutoAi || force);
         var mergeEnabled = modelsEnabled && settings.MergeSenses;
@@ -186,7 +186,7 @@ public partial class MainWindow : Window
                     var dictionary = await dictionaryTask;
                     token.ThrowIfCancellationRequested();
                     local = dictionary.Lookup(query, settings);
-                    RenderWordForms(query, dictionary.Forms(query, settings));
+                    ApplyLocalWordForms(query, dictionary.Forms(query, settings));
                 }
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }
@@ -287,7 +287,7 @@ public partial class MainWindow : Window
         header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         header.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, FontSize = 15, Foreground = accent ? accentBrush : Foreground, Margin = new(0,0,10,0) });
         var tag = new TextBlock { Text = source, FontSize = 13, Foreground = muted, VerticalAlignment = VerticalAlignment.Center }; Grid.SetColumn(tag,1); header.Children.Add(tag);
-        content.Children.Add(header);
+        if (title.Length > 0) content.Children.Add(header);
         parent.Children.Add(new Border { Background = accent ? Theme.Brush("PanelSurface") : Brushes.Transparent, CornerRadius = new(accent ? 8 : 0), BorderBrush = Theme.Brush("Stroke"), BorderThickness = accent ? new(1) : new(0,0,0,1), Padding = accent ? new(16,14,16,12) : new(0,12,0,14), Margin = new(0,0,0,12), Child = content });
         return content;
     }
@@ -318,7 +318,7 @@ public partial class MainWindow : Window
         {
             stack.Children.Add(new TextBlock { Text = $"[{i+1}]  {entry.Senses[i].PartOfSpeech.ToLowerInvariant()}", Foreground = accentBrush, FontSize = 15, Margin = new(0,7,0,3) });
             stack.Children.Add(Selectable(entry.Senses[i].Definition));
-            foreach (var example in entry.Senses[i].Examples) { var text = Selectable(example,16); text.Foreground = muted; stack.Children.Add(text); }
+            foreach (var example in entry.Senses[i].Examples) { var text = ExampleText(example, Queries.HasChinese(example)); text.Foreground = muted; stack.Children.Add(text); }
         }
         var source = new Button { Content = "查看 Wiktionary 来源 ↗", HorizontalAlignment = HorizontalAlignment.Left, Foreground = accentBrush, Padding = new(0,8,0,8) };
         source.Click += (_, _) => OpenSource(entry.Url);

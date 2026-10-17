@@ -30,17 +30,17 @@ internal static partial class Program
         var request = view.Begin(QueryProgressState.Dictionary(true, true));
         Check(view.Current is { Busy: true, Stage: QueryStage.Dictionary }, "dictionary reads start a visible busy lifecycle");
         main.RenderAnswers(two, null, false); view.Update(request, QueryProgressState.Updating(two, true));
-        Check(view.Current is { Busy: true, Stage: QueryStage.Supplement } && CardLabels().Contains("预览 · 2 条候选"),
+        Check(view.Current is { Busy: true, Stage: QueryStage.Supplement } && view.Current.Detail.Contains("预览 · 2 条候选"),
             "two early senses are labeled as preview candidates");
         main.RenderAnswers(six, null, false); view.Update(request, QueryProgressState.Updating(six, true));
-        Check(!six.Provisional && view.Current is { Busy: true, Stage: QueryStage.Supplement } && CardLabels().Contains("预览 · 6 条候选"),
+        Check(!six.Provisional && view.Current is { Busy: true, Stage: QueryStage.Supplement } && view.Current.Detail.Contains("预览 · 6 条候选"),
             "both models completing does not prematurely finalize six candidates");
         view.Update(request, QueryProgressState.Updating(six with { Merging = true }, true));
         Check(view.Current is { Busy: true, Stage: QueryStage.Merge } && view.Current.Detail.Contains("可能减少"),
             "merge stage explicitly explains why the displayed count can shrink");
         main.RenderAnswers(four, null); view.Update(request, QueryProgressState.Finished(four, true));
         Check(view.Current is { Busy: false, Outcome: QueryOutcome.Complete } && view.Current.Title.Contains("4 个义项") &&
-            CardLabels().Contains("4 个义项") && AutomationProperties.GetName(view).Contains("结果已稳定"),
+            !CardLabels().Contains("双语释义") && AutomationProperties.GetName(view).Contains("结果已稳定"),
             "only the final return marks four stable senses and announces completion");
         view.Update(request, QueryProgressState.Updating(two, true));
         Check(view.Current?.Busy == false, "late streaming callbacks cannot revive a finished query");
@@ -56,7 +56,7 @@ internal static partial class Program
         next = view.Begin(QueryProgressState.Dictionary(true, true));
         main.RenderAnswers(failedMerge, null); view.Update(next, QueryProgressState.Finished(failedMerge, true));
         Check(view.Current is { Busy: false, Warning: true } && view.Current.Detail.Contains("保留 6 条") &&
-            CardLabels().Contains("已保留 6 条释义"), "judge failure ends loading without presenting an unmerged list as successfully merged");
+            CardLabels().Contains(failedMerge.MergeNote), "judge failure ends loading without presenting an unmerged list as successfully merged");
         var oneFailed = new LookupSnapshot([complete[0], new(secondary, ModelPhase.Failed)], SenseMerging.Group([complete[0]]));
         var allFailed = new LookupSnapshot([new(primary, ModelPhase.Failed), new(secondary, ModelPhase.Failed)], []);
         Check(QueryProgressState.Finished(oneFailed, true) is { Busy: false, Outcome: QueryOutcome.Partial } &&

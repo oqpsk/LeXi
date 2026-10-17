@@ -4,6 +4,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
+using System.Windows.Media;
 using Lexi.Core;
 
 namespace Lexi;
@@ -28,6 +29,13 @@ public partial class MainWindow
         return block;
     }
 
+    private TextBox ExampleText(string text, bool chinese = false)
+    {
+        var block = CompactText(text, 18);
+        block.FontFamily = (FontFamily)FindResource(chinese ? "ChineseExampleFont" : "LexicalFont");
+        return block;
+    }
+
     private static string Provenance(SenseCandidate candidate) => candidate.Provisional ? "释义仍在生成，来源信息尚未完整。" :
         candidate.EvidenceStatus == "source_based" ? "模型参考下列词典整理；释义与例句由模型生成。" :
         "这条解释由模型补充，现有词典原文不足以核对全部内容；这不表示释义错误。";
@@ -38,8 +46,10 @@ public partial class MainWindow
         label.ToolTip = candidate.Sense.PartOfSpeech + " · " + candidate.Sense.Register;
         label.Inlines.Add(new Run(prefix + "  ") { Foreground = accentBrush });
         label.Inlines.Add(new Run(LexicalLabels.PartOfSpeech(candidate.Sense.PartOfSpeech))
-            { Foreground = Theme.Brush("Warning"), FontWeight = FontWeights.SemiBold, FontSize = 16 });
-        var usage = string.Join(" · ", new[] { LexicalLabels.Form(candidate.Sense.PartOfSpeech), LexicalLabels.Usage(candidate.Sense.Register) }.Where(s => s.Length > 0));
+            { Foreground = Theme.Brush("Warning"), FontFamily = (FontFamily)FindResource("LexicalFont"), FontStyle = FontStyles.Italic, FontSize = 18 });
+        var form = LexicalLabels.Form(candidate.Sense.PartOfSpeech);
+        if (form.Length > 0) label.Inlines.Add(new Run("  " + form) { FontFamily = (FontFamily)FindResource("LexicalFont"), FontStyle = FontStyles.Italic, FontSize = 16 });
+        var usage = LexicalLabels.Usage(candidate.Sense.Register);
         if (usage.Length > 0) label.Inlines.Add(new Run("  " + usage));
         if (candidate.Provisional) label.Inlines.Add(new Run(" · 生成中"));
         return label;
@@ -64,8 +74,8 @@ public partial class MainWindow
         if (!string.IsNullOrWhiteSpace(sense.Example) || !string.IsNullOrWhiteSpace(sense.ExampleChinese))
         {
             var examples = new StackPanel();
-            if (!string.IsNullOrWhiteSpace(sense.Example)) examples.Children.Add(CompactText(sense.Example, 16));
-            if (!string.IsNullOrWhiteSpace(sense.ExampleChinese)) examples.Children.Add(CompactText(sense.ExampleChinese, 16));
+            if (!string.IsNullOrWhiteSpace(sense.Example)) examples.Children.Add(ExampleText(sense.Example));
+            if (!string.IsNullOrWhiteSpace(sense.ExampleChinese)) examples.Children.Add(ExampleText(sense.ExampleChinese, true));
             AddDisclosure(controls, details, key + ":examples", "例句", examples);
         }
 

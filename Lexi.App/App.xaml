@@ -1,6 +1,9 @@
 <Application x:Class="Lexi.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" ShutdownMode="OnMainWindowClose">
   <Application.Resources>
     <FontFamily x:Key="UiFont">Segoe UI, Microsoft YaHei UI</FontFamily>
+    <FontFamily x:Key="LexicalFont">Georgia, Cambria, SimSun</FontFamily>
+    <FontFamily x:Key="ChineseExampleFont">SimSun, Georgia</FontFamily>
+    <SolidColorBrush x:Key="LogoSurface" Color="#17171B"/>
     <SolidColorBrush x:Key="Canvas" Color="#191A1D"/>
     <SolidColorBrush x:Key="WindowSurface" Color="#191A1D"/>
     <SolidColorBrush x:Key="PanelSurface" Color="#99222327"/>
