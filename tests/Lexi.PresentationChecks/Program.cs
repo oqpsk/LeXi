@@ -15,6 +15,17 @@ internal static partial class Program
     {
         // Construct and measure resources only: no visible windows, screenshots,
         // simulated input, application message loop or online provider calls.
+        // Validate executable content paths, independently of the test host resource assembly.
+        var resourceAssembly = typeof(App).Assembly;
+        using (var resources = new System.Resources.ResourceReader(resourceAssembly.GetManifestResourceStream("Lexi.g.resources")!))
+        {
+            var names = resources.Cast<System.Collections.DictionaryEntry>().Select(x => (string)x.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var content in resourceAssembly.GetCustomAttributes(typeof(System.Windows.Resources.AssemblyAssociatedContentFileAttribute), false)
+                .Cast<System.Windows.Resources.AssemblyAssociatedContentFileAttribute>())
+                if (names.Contains(content.RelativeContentFilePath.Replace((char)92, '/')))
+                    throw new Exception("Packaged content shadows an embedded WPF resource: " + content.RelativeContentFilePath);
+            Console.WriteLine("PASS: loose shell assets never shadow embedded WPF resource paths in the executable.");
+        }
         var app = new App(); app.InitializeComponent();
         var main = new MainWindow();
         Measure((FrameworkElement)main.Content, 558, 398);

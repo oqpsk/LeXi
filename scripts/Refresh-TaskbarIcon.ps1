@@ -7,11 +7,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $executablePath = (Resolve-Path -LiteralPath $Executable).Path
 $appDirectory = Split-Path -Parent $executablePath
-$iconSource = Join-Path $appDirectory 'assets/Lexi.ico'
+$iconSource = Join-Path $appDirectory 'assets/shell/Lexi.ico'
 if (!(Test-Path -LiteralPath $iconSource -PathType Leaf)) { throw 'Packaged LeXi icon is missing.' }
 # A changed icon gets a different shell cache identity; unchanged artwork stays stable.
 $digest = (Get-FileHash -LiteralPath $iconSource -Algorithm SHA256).Hash.Substring(0,16).ToLowerInvariant()
-$iconPath = Join-Path $appDirectory ('assets/LeXi-' + $digest + '.ico')
+$iconPath = Join-Path $appDirectory ('assets/shell/LeXi-' + $digest + '.ico')
 if (!(Test-Path -LiteralPath $iconPath)) { Copy-Item -LiteralPath $iconSource -Destination $iconPath }
 $iconLocation = $iconPath + ',0'
 if (!(Test-Path -LiteralPath $ShortcutDirectory -PathType Container)) { Write-Host 'No taskbar shortcuts to refresh.'; return }

@@ -4,12 +4,12 @@ $fixtureRoot = Join-Path $root '.cache'
 $fixture = [IO.Path]::GetFullPath((Join-Path $fixtureRoot ('shell-icon-' + [Guid]::NewGuid().ToString('N'))))
 $shortcuts = Join-Path $fixture 'shortcuts'
 $app = Join-Path $fixture 'app'
-New-Item -ItemType Directory -Path $shortcuts, (Join-Path $app 'assets') -Force | Out-Null
+New-Item -ItemType Directory -Path $shortcuts, (Join-Path $app 'assets/shell') -Force | Out-Null
 $shellObject = New-Object -ComObject WScript.Shell
 try {
     $exe = Join-Path $app 'Lexi.exe'
     [IO.File]::WriteAllText($exe, 'not an executable; never launched')
-    Copy-Item -LiteralPath (Join-Path $root 'Lexi.App/Assets/Lexi.ico') -Destination (Join-Path $app 'assets/Lexi.ico')
+    Copy-Item -LiteralPath (Join-Path $root 'Lexi.App/Assets/Lexi.ico') -Destination (Join-Path $app 'assets/shell/Lexi.ico')
     $matchPath = Join-Path $shortcuts 'Custom name.lnk'
     $otherPath = Join-Path $shortcuts 'Lexi.lnk'
     $match = $shellObject.CreateShortcut($matchPath)
@@ -22,7 +22,7 @@ try {
     if ($updated.TargetPath -ne $exe -or $updated.Arguments -ne '--preserved' -or $updated.WorkingDirectory -ne $app) { throw 'Shortcut launch settings changed.' }
     if ($updated.IconLocation -notmatch 'LeXi-[0-9a-f]{16}\.ico,0$') { throw 'Icon did not receive a content-addressed resource.' }
     $icon = $updated.IconLocation.Substring(0, $updated.IconLocation.Length - 2)
-    if ((Get-FileHash -LiteralPath $icon).Hash -ne (Get-FileHash -LiteralPath (Join-Path $app 'assets/Lexi.ico')).Hash) { throw 'Shell icon bytes differ from packaged artwork.' }
+    if ((Get-FileHash -LiteralPath $icon).Hash -ne (Get-FileHash -LiteralPath (Join-Path $app 'assets/shell/Lexi.ico')).Hash) { throw 'Shell icon bytes differ from packaged artwork.' }
     if ($otherHash -ne (Get-FileHash -LiteralPath $otherPath).Hash) { throw 'An unrelated shortcut was modified.' }
     if (@(Get-ChildItem -LiteralPath (Join-Path $fixture 'recovery') -File).Count -ne 1) { throw 'Shortcut recovery copy is missing.' }
     Write-Host 'PASS: taskbar icon refresh matches the executable, preserves launch settings and unrelated shortcuts, and backs up the changed link.'

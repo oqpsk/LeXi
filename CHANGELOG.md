@@ -7,6 +7,7 @@
 - Restore saved window bounds after initial WPF/chrome layout, preserving the startup snapshot until restoration succeeds. Keep early startup geometry from overwriting the saved position.
 - Theme the tray menu with the application's dark surface, readable text, rounded hover states and pale-pink selection text.
 - Make scrollbars visible on acrylic using neutral-gray grips, with brighter hover/drag states and a wider hit area.
+- Keep the loose shell icon in a separate content path so it cannot shadow the embedded WPF icon; validate this during program checks.
 - Refresh matching LeXi taskbar shortcuts with a content-addressed packaged icon, avoiding stale executable-icon caches without resetting Explorer or unrelated shortcuts.
 
 ## 0.9.7
