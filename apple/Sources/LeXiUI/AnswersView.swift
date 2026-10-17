@@ -55,7 +55,8 @@ struct SenseHeadingText: View {
     let heading: SenseHeading
     var body: some View {
         var text = Text(heading.prefix + "  ").monospacedDigit().foregroundStyle(.tertiary)
-        text = Text("\(text)\(Text(heading.partOfSpeech).font(LexiTheme.lexical(16)).italic().foregroundStyle(.secondary))")
+        // The part of speech stands out in the accent color, as it does in the Windows highlight color.
+        text = Text("\(text)\(Text(heading.partOfSpeech).font(LexiTheme.lexical(16)).italic().foregroundStyle(.tint))")
         if !heading.form.isEmpty { text = Text("\(text)\(Text("  " + heading.form).font(LexiTheme.lexical(14)).italic())") }
         if !heading.usage.isEmpty { text = Text("\(text)\(Text("  " + heading.usage))") }
         if heading.abbreviation { text = Text("\(text)\(Text("  缩写"))") }

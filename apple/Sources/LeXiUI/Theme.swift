@@ -12,8 +12,9 @@ public enum LexiTheme {
 }
 
 // Every LeXi window is a pane of Liquid Glass, like Control Center: the desktop shows through,
-// blurred and refracted, as light or dark glass that follows the appearance (and takes on the
-// wallpaper's color, as system glass does). With Reduce Transparency the system makes it frostier and more opaque.
+// blurred and refracted, and takes on the wallpaper's color, as system glass does. Dark windows
+// use regular glass; light windows use clear glass, since regular glass in light mode is a
+// milky white. With Reduce Transparency the system makes it frostier and more opaque.
 struct WindowGlass: NSViewRepresentable {
     func makeNSView(context: Context) -> WindowGlassView { WindowGlassView() }
     func updateNSView(_ view: WindowGlassView, context: Context) {}
@@ -24,13 +25,23 @@ final class WindowGlassView: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        glass.style = .regular
         glass.frame = bounds
         glass.autoresizingMask = [.width, .height]
         addSubview(glass)
+        updateStyle()
     }
 
     required init?(coder: NSCoder) { nil }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateStyle()
+    }
+
+    private func updateStyle() {
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        glass.style = dark ? .regular : .clear
+    }
 
     // The glass reaches the desktop only through a transparent window.
     override func viewDidMoveToWindow() {
