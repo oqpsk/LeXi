@@ -47,8 +47,8 @@ internal static class InferenceChecks
         check(restored.Length == 1 && restored[0].Capabilities.Efforts.SequenceEqual(caps.Efforts) &&
             InferenceOptions.Load(folder, "compatible", "https://other.example.org/v1").Length == 0, "public capability cache survives reopening and is isolated by normalized endpoint");
         var choices = InferenceOptions.Available(folder, settings);
-        check(choices.Any(c => c.Provider == "compatible" && c.Id == "model-a" && c.Label.Contains("自定义 API") && c.Speed == "priority") &&
-            choices.Where(c => c.Provider != "compatible").All(c => c.Label.Contains("OAuth 订阅") && !c.Label.Contains("Fast")), "model menus label connection mode and keep speed outside model names");
+        check(choices.Any(c => c.Provider == "compatible" && c.Id == "model-a" && c.Label.StartsWith("API | ", StringComparison.Ordinal) && c.Speed == "priority") &&
+            choices.Where(c => c.Provider != "compatible").All(c => c.Label.StartsWith("OAuth | ", StringComparison.Ordinal) && !c.Label.Contains("Fast")), "model menus label connection mode and keep speed outside model names");
         InferenceOptions.ValidateRequest(settings, folder);
         await InferenceOptions.Remember(folder, "compatible", endpoint, [model with { Options = InferenceOptions.Unknown }]);
         try { InferenceOptions.ValidateRequest(settings, folder); check(false, "removed capability"); }

@@ -25,6 +25,11 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.22 (Windows / macOS)
+
+- Place compact OAuth and API connection actions together above the query model selectors, with direct access to each connection form. Prefix all shared model choices with `OAuth |` or `API |` while preserving their underlying provider/model identities and saved preferences.
+- Make unavailable model controls visibly disabled, including WPF dropdown content and arrows, with dimmed inference labels and explanations available on disabled controls. macOS uses the native disabled picker state.
+
 ## 0.9.21 (Windows / macOS)
 
 - Separate model identity from inference preferences. Label subscription choices as OAuth and direct endpoint choices as custom API; show effort and speed beneath each model using the same shared capability rules. Save explicit preferences per provider/model and, for APIs, per endpoint. The same model selected in multiple roles shares its settings.

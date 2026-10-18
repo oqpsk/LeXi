@@ -30,7 +30,7 @@ struct CompatibleConnectionSettings: View {
                 if loading { ProgressView().controlSize(.small) }
             }
             Text(message).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
-        } header: { Text("自定义文本服务") }
+        } header: { Text("API 连接") }
         footer: { Text("OpenAI 兼容接口。凭据按地址保存在本机钥匙串中，API Key 可留空。此入口只用于文本；发音独立配置。") }
         .onAppear {
             if baseUrl.isEmpty {

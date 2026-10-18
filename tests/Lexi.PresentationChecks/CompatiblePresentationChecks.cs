@@ -49,6 +49,18 @@ internal static partial class Program
         var connections = tabs.Items.OfType<TabItem>().Single(t => (string)t.Header == "账号连接");
         var selectors = Contents((DependencyObject)queryTab.Content).OfType<ComboBox>().Where(p => p.ItemsSource is System.Collections.Generic.IEnumerable<ModelChoice>).ToArray();
         var primary = selectors[0]; var initial = (ModelChoice)primary.SelectedItem;
+        var oauthAction = Contents(fixture).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "OAuth 连接");
+        var apiAction = Contents(fixture).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "API 连接");
+        tabs.SelectedItem = queryTab;
+        foreach (var width in new[] { 538d, 618d })
+        {
+            var root = (FrameworkElement)fixture.Content; Measure(root, width, 478);
+            var oauthPosition = oauthAction.TranslatePoint(new Point(), root); var apiPosition = apiAction.TranslatePoint(new Point(), root);
+            var modelPosition = primary.TranslatePoint(new Point(), root);
+            Check(Math.Abs(oauthPosition.Y - apiPosition.Y) < 1 && apiPosition.X >= oauthPosition.X + oauthAction.ActualWidth + 6 &&
+                modelPosition.Y >= oauthPosition.Y + oauthAction.ActualHeight && apiPosition.X + apiAction.ActualWidth <= width,
+                $"OAuth and API actions share one row above the model selector at {width} DIP");
+        }
         PasswordBox Field(string name) => Contents(fixture).OfType<PasswordBox>().Single(x => AutomationProperties.GetName(x) == name);
         var id = Field("CF Access Client ID"); var secret = Field("CF Access Client Secret");
         var status = Contents(fixture).OfType<TextBlock>().Single(x => AutomationProperties.GetName(x) == "自定义文本服务连接状态");
@@ -76,9 +88,12 @@ internal static partial class Program
         Check(((InferenceOption)Option("义项判断模型 effort").SelectedItem).Id == "high" && ((InferenceOption)Option("义项判断模型速度").SelectedItem).Id == "priority" && settings.InferenceProfiles.Length == 0,
             "the same model shares both preferences across roles while the Windows dialog remains an unsaved draft");
         primary.SelectedItem = primary.Items.OfType<ModelChoice>().Single(m => m.Provider == "claude" && m.Id == "haiku");
-        Check(!effort.IsEnabled && !speed.IsEnabled, "models without advertised controls disable the corresponding inference selectors");
+        Check(!effort.IsEnabled && !speed.IsEnabled && effort.Opacity < 0.6 && speed.Opacity < 0.6 &&
+            ((Panel)speed.Parent).Children.OfType<TextBlock>().All(t => t.Opacity < 0.6),
+            "unsupported inference controls and their labels are visibly dimmed, as well as non-interactive");
         primary.SelectedItem = primary.Items.OfType<ModelChoice>().Single(m => m.Id == "synthetic-b");
-        Check(((InferenceOption)effort.SelectedItem).Id == "high" && ((InferenceOption)speed.SelectedItem).Id == "priority", "switching away and back restores the model's chosen inference preferences");
+        Check(((InferenceOption)effort.SelectedItem).Id == "high" && ((InferenceOption)speed.SelectedItem).Id == "priority" && effort.Opacity > 0.9 && speed.Opacity > 0.9,
+            "switching to a supported model restores both preferences and the normal enabled appearance");
         rejected = true; load.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check(requests == 2 && status.Text.Contains("鉴权失败") && !status.Text.Contains("private"), "Windows shows a clear sanitized authentication failure with no anonymous retry");
         var url = Contents(fixture).OfType<TextBox>().Single(x => AutomationProperties.GetName(x) == "自定义文本服务 Base URL");

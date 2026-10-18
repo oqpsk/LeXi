@@ -11,6 +11,7 @@ public sealed partial class SettingsWindow
     {
         private readonly ComboBox effort = new(), speed = new();
         private readonly TextBlock note = Text("", 13, Muted);
+        private readonly TextBlock effortLabel = Text("Effort · 思考深度", 13, Muted), speedLabel = Text("速度", 13, Muted);
         private bool updating;
         private ModelChoice? model;
         private readonly AppSettings draft;
@@ -19,8 +20,8 @@ public sealed partial class SettingsWindow
         {
             this.draft = draft; Margin = new(0,0,0,14);
             var columns = new Grid(); columns.ColumnDefinitions.Add(new()); columns.ColumnDefinitions.Add(new());
-            var left = new StackPanel { Margin = new(0,0,7,0) }; left.Children.Add(Text("Effort · 思考深度", 13, Muted)); left.Children.Add(effort);
-            var right = new StackPanel { Margin = new(7,0,0,0) }; right.Children.Add(Text("速度", 13, Muted)); right.Children.Add(speed);
+            var left = new StackPanel { Margin = new(0,0,7,0) }; left.Children.Add(effortLabel); left.Children.Add(effort);
+            var right = new StackPanel { Margin = new(7,0,0,0) }; right.Children.Add(speedLabel); right.Children.Add(speed);
             Grid.SetColumn(right, 1); columns.Children.Add(left); columns.Children.Add(right); Children.Add(columns);
             note.Margin = new(0,6,0,0); Children.Add(note);
             AutomationProperties.SetName(effort, name + " effort"); AutomationProperties.SetName(speed, name + "速度");
@@ -47,6 +48,10 @@ public sealed partial class SettingsWindow
                     picker.IsEnabled = values.Count > 1;
                 }
                 Set(effort, choice.Capabilities.EffortChoices, selected.Effort); Set(speed, choice.Capabilities.SpeedChoices, selected.Speed);
+                effortLabel.Opacity = effort.IsEnabled ? 1 : 0.45; speedLabel.Opacity = speed.IsEnabled ? 1 : 0.45;
+                ToolTipService.SetShowOnDisabled(effort, true); ToolTipService.SetShowOnDisabled(speed, true);
+                effort.ToolTip = effort.IsEnabled ? null : "此模型未提供可选 effort，使用模型默认设置。";
+                speed.ToolTip = speed.IsEnabled ? null : "此模型未提供可选速度，使用服务默认设置。";
                 note.Text = choice.Capabilities.Note;
             }
             finally { updating = false; }

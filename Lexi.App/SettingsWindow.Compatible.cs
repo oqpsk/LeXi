@@ -15,7 +15,7 @@ public sealed partial class SettingsWindow
         var keys = new TextProviderKeys(suppliedRoot ?? App.UserRoot);
         var panel = (StackPanel)((ScrollViewer)tab.Content).Content;
         var card = new StackPanel();
-        card.Children.Add(Text("自定义文本服务", 20));
+        card.Children.Add(Text("API 连接", 20));
         card.Children.Add(Text("OpenAI 兼容接口 · 仅用于查词、翻译和义项整理。发音在“发音”中独立设置。", 13, Muted));
         card.Children.Add(Text("Base URL", 14));
         var url = new TextBox { Text = settings.CompatibleBaseUrl, FontSize = 14, Margin = new(0,0,0,12) };

@@ -39,9 +39,16 @@ struct SettingLabel: View {
     }
 }
 
+enum ModelConnectionDestination: String, Identifiable {
+    case oauth, api
+    var id: String { rawValue }
+    var title: String { self == .oauth ? "OAuth 连接" : "API 连接" }
+}
+
 struct QuerySettings: View {
     @Bindable var store: LexiStore
     @State private var error: String?
+    @State private var connection: ModelConnectionDestination?
 
     var body: some View {
         if let payload = store.settings {
@@ -52,6 +59,11 @@ struct QuerySettings: View {
                     toggle(SettingLabel("自动补充双语释义", "查词时自动请模型补充；关闭后可点“重新生成”手动获取。"), settings.autoAi, "autoAi")
                 }
                 Section {
+                    HStack(spacing: 10) {
+                        Button("OAuth 连接…") { connection = .oauth }
+                        Button("API 连接…") { connection = .api }
+                    }
+                    .buttonStyle(.bordered)
                     modelPicker(SettingLabel("主要模型", "用于查词与文本翻译"), store.queryModels, selected: settings.provider + ":" + settings.model) { choice in
                         ["provider": .string(choice.provider), "model": .string(choice.id)]
                     }
@@ -65,11 +77,11 @@ struct QuerySettings: View {
                 } header: {
                     Text("查询模型")
                 } footer: {
-                    Note("使用本机模型订阅或“账号”中连接的自定义文本服务。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Effort 和速度分别控制思考深度与服务档位。同一模型共用配置；OAuth 订阅与自定义 API 分开保存。")
+                    Note("通过 OAuth 订阅或 API 查询。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Effort 和速度分别控制思考深度与服务档位。同一模型共用配置；OAuth 订阅与自定义 API 分开保存。")
                 }
                 Section {
                     toggle(SettingLabel("自动整理同类义项", "合并重复的说法，包含单个模型内部"), settings.mergeSenses, "mergeSenses")
-                    modelPicker(SettingLabel("义项判断模型", "Codex 订阅或自定义服务"), store.judgeChoices, selected: (settings.judgeProvider ?? "codex") + ":" + settings.judgeModel) { choice in
+                    modelPicker(SettingLabel("义项判断模型", "OAuth / API"), store.judgeChoices, selected: (settings.judgeProvider ?? "codex") + ":" + settings.judgeModel) { choice in
                         ["judgeProvider": .string(choice.provider), "judgeModel": .string(choice.id)]
                     }
                     .disabled(!settings.mergeSenses)
@@ -84,6 +96,17 @@ struct QuerySettings: View {
                 }
             }
             .formStyle(.grouped)
+            .sheet(item: $connection) { destination in
+                VStack(spacing: 0) {
+                    HStack {
+                        Text(destination.title).font(.headline)
+                        Spacer()
+                        Button("完成") { connection = nil }
+                    }.padding()
+                    ConnectionSettings(store: store, destination: destination)
+                }
+                .frame(width: 600, height: 520)
+            }
         } else {
             ProgressView()
         }
@@ -218,38 +241,41 @@ struct DictionarySettings: View {
 
 struct ConnectionSettings: View {
     @Bindable var store: LexiStore
+    var destination: ModelConnectionDestination? = nil
     @State private var codexPath = ""
     @State private var readingModels = false
     @State private var modelStatus = ""
 
     var body: some View {
         Form {
-            CompatibleConnectionSettings(store: store)
-            Section {
-                Button(readingModels ? "正在读取…" : "读取 OAuth 订阅模型") {
-                    readingModels = true
-                    Task {
-                        modelStatus = await store.readSubscriptionModels() ?? "已更新订阅模型与可用档位。"
-                        readingModels = false
-                    }
-                }.disabled(readingModels)
-                if !modelStatus.isEmpty { Text(modelStatus).font(.callout).foregroundStyle(.secondary) }
-            }
-            Section {
-                ProviderRow(store: store, provider: "codex", title: "ChatGPT · Codex", symbol: "sparkles", install: "https://learn.chatgpt.com/docs/cli")
-                LabeledContent {
-                    HStack {
-                        TextField("自动检测", text: $codexPath)
-                            .labelsHidden()
-                            .onSubmit { Task { await store.update(["codexPath": .string(codexPath.trimmingCharacters(in: .whitespaces))]) } }
-                        Button("选择…") { choose() }
-                    }
-                } label: { SettingLabel("程序路径", "留空时自动查找命令行与 ChatGPT 应用中的 Codex") }
-            }
-            Section {
-                ProviderRow(store: store, provider: "claude", title: "Claude", symbol: "asterisk", install: "https://code.claude.com/docs/en/setup")
-            } footer: {
-                Note("在官方登录页完成授权，LeXi 使用同一台电脑上的登录状态，不读取令牌。登录会即时生效并与官方客户端共用账号；主要模型、第二模型和义项判断共用对应账号。")
+            if destination != .oauth { CompatibleConnectionSettings(store: store) }
+            if destination != .api {
+                Section {
+                    Button(readingModels ? "正在读取…" : "读取 OAuth 订阅模型") {
+                        readingModels = true
+                        Task {
+                            modelStatus = await store.readSubscriptionModels() ?? "已更新订阅模型与可用档位。"
+                            readingModels = false
+                        }
+                    }.disabled(readingModels)
+                    if !modelStatus.isEmpty { Text(modelStatus).font(.callout).foregroundStyle(.secondary) }
+                }
+                Section {
+                    ProviderRow(store: store, provider: "codex", title: "ChatGPT · Codex", symbol: "sparkles", install: "https://learn.chatgpt.com/docs/cli")
+                    LabeledContent {
+                        HStack {
+                            TextField("自动检测", text: $codexPath)
+                                .labelsHidden()
+                                .onSubmit { Task { await store.update(["codexPath": .string(codexPath.trimmingCharacters(in: .whitespaces))]) } }
+                            Button("选择…") { choose() }
+                        }
+                    } label: { SettingLabel("程序路径", "留空时自动查找命令行与 ChatGPT 应用中的 Codex") }
+                }
+                Section {
+                    ProviderRow(store: store, provider: "claude", title: "Claude", symbol: "asterisk", install: "https://code.claude.com/docs/en/setup")
+                } footer: {
+                    Note("在官方登录页完成授权，LeXi 使用同一台电脑上的登录状态，不读取令牌。登录会即时生效并与官方客户端共用账号；主要模型、第二模型和义项判断共用对应账号。")
+                }
             }
         }
         .formStyle(.grouped)

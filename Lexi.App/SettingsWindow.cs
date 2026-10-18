@@ -38,8 +38,14 @@ public sealed partial class SettingsWindow : Window
         var online = new CheckBox { Content = "在线补充", IsChecked = settings.Online, Margin = new(0,0,0,14) };
         var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
         general.Children.Add(online); general.Children.Add(ai);
-        general.Children.Add(Text("使用本机模型订阅或自定义文本服务。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。", 14, Muted));
+        general.Children.Add(Text("通过 OAuth 订阅或 API 查询。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。", 14, Muted));
         general.Children.Add(Text("查过的内容直接使用缓存。切换模型后，点击“重新生成”才会更新已有结果。", 14, Muted));
+        var connections = new WrapPanel { Margin = new(0,3,0,0) };
+        var accounts = ConnectionButton("OAuth 连接…"); accounts.Margin = new(0,0,8,0);
+        var customEntry = ConnectionButton("API 连接…"); customEntry.Margin = new(0);
+        System.Windows.Automation.AutomationProperties.SetName(accounts, "OAuth 连接");
+        System.Windows.Automation.AutomationProperties.SetName(customEntry, "API 连接");
+        connections.Children.Add(accounts); connections.Children.Add(customEntry); general.Children.Add(connections);
         var label = Text("主要模型 · 查词与翻译"); label.Margin = new(0,13,0,8); general.Children.Add(label);
         var draft = settings.ForModel(LookupModel.Primary(settings));
         var modelRoot = textRoot ?? App.UserRoot;
@@ -53,7 +59,6 @@ public sealed partial class SettingsWindow : Window
         };
         var model = ModelSelector(primaryChoice, choices); general.Children.Add(model);
         var primaryOptions = new InferencePicker(draft, "主要模型"); general.Children.Add(primaryOptions);
-        var accounts = ConnectionButton("账号登录与连接…"); accounts.HorizontalAlignment = HorizontalAlignment.Left; general.Children.Add(accounts);
         var parallel = new CheckBox { Content = "双模型同时查词", IsChecked = settings.ParallelLookup, Margin = new(0,12,0,12) }; general.Children.Add(parallel);
         var secondaryPanel = new StackPanel(); general.Children.Add(secondaryPanel);
         secondaryPanel.Children.Add(Text("第二个查询模型"));
@@ -61,7 +66,7 @@ public sealed partial class SettingsWindow : Window
         var secondaryOptions = new InferencePicker(draft, "第二个模型"); secondaryPanel.Children.Add(secondaryOptions);
         var merge = new CheckBox { Content = "自动整理同类义项（包含单模型内部）", IsChecked = settings.MergeSenses, Margin = new(0,6,0,12) }; general.Children.Add(merge);
         var judgePanel = new StackPanel(); general.Children.Add(judgePanel);
-        judgePanel.Children.Add(Text("义项判断模型 · Codex 或自定义服务"));
+        judgePanel.Children.Add(Text("义项判断模型"));
         var judge = ModelSelector(new(settings.JudgeProvider, settings.JudgeModel), ModelCatalog.JudgeChoices(choices)); judgePanel.Children.Add(judge);
         var judgeOptions = new InferencePicker(draft, "义项判断模型"); judgePanel.Children.Add(judgeOptions);
         void RefreshOptions()
@@ -91,7 +96,9 @@ public sealed partial class SettingsWindow : Window
         var subscriptions = ConnectionButton("读取 OAuth 订阅模型"); subscriptions.HorizontalAlignment = HorizontalAlignment.Left;
         var subscriptionStatus = Text("通过官方 Codex / Claude Code 客户端读取模型与可用档位。", 13, Muted);
         var connectionPanel = (StackPanel)((ScrollViewer)connectionTab.Content).Content;
-        connectionPanel.Children.Insert(0, subscriptions); connectionPanel.Children.Insert(1, subscriptionStatus);
+        var oauthHeading = connectionPanel.Children.OfType<TextBlock>().First(t => t.Text == "OAuth 订阅");
+        var oauthIndex = connectionPanel.Children.IndexOf(oauthHeading);
+        connectionPanel.Children.Insert(oauthIndex + 1, subscriptions); connectionPanel.Children.Insert(oauthIndex + 2, subscriptionStatus);
         subscriptions.Click += async (_, _) =>
         {
             subscriptions.IsEnabled = false;
@@ -110,10 +117,13 @@ public sealed partial class SettingsWindow : Window
             finally { if (!connectionLifetime.IsCancellationRequested) subscriptions.IsEnabled = true; }
         };
         var custom = AddCompatibleConnection(connectionTab, settings, RefreshModels, () => online.IsChecked == true, textMetadata, textRoot);
-        var customEntry = ConnectionButton("自定义文本服务…"); customEntry.HorizontalAlignment = HorizontalAlignment.Left;
-        general.Children.Insert(general.Children.IndexOf(accounts) + 1, customEntry);
         customEntry.Click += (_, _) => { tabs.SelectedItem = connectionTab; ((ScrollViewer)connectionTab.Content).ScrollToTop(); };
-        accounts.Click += (_, _) => tabs.SelectedItem = connectionTab;
+        accounts.Click += (_, _) =>
+        {
+            tabs.SelectedItem = connectionTab;
+            var anchor = connectionPanel.Children.OfType<TextBlock>().First(t => t.Text == "OAuth 订阅");
+            _ = Dispatcher.BeginInvoke(() => anchor.BringIntoView());
+        };
         general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+, 设置 · Ctrl+Q 退出\n固定到任务栏第 2 位后用 Win+2 切换", 14,Muted));
 
         var dictionaries = new StackPanel { Margin = new(2,4,8,10) };

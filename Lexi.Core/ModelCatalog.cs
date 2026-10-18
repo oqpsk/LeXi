@@ -10,7 +10,7 @@ public sealed record ModelChoice(string Label, string Id, string Provider = "cod
 public static class ModelCatalog
 {
     public static ModelChoice Choice(string provider, string id, InferenceCapabilities? capabilities = null) =>
-        new(new LookupModel(provider, id).Name + (provider == CompatibleText.Provider ? " · 自定义 API" : " · OAuth 订阅"), id, provider, capabilities ?? (provider == CompatibleText.Provider ? InferenceOptions.Unknown : InferenceOptions.Subscription(provider, id)));
+        new((provider == CompatibleText.Provider ? "API | " : "OAuth | ") + new LookupModel(provider, id).Name, id, provider, capabilities ?? (provider == CompatibleText.Provider ? InferenceOptions.Unknown : InferenceOptions.Subscription(provider, id)));
     public static ModelChoice[] Choices(AppSettings settings, IEnumerable<string>? compatibleModels = null, IEnumerable<ModelChoice>? details = null)
     {
         var choices = new List<ModelChoice> { Choice("claude", "haiku"), Choice("codex", "gpt-6-luna"), Choice("codex", "gpt-6.1-sol"), Choice("codex", "") };
@@ -38,7 +38,7 @@ public static class ModelCatalog
             try { CompatibleText.NormalizeBase(settings.CompatibleBaseUrl); }
             catch (CompatibleException e) { return e.Message; }
             if (LookupModel.Selected(settings).Append(new(settings.JudgeProvider, settings.JudgeModel)).Any(m => m.Provider == CompatibleText.Provider && !CompatibleText.ValidModel(m.Model)))
-                return "请先连接自定义文本服务，读取模型列表并选择模型。";
+                return "请先完成 API 连接，读取模型列表并选择模型。";
         }
         if (settings.ParallelLookup && LookupModel.Primary(settings) == LookupModel.Secondary(settings)) return "请选择两个不同的查询模型。";
         if ((settings.InferenceProfiles ?? []).Length > 1024 || (settings.InferenceProfiles ?? []).Any(p => p == null || p.Provider is not ("codex" or "claude" or CompatibleText.Provider) || p.Model == null || p.Model.Length > 256 || p.Endpoint == null || p.Endpoint.Length > 128 || !InferenceOptions.ValidEffort(p.Effort) || !InferenceOptions.ValidSpeed(p.Speed)))

@@ -61,7 +61,7 @@ internal static class HostChecks
             var init = await client.Call("initialize");
             Check(init.GetProperty("result") is var ready && ready.GetProperty("protocol").GetInt32() == HostServer.Protocol &&
                 ready.GetProperty("view").GetProperty("kind").GetString() == "home" &&
-                ready.GetProperty("settings").GetProperty("models").EnumerateArray().Any(m => m.GetProperty("label").GetString() == "GPT-6 Luna · OAuth 订阅") &&
+                ready.GetProperty("settings").GetProperty("models").EnumerateArray().Any(m => m.GetProperty("label").GetString() == "OAuth | GPT-6 Luna") &&
                 ready.GetProperty("settings").GetProperty("controls").GetProperty("onlineLabel").GetString() == "在线补充",
                 "initialize reports the protocol version, the home view, shared model choices and control labels");
             Check((await client.Call("suggest", new { text = "wal" })).GetProperty("result").GetProperty("suggestions").EnumerateArray().Any(s => s.GetString() == "walk"),

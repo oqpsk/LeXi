@@ -24,7 +24,7 @@ public static class CompatibleText
 {
     public const string Provider = "compatible";
     public const string DefaultBaseUrl = "https://ai.rwby.io/v1";
-    public const string MissingCredentials = "请在设置 → 自定义文本服务中填写 CF Access Client ID 和 Client Secret。";
+    public const string MissingCredentials = "请在设置 → API 连接中填写 CF Access Client ID 和 Client Secret。";
     public const string AuthenticationFailed = "自定义文本服务鉴权失败，请检查 CF Access Client ID、Client Secret 及可选 API Key。";
     public const string StorageFailure = "自定义文本服务凭据无法读取或保存，请在设置中重新填写。";
     public static string UserAgent => "LeXi/" + (typeof(CompatibleText).Assembly.GetName().Version?.ToString(3) ?? "0.0.0");
@@ -92,7 +92,7 @@ public sealed class CompatibleTextClient : IDisposable
     public Task<string> CompleteAsync(string baseUrl, string model, bool streaming, CompatibleCredentials credentials,
         string instructions, string prompt, CancellationToken token, Action<string>? preview = null, string effort = "", string speed = "") => Guard(async cancel =>
     {
-        if (!CompatibleText.ValidModel(model)) throw new CompatibleException("missing_model", "请先连接自定义文本服务，读取模型列表并选择模型。");
+        if (!CompatibleText.ValidModel(model)) throw new CompatibleException("missing_model", "请先完成 API 连接，读取模型列表并选择模型。");
         using var request = Request(HttpMethod.Post, baseUrl, "chat/completions", credentials);
         request.Headers.Accept.Add(new(streaming ? "text/event-stream" : "application/json"));
         if (!InferenceOptions.ValidEffort(effort) || !InferenceOptions.ValidSpeed(speed)) throw new CompatibleException("invalid_options", "模型 effort 或速度配置无效，请重新选择。");
