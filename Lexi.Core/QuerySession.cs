@@ -21,6 +21,8 @@ public sealed class QuerySession : IDisposable
     private readonly bool ownsCompatibleClient;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CompatibleCredentials> compatibleCredentials = new();
     private readonly bool warmClients;
+    private readonly CancellationTokenSource catalogStop = new();
+    private int catalogStarted;
     private readonly QueryProgressTracker progress = new();
     private readonly TimeProvider clock;
     private CancellationTokenSource? lookup;
@@ -73,8 +75,12 @@ public sealed class QuerySession : IDisposable
     public void SetTextCredentials(string baseUrl, CompatibleCredentials credentials) => compatibleCredentials[CompatibleText.NormalizeBase(baseUrl)] = credentials;
     private string ProviderName => Settings.Provider == CompatibleText.Provider ? "自定义文本服务" : Settings.Provider == "claude" ? "Claude" : "Codex";
 
+    // Completes when this start's background read of the OAuth model catalog ends (or was skipped).
+    public Task SubscriptionCatalog { get; private set; } = Task.CompletedTask;
+
     public async Task InitializeAsync()
     {
+        RefreshSubscriptionCatalog();
         UpdatePreparedModel();
         try { await Library; UpdateReadyStatus(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
@@ -113,7 +119,22 @@ public sealed class QuerySession : IDisposable
     {
         Settings.Online = online; SaveSettings();
         StopForSettings("查询模式已更改"); UpdatePreparedModel();
-        UpdateReadyStatus();
+        UpdateReadyStatus(); RefreshSubscriptionCatalog();
+    }
+
+    // OAuth models come from the official clients. Read their catalog once per start, in the
+    // background, so every subscription model is offered before the connection page is opened.
+    // A failure keeps the cached catalog and the saved choices; nothing is selected for the user.
+    private void RefreshSubscriptionCatalog()
+    {
+        if (!warmClients || !Settings.Online || Interlocked.Exchange(ref catalogStarted, 1) == 1) return;
+        var (path, root, token) = (Settings.CodexPath, Paths.UserRoot, catalogStop.Token);
+        SubscriptionCatalog = Task.Run(async () =>
+        {
+            try { await InferenceOptions.RememberSubscriptions(root, await InferenceOptions.ReadSubscriptions(path, token), token); }
+            catch (Exception e) when (e is InvalidOperationException or TimeoutException or OperationCanceledException or IOException or
+                UnauthorizedAccessException or System.ComponentModel.Win32Exception) { }
+        });
     }
     // The kept result is marked before cancellation, so a cancelled flow that resumes inline
     // (no UI synchronization context) cannot describe itself as an interrupted query.
@@ -573,6 +594,7 @@ public sealed class QuerySession : IDisposable
     public void Dispose()
     {
         lock (gate) { disposed = true; lookup?.Cancel(); }
+        catalogStop.Cancel();
         claude.Dispose(); secondaryClaude.Dispose(); compatibleCredentials.Clear(); if (ownsCompatibleClient) compatibleClient.Dispose(); web.Dispose(); pronunciations.Dispose();
         if (Library.IsCompletedSuccessfully) Library.Result.Dispose();
     }

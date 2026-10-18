@@ -138,6 +138,9 @@ internal static class HostChecks
             var unsupported = await client.Call("inference.configure", new { provider = "compatible", model = "synthetic-model", effort = "ultra", speed = "priority" });
             Check(unsupported.GetProperty("error").GetProperty("code").GetString() == "invalid_settings" && AppSettings.Load(user).InferenceProfiles.Single().Effort == "low",
                 "host rejects unsupported effort without changing the saved profile");
+            var catalog = await client.Call("inference.catalog");
+            Check(catalog.GetProperty("result").GetProperty("models").EnumerateArray().Any(m => m.GetProperty("id").GetString() == "synthetic-model"),
+                "host returns current settings once this start's OAuth catalog read is over (never started with injected providers)");
             var configuredText = await client.Call("text.credentials", textRequest);
             Check(configuredText.GetProperty("result").EnumerateObject().Count() == 0 &&
                 !File.ReadAllText(Path.Combine(user, "settings.json")).Contains("synthetic-secret"), "text credentials stay in process memory and outside host settings and responses");

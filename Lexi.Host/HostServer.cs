@@ -168,6 +168,10 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
                 catch (Exception e) when (e is InvalidOperationException or TimeoutException or System.ComponentModel.Win32Exception or IOException)
                 { throw new HostException("model_discovery_failed", "无法读取订阅模型，请检查官方客户端版本、登录状态和网络。"); }
             }
+            case "inference.catalog":
+                // Returns once the background OAuth catalog read of this start has finished.
+                await session.SubscriptionCatalog.WaitAsync(token);
+                return Settings();
             case "inference.configure":
             {
                 var model = InferenceOptions.Available(session.Paths.UserRoot, session.Settings).FirstOrDefault(m => m.Provider == Text(p, "provider") && m.Id == Text(p, "model"))

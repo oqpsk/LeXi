@@ -160,6 +160,11 @@ public final class LexiStore {
         catch let error as HostError { return error.message }
         catch { return error.localizedDescription }
     }
+    // The host reads the OAuth model catalog in the background after it starts; this returns the
+    // settings once that read has finished, so an early settings window still gets every model.
+    public func awaitModelCatalog() async {
+        if let payload = try? await client?.call("inference.catalog") as SettingsPayload? { settings = payload }
+    }
     public func refreshSettings() async {
         if let payload = try? await client?.call("settings.get") as SettingsPayload? { settings = payload }
     }

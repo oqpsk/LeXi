@@ -17,7 +17,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | Wiktionary 在线来源与原文 | `OnlineDictionary`、`QueryView.Online` | 已实现：可展开原文与来源链接 | 已实现：可展开原文与来源链接 |
 | 同义项判断返回精简 | `SenseMerging`：仍逐对判断，仅返回高置信度合并关系；省略项按不确定处理，保留原文及 TL;DR 选择 | 已实现：同一 Core | 已实现：同一 Host/Core |
 | 双模型查词、流式预览、失败隔离 | `DictionaryCoordinator`、`QuerySession`；后台生成与预览采样、重复内容去重，最终结果完整校验 | 已实现：仅排队最新预览，输入/滚动/取消优先 | 已实现：Host 使用同一预览采样 |
-| OAuth 动态模型列表 | 官方客户端模型发现及能力缓存；隐藏模型单独标注；保留已选模型，移除固定四项列表 | 已实现：打开 OAuth 连接即读取完整列表及各模型 effort/速度 | 已实现：打开 OAuth 连接读取同一 Host 列表与能力 |
+| OAuth 动态模型列表 | 官方客户端模型发现及能力缓存；在线时每次启动后在后台读取一次，失败时保留缓存与已选模型；隐藏模型单独标注；移除固定四项列表 | 已实现：启动后自动读取；打开 OAuth 连接时再次读取完整列表及各模型 effort/速度 | 已实现：Host 启动后自动读取；打开“查询”设置时等读取结束再刷新列表；打开 OAuth 连接时再次读取 |
 | 义项合并与其他表述 | `SenseMerging`、`AnswersView` | 已实现：折叠的“其他表述 / 用法细分” | 已实现：可展开的“其他表述 / 用法细分” |
 | TL;DR 概览 | `QueryPresentation`（`QuickReadView`） | 已实现：粉色 TL;DR 徽标与状态 | 已实现：粉底深色 TL;DR 标记与状态 |
 | 音标及来源、AI 音标标记 | `QueryPresentation`（`SavedPronunciation`） | 已实现 | 已实现 |

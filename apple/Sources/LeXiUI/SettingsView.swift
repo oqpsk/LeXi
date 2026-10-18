@@ -96,6 +96,7 @@ struct QuerySettings: View {
                 }
             }
             .formStyle(.grouped)
+            .task { await store.awaitModelCatalog() }
             .sheet(item: $connection) { destination in
                 VStack(spacing: 0) {
                     HStack {
