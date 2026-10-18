@@ -18,6 +18,7 @@ public partial class MainWindow
         if (focusClosed || !IsActive || !IsVisible || !IsEnabled || WindowState == WindowState.Minimized) return;
         var handle = new WindowInteropHelper(this).Handle;
         if (handle == IntPtr.Zero || GetForegroundWindow() != handle) return;
+        focusedSense = null;
         var alreadyFocused = SearchBox.IsKeyboardFocused;
         // Logical focus alone can survive activation while native keyboard focus is
         // elsewhere. Bring the foreground window's input host back into agreement.

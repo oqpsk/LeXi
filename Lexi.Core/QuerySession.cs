@@ -40,6 +40,19 @@ public sealed partial class QuerySession : IDisposable
     // The current query's stage times; each published view may mark the TL;DR or first sense.
     private LookupTiming? activeTiming;
     private readonly TimingLog timings;
+    private QueryWorkItem? contextWork;
+    private string? contextRetryIdentity;
+    private string ContextStatus(string text) => text + (contextWork?.State == QueryWorkState.Failed ? " · 本句语境未完成，一般释义已保留" : "");
+    private bool CanPickContext(string? sentence) => !string.IsNullOrWhiteSpace(sentence) && providers.Context != null && Settings.Online && Settings.AutoAi;
+    private QueryProgressState? ContextProgress(QueryProgressState? state)
+    {
+        if (state == null || contextWork == null) return state;
+        var item = !state.Busy && contextWork.State == QueryWorkState.Querying
+            ? contextWork with { State = QueryWorkState.Failed, Detail = "本次查询已停止" } : contextWork;
+        var result = state with { Items = [.. state.Items, item] };
+        return !state.Busy && state.Outcome == QueryOutcome.Complete && item.State == QueryWorkState.Failed
+            ? result with { Outcome = QueryOutcome.Partial, Title = "本句语境未完成", Detail = "一般释义已保留；可仅重试未完成的语境判断。", FailedStage = QueryStage.Merge } : result;
+    }
 
     public QuerySession(LexiPaths paths, Task<OfflineLibrary>? library = null, QueryProviders? providers = null,
         HttpMessageHandler? network = null, TimeProvider? clock = null,
@@ -264,7 +277,7 @@ public sealed partial class QuerySession : IDisposable
     private (long Id, CancellationToken Token) Begin(QueryViewKind next, string query, string text)
     {
         // Advance first: a cancelled flow resuming inline must already be stale.
-        request++; lookup?.Cancel(); lookup?.Dispose(); lookup = new(); retry = null; sourceFetchFailed.Clear(); activeTiming = null;
+        request++; lookup?.Cancel(); lookup?.Dispose(); lookup = new(); retry = null; sourceFetchFailed.Clear(); activeTiming = null; contextWork = null;
         kind = next; current = query; input = text; speechText = text;
         return (request, lookup.Token);
     }
@@ -298,7 +311,20 @@ public sealed partial class QuerySession : IDisposable
         try
         {
             if (Saved.Dictionary(query, force) is { } saved)
-            { timing.Path = "saved"; Step(id, () => RestoreSavedCore(saved, timing, progressId)); await ApplyContextAsync(id, query, context, token); return; }
+            {
+                timing.Path = "saved";
+                QueryProgressState? restored = null;
+                var contextual = CanPickContext(context);
+                Step(id, () => restored = RestoreSavedCore(saved, timing, progressId, contextual));
+                await ApplyContextAsync(id, query, context, token);
+                token.ThrowIfCancellationRequested();
+                if (contextual && restored != null) Step(id, () =>
+                {
+                    progress.Update(progressId, restored);
+                    status = timing.Finish(ContextStatus(restored.Warning ? "已显示缓存 · 部分结果 · 重新生成可重试" : "已显示缓存 · 重新生成可更新"));
+                });
+                return;
+            }
             try
             {
                 if (Settings.OfflineEnabled)
@@ -331,12 +357,16 @@ public sealed partial class QuerySession : IDisposable
                 Step(id, () => Presentation.ApplyAnswers(shown, basis));
                 await SaveDictionaryAsync(query, local, online, evidence, cachedAnswers, Settings.MergeSenses, sourceIncomplete, token);
                 token.ThrowIfCancellationRequested(); timing.MarkFirst(); timing.Path = "cached";
+                if (CanPickContext(context)) Step(id, () => progress.Update(progressId,
+                    QueryProgressState.Finished(shown, Settings.MergeSenses, sourceIncomplete).WithWork(Settings, shown, false) with
+                    { Stage = QueryStage.Merge, Outcome = QueryOutcome.Running, Title = "正在判断本句语境", Detail = "缓存释义已显示，正在确定本句含义", Restored = true }));
+                await ApplyContextAsync(id, query, context, token);
+                token.ThrowIfCancellationRequested();
                 Step(id, () =>
                 {
                     progress.Update(progressId, QueryProgressState.Finished(shown, Settings.MergeSenses, sourceIncomplete).WithWork(Settings, shown, false) with { Restored = true, Detail = "已恢复已有缓存 · 点击重新生成可更新" });
-                    status = timing.Finish("已显示缓存 · 重新生成可更新");
+                    status = timing.Finish(ContextStatus("已显示缓存 · 重新生成可更新"));
                 });
-                await ApplyContextAsync(id, query, context, token);
                 return;
             }
             if (!Settings.Online)
@@ -440,6 +470,18 @@ public sealed partial class QuerySession : IDisposable
                 Step(id, () => retry = new(query, local, online, evidence, result, options, sourceIncomplete, failedSources));
                 await SaveDictionaryAsync(query, local, online, evidence, result, mergeEnabled, sourceIncomplete, token);
                 token.ThrowIfCancellationRequested();
+                // The whole query stays active until both independent judge jobs have ended.
+                // In particular, a slow context pick cannot arrive after the success retirement
+                // or be omitted from the total elapsed time (including saved-entry lookups).
+                if (CanPickContext(context) && contextPick?.IsCompleted != true)
+                    Step(id, () =>
+                    {
+                        progress.Update(progressId, QueryProgressState.Finished(result, mergeEnabled, sourceIncomplete).WithWork(options, result) with
+                        { Stage = QueryStage.Merge, Outcome = QueryOutcome.Running, Title = "正在判断本句语境", Detail = "义项整理已结束，正在确定本句含义" });
+                        status = "释义已显示 · 正在判断本句语境…";
+                    });
+                await (contextPick ?? ApplyContextAsync(id, query, context, token));
+                token.ThrowIfCancellationRequested();
                 var failures = result.Answers.Count(a => a.Phase == ModelPhase.Failed);
                 var outcome = failures > 0 ? $"{failures} 个模型未完成 · 其余结果已保留" : "查询完成";
                 if (!string.IsNullOrEmpty(result.MergeNote)) outcome += " · " + result.MergeNote;
@@ -448,11 +490,10 @@ public sealed partial class QuerySession : IDisposable
                 {
                     progress.Update(progressId, QueryProgressState.Finished(result, mergeEnabled, sourceIncomplete,
                         SpecialistReferences.Uncovered(query, result.Groups, sourceEvidence).Length).WithWork(options, result));
-                    status = timing.Finish(Status(notes, outcome));
+                    status = timing.Finish(ContextStatus(Status(notes, outcome)));
                 });
             }
             finally { lock (gate) finished = true; }
-            await (contextPick ?? ApplyContextAsync(id, query, context, token));
         }
         catch (OperationCanceledException)
         { Step(id, () => progress.Update(progressId, (progress.Current ?? initialProgress).Interrupted("查询已中断", "本次查询已结束，可重新查询"))); }
@@ -601,7 +642,7 @@ public sealed partial class QuerySession : IDisposable
     }
     private void Update(Action action) { lock (gate) { action(); Publish(); } }
 
-    private QueryProgressState RestoreSavedCore(SavedDictionary saved, LookupTiming timing, long progressId)
+    private QueryProgressState RestoreSavedCore(SavedDictionary saved, LookupTiming timing, long progressId, bool deferFinish = false)
     {
         var query = saved.Query;
         current = query; Presentation.SetQuery(query);
@@ -617,8 +658,9 @@ public sealed partial class QuerySession : IDisposable
         var state = (saved.Result.Answers.Length > 0 ? QueryProgressState.Finished(saved.Result, saved.MergeEnabled,
             saved.SourceIncomplete, SpecialistReferences.Uncovered(query, saved.Result.Groups, saved.Evidence).Length) :
             QueryProgressState.SourcesFinished(false, saved.SourceIncomplete)).WithWork(Settings, saved.Result, false) with { Restored = true, Detail = "已恢复保存的结果 · 点击重新生成可更新" };
-        progress.Update(progressId, state);
-        status = timing.Finish(state.Warning ? "已显示缓存 · 部分结果 · 重新生成可重试" : "已显示缓存 · 重新生成可更新");
+        progress.Update(progressId, deferFinish ? state with { Stage = QueryStage.Merge, Outcome = QueryOutcome.Running,
+            Title = "正在判断本句语境", Detail = "缓存释义已显示，正在确定本句含义" } : state);
+        status = deferFinish ? "已显示缓存 · 正在判断本句语境…" : timing.Finish(state.Warning ? "已显示缓存 · 部分结果 · 重新生成可重试" : "已显示缓存 · 重新生成可更新");
         return state;
     }
 
@@ -682,21 +724,30 @@ public sealed partial class QuerySession : IDisposable
         var key = contextRequest.InputHash + ":" + judge.CacheKey("", options);
         if (Cache.Read<ContextPick>(LookupContext.CacheKind, key) is { } saved)
         {
-            try { var valid = LookupContext.Parse(JsonSerializer.Serialize(saved, Json.Options), contextRequest); Step(id, () => { Presentation.ApplyContext(sentence, valid); activeTiming?.Mark("context"); }); return; }
+            try { var valid = LookupContext.Parse(JsonSerializer.Serialize(saved, Json.Options), contextRequest); Step(id, () => { Presentation.ApplyContext(sentence, valid); activeTiming?.Mark("context");
+                contextWork = new("context", "本句语境", QueryWorkState.Complete, "已使用缓存语境判断"); }); return; }
             catch (Exception e) when (e is InvalidDataException or JsonException) { }
         }
-        Step(id, () => Presentation.BeginContext(sentence));
+        Step(id, () =>
+        {
+            contextRetryIdentity = RetryIdentity(Settings);
+            contextWork = new("context", judge.Name + " · 本句", QueryWorkState.Querying, "正在判断本句含义");
+            Presentation.BeginContext(sentence);
+        });
         try
         {
             var pick = await Task.Run(() => providers.Context(contextRequest, options, token), token);
             pick = LookupContext.Parse(JsonSerializer.Serialize(pick, Json.Options), contextRequest);
             token.ThrowIfCancellationRequested();
             await TryCacheAsync(LookupContext.CacheKind, key, pick);
-            Step(id, () => { Presentation.ApplyContext(sentence, pick); activeTiming?.Mark("context"); });
+            Step(id, () => { Presentation.ApplyContext(sentence, pick); activeTiming?.Mark("context");
+                contextWork = new("context", judge.Name + " · 本句", QueryWorkState.Complete,
+                    pick.Gloss.Length > 0 ? "本句语境判断已完成" : "本句含义不明确，保留一般释义"); });
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception e) when (DictionaryCoordinator.ExpectedFailure(e) || e is OperationCanceledException)
-        { Step(id, () => Presentation.ContextFailed()); }
+        { Step(id, () => { Presentation.ContextFailed(); contextWork = new("context", judge.Name + " · 本句", QueryWorkState.Failed,
+            "本句语境判断失败，已保留一般释义；可仅重试语境判断"); }); }
     }
 
     private async Task TryCacheAsync<T>(string kindName, string key, T value)
@@ -726,7 +777,7 @@ public sealed partial class QuerySession : IDisposable
     }
 
     private QueryView Build() => new(request, ++revision, kind, current, input, speechText, Presentation.Heading,
-        Presentation.Pronunciation, progress.Current, progress.Generation, status, kind != QueryViewKind.Home && Settings.Online,
+        Presentation.Pronunciation, ContextProgress(progress.Current), progress.Generation, status, kind != QueryViewKind.Home && Settings.Online,
         new(Navigation.CanBack, Navigation.CanForward, QueryNavigation.Label(Navigation.Back), QueryNavigation.Label(Navigation.Forward)),
         Presentation.Local, Presentation.LocalHint, Presentation.Online, Presentation.OnlineHint, Presentation.Answers,
         Presentation.QuickRead, Presentation.FormRows, Presentation.Etymology, Presentation.Translation, CanRetry);

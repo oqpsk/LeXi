@@ -12,7 +12,9 @@ public partial class MainWindow
 
     private void RenderAnswerCard(AnswersView? answers)
     {
-        AiPanel.Children.Clear(); readAloudBlocks.Clear();
+        var hadFocus = keyboardSenses.Any(s => s.Row.IsKeyboardFocused);
+        var key = focusedSense;
+        AiPanel.Children.Clear(); readAloudBlocks.Clear(); keyboardSenses.Clear(); disclosureToggles.Clear();
         if (answers is null or { Empty: true }) return;
         var card = Card(AiPanel, "", "", true);
         // A wider left margin holds the read-aloud speakers.
@@ -28,6 +30,7 @@ public partial class MainWindow
             card.Children.Add(controls); card.Children.Add(details);
             AddDisclosure(controls, details, "lookup:notes", "补充说明", content);
         }
+        RestoreSenseKeyboard(key, hadFocus);
         if (answers.MergeWarning.Length > 0) card.Children.Add(CompactHint(answers.MergeWarning, true));
         if (answers.Originals == OriginalsMode.Collapse)
         {

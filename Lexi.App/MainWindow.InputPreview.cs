@@ -14,9 +14,9 @@ public partial class MainWindow
     private void InitializeInputPreview()
     {
         SearchBox.AddHandler(TextCompositionManager.PreviewTextInputStartEvent,
-            new TextCompositionEventHandler((_, _) => { inputComposing = true; CancelInputPreview(); }), true);
+            new TextCompositionEventHandler((_, _) => { inputComposing = true; CancelSummonedLookup(); CancelInputPreview(); }), true);
         SearchBox.AddHandler(TextCompositionManager.PreviewTextInputUpdateEvent,
-            new TextCompositionEventHandler((_, _) => { inputComposing = true; CancelInputPreview(); }), true);
+            new TextCompositionEventHandler((_, _) => { inputComposing = true; CancelSummonedLookup(); CancelInputPreview(); }), true);
         // TextBox handles TextInput itself; observe handled completion too so composition cannot stay stuck.
         SearchBox.AddHandler(TextCompositionManager.TextInputEvent, new TextCompositionEventHandler((_, _) =>
         {

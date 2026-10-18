@@ -86,7 +86,9 @@ public sealed partial class SettingsWindow : Window
         model.SelectionChanged += (_, _) => RefreshOptions(); secondary.SelectionChanged += (_, _) => RefreshOptions(); judge.SelectionChanged += (_, _) => RefreshOptions();
         primaryOptions.Changed += RefreshOptions; secondaryOptions.Changed += RefreshOptions; judgeOptions.Changed += RefreshOptions; RefreshOptions();
         general.Children.Add(Text("同一词义的细分用法可归为一组，优先展示涵盖更完整的原文；其他表述保留在“用法细分”中。不同含义和分歧仍分开。", 14, Muted));
-        void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true; }
+        var selectedLookup = new CheckBox { Content = "呼出时查询选中的文字", IsChecked = settings.LookupSelectedText, Margin = new(0,0,0,10) };
+        var copiedLookup = new CheckBox { Content = "呼出时查询刚复制的文字", IsChecked = settings.LookupCopiedText, Margin = new(0,0,0,10) };
+        void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true || selectedLookup.IsChecked == true; }
         parallel.Checked += (_, _) => UpdateParallelControls(); parallel.Unchecked += (_, _) => UpdateParallelControls();
         merge.Checked += (_, _) => UpdateParallelControls(); merge.Unchecked += (_, _) => UpdateParallelControls(); UpdateParallelControls();
         var modelError = Text("", 14, Theme.Brush("Warning")); modelError.Visibility = Visibility.Collapsed; general.Children.Add(modelError);
@@ -141,7 +143,7 @@ public sealed partial class SettingsWindow : Window
             _ = Dispatcher.BeginInvoke(() => anchor.BringIntoView());
             await ReadSubscriptions();
         };
-        general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+, 设置 · Ctrl+Q 退出\n固定到任务栏第 2 位后用 Win+2 切换", 14,Muted));
+        general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+D 朗读词头 · Ctrl+Shift+C 复制 TL;DR / 译文\n输入框 ↓ / Tab 进入释义；↑↓ 切换，空格朗读，Enter 展开例句，Ctrl+C 复制，Esc 回到输入框\nCtrl+, 设置 · Ctrl+Q 退出 · Win+2 切换（固定到任务栏第 2 位）", 14,Muted));
 
         var dictionaries = new StackPanel { Margin = new(2,4,8,10) };
         tabs.Items.Add(new TabItem { Header = "离线词典", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = dictionaries } });
@@ -176,6 +178,11 @@ public sealed partial class SettingsWindow : Window
         var saveSpeech = AddSpeechTab(tabs, settings, speechMetadata);
         var windowOptions = new StackPanel { Margin = new(2,4,8,10) };
         tabs.Items.Add(new TabItem { Header = "窗口", Padding = new(14,9,14,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = windowOptions } });
+        windowOptions.Children.Add(Text("呼出时速查", 18));
+        windowOptions.Children.Add(selectedLookup); windowOptions.Children.Add(copiedLookup);
+        selectedLookup.Checked += (_, _) => UpdateParallelControls(); selectedLookup.Unchecked += (_, _) => UpdateParallelControls();
+        windowOptions.Children.Add(Text("选词后直接呼出，或 Ctrl+C 后在 8 秒内呼出。单词和短语直接查，长文字只填入输入框；链接与路径忽略。LeXi 内复制的文字不会触发。", 14, Muted));
+        windowOptions.Children.Add(Text("选词使用 Windows 辅助功能接口，仅在呼出时读取；应用未提供选区时尝试刚复制的文字。能读到所在句子时，TL;DR 会给出本句意思。", 14, Muted));
         windowOptions.Children.Add(Text("点击窗口的 X 时", 18));
         var closeBehavior = new ComboBox { ItemsSource = new[] { "最小化 · 保持后台运行", "退出 LeXi" }, SelectedIndex = settings.MinimizeOnClose ? 0 : 1, Margin = new(0,0,0,14) };
         System.Windows.Automation.AutomationProperties.SetName(closeBehavior, "窗口关闭行为");
@@ -195,7 +202,7 @@ public sealed partial class SettingsWindow : Window
             candidate.JudgeProvider = judgeValue.Provider; candidate.JudgeModel = judgeValue.Id;
             candidate.InferenceProfiles = [.. draft.InferenceProfiles];
             candidate.ParallelLookup = parallel.IsChecked == true;
-            foreach (var selected in new[] { primaryValue }.Concat(candidate.ParallelLookup ? new[] { secondaryValue } : []).Concat(merge.IsChecked == true ? new[] { judgeValue } : []))
+            foreach (var selected in new[] { primaryValue }.Concat(candidate.ParallelLookup ? new[] { secondaryValue } : []).Concat(merge.IsChecked == true || selectedLookup.IsChecked == true ? new[] { judgeValue } : []))
             {
                 var options = InferenceOptions.Selected(candidate, new(selected.Provider, selected.Id));
                 if (InferenceOptions.ValidateSelection(selected.Capabilities, options.Effort, options.Speed) is { } error)
@@ -209,6 +216,8 @@ public sealed partial class SettingsWindow : Window
             settings.CompatibleBaseUrl = candidate.CompatibleBaseUrl; settings.CompatibleStreaming = custom.Streaming();
             settings.JudgeProvider = judgeValue.Provider;
             settings.MinimizeOnClose = closeBehavior.SelectedIndex == 0;
+            settings.LookupSelectedText = selectedLookup.IsChecked == true;
+            settings.LookupCopiedText = copiedLookup.IsChecked == true;
             settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
             settings.OfflineEnabled = master.IsChecked == true;
             settings.DisabledDictionaries = toggles.Where(t => t.Toggle.IsChecked != true).Select(t => t.Dictionary.Id).ToArray();

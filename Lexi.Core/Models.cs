@@ -64,6 +64,9 @@ public static class Json
 
 public sealed class AppSettings
 {
+    // Windows summon options; macOS owns equivalent preferences in UserDefaults.
+    public bool LookupCopiedText { get; set; } = true;
+    public bool LookupSelectedText { get; set; }
     public bool MinimizeOnClose { get; set; } = true;
     public bool Online { get; set; } = true;
     public bool AutoAi { get; set; } = true;
