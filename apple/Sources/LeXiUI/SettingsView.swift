@@ -77,11 +77,11 @@ struct QuerySettings: View {
                 } header: {
                     Text("查询模型")
                 } footer: {
-                    Note("通过 OAuth 订阅或 API 查询。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Effort 和速度分别控制思考深度与服务档位。同一模型共用配置；OAuth 订阅与自定义 API 分开保存。")
+                    Note("通过 OAuth 订阅或 API 查询。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。思考深度和速度跟着模型保存：同一模型在不同位置共用一套，OAuth 订阅与自定义 API 分开。")
                 }
                 Section {
                     toggle(SettingLabel("自动整理同类义项", "合并重复的说法，包含单个模型内部"), settings.mergeSenses, "mergeSenses")
-                    modelPicker(SettingLabel("义项判断模型", "OAuth / API"), store.judgeChoices, selected: (settings.judgeProvider ?? "codex") + ":" + settings.judgeModel) { choice in
+                    modelPicker(SettingLabel("义项判断模型", "Codex 订阅或自定义 API"), store.judgeChoices, selected: (settings.judgeProvider ?? "codex") + ":" + settings.judgeModel) { choice in
                         ["judgeProvider": .string(choice.provider), "judgeModel": .string(choice.id)]
                     }
                     .disabled(!settings.mergeSenses)
@@ -132,25 +132,39 @@ struct QuerySettings: View {
         } label: { label }
     }
 
+    // One row under each model picker, so the effort and speed it shows belong to that model.
     @ViewBuilder
     private func inferenceControls(_ models: [ModelChoice], selected: String) -> some View {
         if let model = models.first(where: { $0.key == selected }), let options = model.options {
-            inferencePicker("Effort · 思考深度", options.effortChoices, value: model.effort ?? "") { value in
-                Task { error = await store.configureInference(model, effort: value, speed: model.speed ?? "") }
+            LabeledContent {
+                HStack(spacing: 6) {
+                    inferencePicker("思考深度", options.effortChoices, value: model.effort ?? "",
+                                    unavailable: "此模型未提供可选思考深度，使用模型默认设置。") { value in
+                        Task { error = await store.configureInference(model, effort: value, speed: model.speed ?? "") }
+                    }
+                    inferencePicker("速度", options.speedChoices, value: model.speed ?? "",
+                                    unavailable: "此模型未提供可选速度，使用服务默认设置。") { value in
+                        Task { error = await store.configureInference(model, effort: model.effort ?? "", speed: value) }
+                    }
+                }
+            } label: {
+                SettingLabel("思考深度 · 速度", options.note)
             }
-            inferencePicker("速度", options.speedChoices, value: model.speed ?? "") { value in
-                Task { error = await store.configureInference(model, effort: model.effort ?? "", speed: value) }
-            }
-            if !options.note.isEmpty { Text(options.note).font(.callout).foregroundStyle(.secondary) }
         }
     }
-    private func inferencePicker(_ title: String, _ options: [InferenceOption], value: String, change: @escaping (String) -> Void) -> some View {
-        Picker(title, selection: Binding(get: { value }, set: change)) {
+    private func inferencePicker(_ title: String, _ options: [InferenceOption], value: String, unavailable: String,
+                                 change: @escaping (String) -> Void) -> some View {
+        Picker(title, selection: Binding(get: { value }, set: { change($0) })) {
             ForEach(options) { Text($0.label).tag($0.id) }
             if !options.contains(where: { $0.id == value }) { Text(value + "（当前不可用）").tag(value) }
         }
-        .disabled(options.count <= 1 && value.isEmpty)
+        .labelsHidden()
+        .fixedSize()
+        .disabled(Self.fixed(options, value))
+        .help(Self.fixed(options, value) ? unavailable : title)
     }
+    // Only the default is on offer, and nothing else was saved earlier.
+    private static func fixed(_ options: [InferenceOption], _ value: String) -> Bool { options.count <= 1 && value.isEmpty }
     private func apply(_ changes: [String: SettingValue]) {
         Task { error = await store.update(changes) }
     }

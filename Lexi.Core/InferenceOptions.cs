@@ -8,7 +8,7 @@ public sealed record InferenceOption(string Id, string Label)
 { public override string ToString() => Label; }
 public sealed record InferenceCapabilities(string[] Efforts, InferenceOption[] Speeds, string Note = "")
 {
-    public InferenceOption[] EffortChoices => [new("", "模型默认"), .. Efforts.Select(id => new InferenceOption(id, id))];
+    public InferenceOption[] EffortChoices => [new("", "模型默认"), .. Efforts.Select(id => new InferenceOption(id, InferenceOptions.EffortLabel(id)))];
     public InferenceOption[] SpeedChoices => [new("", "服务默认"), .. Speeds];
 }
 public sealed record InferenceProfile(string Provider, string Model, string Endpoint, string Effort, string Speed);
@@ -29,6 +29,9 @@ public static class InferenceOptions
         // Aliases depend on the installed Claude Code version; never infer a release from an alias.
         return Unknown;
     }
+    // Display names only, written like the speed labels; the id is what reaches the service.
+    public static string EffortLabel(string id) => id switch
+    { "xhigh" => "Extra High", "" => "", _ => char.ToUpperInvariant(id[0]) + id[1..] };
     public static bool ValidEffort(string value) => value == "" || Efforts.Contains(value);
     public static bool ValidSpeed(string value) => value == "" || Speeds.Contains(value);
     public static string CanonicalSpeed(string value) => value == "fast" ? "priority" : value;

@@ -19,6 +19,8 @@ internal static class InferenceChecks
         check(claudeCaps.Efforts.SequenceEqual(["low", "medium", "high"]) && claudeCaps.Speeds.Last().Id == "priority", "Claude official initialization capabilities drive the same effort and speed controls");
         check(InferenceOptions.ValidateSelection(caps, "medium", "priority") != null && InferenceOptions.ValidateSelection(caps, "high", "ultrafast") == null,
             "effort and speed are independently validated without choosing a lower supported value");
+        check(caps.EffortChoices.Select(c => c.Label).SequenceEqual(["模型默认", "Low", "High", "Ultra"]) && caps.EffortChoices[1].Id == "low" &&
+            InferenceOptions.EffortLabel("xhigh") == "Extra High", "effort labels are written like speed labels while the sent values stay lowercase");
         check(InferenceOptions.Unknown.EffortChoices.Length == 1 && InferenceOptions.Unknown.SpeedChoices.Length == 1 &&
             InferenceOptions.ValidateSelection(InferenceOptions.Unknown, "low", "") != null, "unknown capabilities offer defaults only, without guessing from model names");
         var settings = new AppSettings { Provider = "compatible", Model = "model-a", CompatibleBaseUrl = endpoint };

@@ -274,7 +274,8 @@ struct OnlineSourceView: View {
                         Text(sense.label).font(.subheadline).foregroundStyle(.secondary)
                         Text(sense.definition).font(.system(size: 15)).textSelection(.enabled)
                         ForEach(Array(sense.examples.enumerated()), id: \.offset) { _, example in
-                            Text(example.text).font(example.chinese ? LexiTheme.chineseExample(14) : LexiTheme.lexical(14)).italic()
+                            // English examples are italic; Chinese ones stay upright, as on Windows.
+                            Text(example.text).font(example.chinese ? LexiTheme.chineseExample(14) : LexiTheme.lexical(14)).italic(!example.chinese)
                                 .foregroundStyle(.secondary).textSelection(.enabled)
                         }
                     }
