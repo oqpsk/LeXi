@@ -99,13 +99,16 @@ public sealed partial class SettingsWindow : Window
         var oauthHeading = connectionPanel.Children.OfType<TextBlock>().First(t => t.Text == "OAuth 订阅");
         var oauthIndex = connectionPanel.Children.IndexOf(oauthHeading);
         connectionPanel.Children.Insert(oauthIndex + 1, subscriptions); connectionPanel.Children.Insert(oauthIndex + 2, subscriptionStatus);
-        subscriptions.Click += async (_, _) =>
+        async Task ReadSubscriptions()
         {
+            if (!subscriptions.IsEnabled) return;
             subscriptions.IsEnabled = false;
+            subscriptionStatus.Text = "正在读取 OAuth 模型与可用档位…";
             try
             {
                 if (online.IsChecked != true) { subscriptionStatus.Text = "请先开启在线补充，再读取订阅模型。"; return; }
-                var available = await InferenceOptions.ReadSubscriptions(path.Text.Trim(), connectionLifetime.Token);
+                var clientPath = path.Text.Trim();
+                var available = await Task.Run(() => InferenceOptions.ReadSubscriptions(clientPath, connectionLifetime.Token), connectionLifetime.Token);
                 await InferenceOptions.RememberSubscriptions(modelRoot, available, connectionLifetime.Token);
                 details = details.Where(m => !available.Any(a => a.Provider == m.Provider)).Concat(available).ToArray();
                 RefreshModels(draft.CompatibleBaseUrl, details.Where(m => m.Provider == CompatibleText.Provider).ToArray());
@@ -115,14 +118,16 @@ public sealed partial class SettingsWindow : Window
             catch (Exception e) when (e is InvalidOperationException or TimeoutException or System.ComponentModel.Win32Exception or System.IO.IOException)
             { subscriptionStatus.Text = "无法读取订阅模型，请检查官方客户端版本、登录状态和网络。"; }
             finally { if (!connectionLifetime.IsCancellationRequested) subscriptions.IsEnabled = true; }
-        };
+        }
+        subscriptions.Click += async (_, _) => await ReadSubscriptions();
         var custom = AddCompatibleConnection(connectionTab, settings, RefreshModels, () => online.IsChecked == true, textMetadata, textRoot);
         customEntry.Click += (_, _) => { tabs.SelectedItem = connectionTab; ((ScrollViewer)connectionTab.Content).ScrollToTop(); };
-        accounts.Click += (_, _) =>
+        accounts.Click += async (_, _) =>
         {
             tabs.SelectedItem = connectionTab;
             var anchor = connectionPanel.Children.OfType<TextBlock>().First(t => t.Text == "OAuth 订阅");
             _ = Dispatcher.BeginInvoke(() => anchor.BringIntoView());
+            await ReadSubscriptions();
         };
         general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+, 设置 · Ctrl+Q 退出\n固定到任务栏第 2 位后用 Win+2 切换", 14,Muted));
 

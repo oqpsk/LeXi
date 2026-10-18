@@ -327,7 +327,10 @@ public sealed class QuerySession : IDisposable
                         Publish();
                     }
                 });
-                var result = await coordinator.LookupAsync(query, evidence, Settings, force, token, report);
+                var options = Settings.ForModel(LookupModel.Primary(Settings));
+                // Buffered SSE and CLI output can complete reads synchronously for a whole burst.
+                // Keep parsing, grouping and provider callbacks off the front end's UI context.
+                var result = await Task.Run(() => coordinator.LookupAsync(query, evidence, options, force, token, report), token);
                 token.ThrowIfCancellationRequested();
                 lock (gate) finished = true;
                 Step(id, () => Presentation.ApplyAnswers(result, sourceEvidence));
@@ -429,7 +432,8 @@ public sealed class QuerySession : IDisposable
                     Publish();
                 }
             });
-            var entry = await providers.Translate(text, target, Settings, token, report);
+            var options = Settings.ForModel(LookupModel.Primary(Settings));
+            var entry = await Task.Run(() => providers.Translate(text, target, options, token, report), token);
             token.ThrowIfCancellationRequested();
             lock (gate) finished = true;
             timing.MarkFirst();
@@ -549,10 +553,9 @@ public sealed class QuerySession : IDisposable
     public static string ModelStatus(LookupSnapshot snapshot) => string.Join(" · ", snapshot.Answers.Select(a => a.Model.Name + (a.Phase switch
     { ModelPhase.Pending => " 查询中", ModelPhase.Streaming => " 生成中", ModelPhase.Complete => a.Cached ? " 缓存" : " 完成", ModelPhase.Failed => " 未完成", _ => a.Cached ? " 缓存" : " 无缓存" })));
 
-    // Progress<T> keeps UI-thread delivery for desktop front ends; without a synchronization
-    // context (the host), updates are delivered inline so they cannot be reordered.
-    private static IProgress<T> Reporter<T>(Action<T> handler) =>
-        SynchronizationContext.Current != null ? new Progress<T>(handler) : new InlineProgress<T>(handler);
+    // Process ordered model snapshots on the generation worker. Front ends marshal complete
+    // views; posting every token to their synchronization context would starve input/cancel.
+    private static IProgress<T> Reporter<T>(Action<T> handler) => new InlineProgress<T>(handler);
 
     private bool Step(long id, Action action)
     {

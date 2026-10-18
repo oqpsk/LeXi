@@ -25,6 +25,11 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.23 (Windows / macOS)
+
+- Keep generation and model-preview processing off the desktop UI synchronization context. Sample Claude and compatible-API JSON previews at most once per 80 ms and skip unchanged content; final responses still receive complete validation. Windows coalesces pending views at background dispatcher priority so input, scrolling and cancellation can run during token bursts, and stale revisions cannot overwrite the latest result. The same preview sampling applies to macOS through Core/Host.
+- Replace the fixed four-entry OAuth starter catalog with official-client discovery and persisted model capabilities. Opening the OAuth connection explicitly refreshes available models and their independent effort/speed options on both platforms; Codex discovery requests all pages including hidden models, labels hidden entries and explains that invocation remains account-dependent. Keep previously selected models and cached metadata available offline or after a failed refresh. Never substitute API model IDs for OAuth models or switch the user's selections.
+
 ## 0.9.22 (Windows / macOS)
 
 - Place compact OAuth and API connection actions together above the query model selectors, with direct access to each connection form. Prefix all shared model choices with `OAuth |` or `API |` while preserving their underlying provider/model identities and saved preferences.

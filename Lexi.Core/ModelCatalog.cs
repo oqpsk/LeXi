@@ -1,6 +1,6 @@
 namespace Lexi.Core;
 
-public sealed record ModelChoice(string Label, string Id, string Provider = "codex", InferenceCapabilities? Options = null, string Effort = "", string Speed = "")
+public sealed record ModelChoice(string Label, string Id, string Provider = "codex", InferenceCapabilities? Options = null, string Effort = "", string Speed = "", bool Hidden = false)
 {
     public InferenceCapabilities Capabilities => Options ?? InferenceOptions.Subscription(Provider, Id);
     public override string ToString() => Label;
@@ -9,15 +9,20 @@ public sealed record ModelChoice(string Label, string Id, string Provider = "cod
 // Model options and settings rules shared by every settings screen.
 public static class ModelCatalog
 {
-    public static ModelChoice Choice(string provider, string id, InferenceCapabilities? capabilities = null) =>
-        new((provider == CompatibleText.Provider ? "API | " : "OAuth | ") + new LookupModel(provider, id).Name, id, provider, capabilities ?? (provider == CompatibleText.Provider ? InferenceOptions.Unknown : InferenceOptions.Subscription(provider, id)));
+    public static ModelChoice Choice(string provider, string id, InferenceCapabilities? capabilities = null, bool hidden = false)
+    {
+        var options = capabilities ?? (provider == CompatibleText.Provider ? InferenceOptions.Unknown : InferenceOptions.Subscription(provider, id));
+        const string hiddenNote = "官方客户端隐藏模型；能否调用取决于订阅权限。";
+        if (hidden && !options.Note.Contains(hiddenNote, StringComparison.Ordinal)) options = options with { Note = hiddenNote + options.Note };
+        return new((provider == CompatibleText.Provider ? "API | " : "OAuth | ") + new LookupModel(provider, id).Name + (hidden ? " · 隐藏" : ""), id, provider, options, Hidden: hidden);
+    }
     public static ModelChoice[] Choices(AppSettings settings, IEnumerable<string>? compatibleModels = null, IEnumerable<ModelChoice>? details = null)
     {
-        var choices = new List<ModelChoice> { Choice("claude", "haiku"), Choice("codex", "gpt-6-luna"), Choice("codex", "gpt-6.1-sol"), Choice("codex", "") };
+        var choices = new List<ModelChoice>();
         if (details != null) foreach (var model in details)
         {
             choices.RemoveAll(m => m.Provider == model.Provider && m.Id == model.Id);
-            choices.Add(Choice(model.Provider, model.Id, model.Options));
+            choices.Add(Choice(model.Provider, model.Id, model.Options, model.Hidden));
         }
         if (compatibleModels != null)
             choices.AddRange(compatibleModels.Where(CompatibleText.ValidModel).Distinct(StringComparer.Ordinal).Select(id => Choice(CompatibleText.Provider, id)));

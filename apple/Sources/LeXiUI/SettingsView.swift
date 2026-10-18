@@ -252,11 +252,7 @@ struct ConnectionSettings: View {
             if destination != .api {
                 Section {
                     Button(readingModels ? "正在读取…" : "读取 OAuth 订阅模型") {
-                        readingModels = true
-                        Task {
-                            modelStatus = await store.readSubscriptionModels() ?? "已更新订阅模型与可用档位。"
-                            readingModels = false
-                        }
+                        Task { await refreshModels() }
                     }.disabled(readingModels)
                     if !modelStatus.isEmpty { Text(modelStatus).font(.callout).foregroundStyle(.secondary) }
                 }
@@ -280,6 +276,16 @@ struct ConnectionSettings: View {
         }
         .formStyle(.grouped)
         .onAppear { codexPath = store.settings?.settings.codexPath ?? "" }
+        // Opening the OAuth connection is the user's explicit discovery action.
+        .task { if destination == .oauth { await refreshModels() } }
+    }
+
+    private func refreshModels() async {
+        guard !readingModels else { return }
+        readingModels = true
+        modelStatus = "正在读取 OAuth 模型与可用档位…"
+        modelStatus = await store.readSubscriptionModels() ?? "已更新订阅模型与可用档位。"
+        readingModels = false
     }
 
     private func choose() {

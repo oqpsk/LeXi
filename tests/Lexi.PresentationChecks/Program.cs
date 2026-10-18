@@ -80,6 +80,7 @@ internal static partial class Program
         CheckNativeWindowMemory();
         CheckPaletteAndSavedView(app, main, settings);
         CheckNativeFrame();
+        CheckStreamingDispatch(main);
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)
     {

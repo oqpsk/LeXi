@@ -37,6 +37,21 @@ internal static class InferenceChecks
         check(settings.InferenceProfiles.Length == 1 && InferenceOptions.Selected(settings, new("compatible", "model-a")).Effort == "low", "changing a model's options replaces only its own saved profile");
         try { InferenceOptions.Configure(settings, model, "medium", "priority"); check(false, "unsupported option"); }
         catch (InvalidOperationException) { check(InferenceOptions.Selected(settings, new("compatible", "model-a")).Effort == "low", "rejected option leaves the last explicit selection intact"); }
+        var catalogueSettings = new AppSettings { Provider = "compatible", Model = "saved-api", SecondaryProvider = "claude", SecondaryModel = "saved-claude", JudgeProvider = "codex", JudgeModel = "saved-codex" };
+        var discovered = new[] { ModelCatalog.Choice("codex", "future-model", caps), ModelCatalog.Choice("claude", "future-alias", claudeCaps) };
+        var catalogue = ModelCatalog.Choices(catalogueSettings, details: discovered);
+        check(catalogue.Length == 5 && !catalogue.Any(m => m.Id is "haiku" or "gpt-6-luna" or "gpt-6.1-sol" or ""),
+            "the OAuth catalog uses discovered models and saved choices without the retired four-option starter list");
+        check(catalogue.First(m => m.Id == "future-model").Capabilities.Speeds.Any(s => s.Id == "ultrafast") && catalogue.First(m => m.Id == "future-alias").Capabilities.Efforts.SequenceEqual(claudeCaps.Efforts),
+            "all advertised effort and speed choices survive dynamic model discovery independently for each provider");
+        var hiddenModel = ModelCatalog.Choice("codex", "hidden-future-model", caps, true);
+        var hiddenCatalog = ModelCatalog.Choices(catalogueSettings, details: [hiddenModel]);
+        check(hiddenCatalog.First(m => m.Id == hiddenModel.Id) is { Hidden: true, Label: var hiddenLabel } && hiddenLabel.EndsWith(" · 隐藏") && hiddenCatalog.First(m => m.Id == hiddenModel.Id).Capabilities.Note.Contains("订阅权限"),
+            "hidden official models are distinctly labeled and retain their account-availability caveat");
+        var catalogueRoot = Path.Combine(root, "catalogue-" + Guid.NewGuid().ToString("N"));
+        await InferenceOptions.RememberSubscriptions(catalogueRoot, discovered, default);
+        check(InferenceOptions.Available(catalogueRoot, catalogueSettings).Select(m => (m.Provider, m.Id)).ToHashSet().SetEquals(catalogue.Select(m => (m.Provider, m.Id))),
+            "discovered OAuth models persist across restarts alongside saved selections");
         var legacy = new AppSettings();
         check(InferenceOptions.Selected(legacy, LookupModel.Primary(legacy)) == new InferenceSelection("low", "priority") &&
             LookupModel.Primary(legacy).CacheKey("Word", legacy) == JsonSerializer.Serialize(new { query = "Word", legacy.Provider, legacy.Model, legacy.ReasoningEffort, legacy.ServiceTier }, Lexi.Core.Json.Options),

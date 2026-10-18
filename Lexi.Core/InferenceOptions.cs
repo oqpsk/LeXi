@@ -197,14 +197,14 @@ public static class InferenceOptions
             var models = new List<ModelChoice>(); string? cursor = null;
             for (int page = 0; page < 20; page++)
             {
-                await Send(new { id = 2, method = "model/list", @params = new { cursor } });
+                await Send(new { id = 2, method = "model/list", @params = new { cursor, includeHidden = true } });
                 using var data = await Response(2);
                 if (!data.RootElement.TryGetProperty("result", out var result) || !result.TryGetProperty("data", out var list) || list.ValueKind != JsonValueKind.Array)
                     throw new InvalidOperationException("无法读取订阅模型列表，请检查 Codex 客户端版本与登录状态。");
                 foreach (var model in list.EnumerateArray())
                 {
                     var id = String(model, "model", "id"); if (!CompatibleText.ValidModel(id)) continue;
-                    models.Add(ModelCatalog.Choice("codex", id, Parse(model)));
+                    models.Add(ModelCatalog.Choice("codex", id, Parse(model), model.TryGetProperty("hidden", out var hidden) && hidden.ValueKind == JsonValueKind.True));
                 }
                 cursor = result.TryGetProperty("nextCursor", out var next) && next.ValueKind == JsonValueKind.String ? next.GetString() : null;
                 if (string.IsNullOrEmpty(cursor)) return models.DistinctBy(m => m.Id).ToArray();

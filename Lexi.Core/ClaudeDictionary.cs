@@ -59,36 +59,28 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
 
     public async Task<AiEntry> LookupAsync(string query, OnlineEntry? online, AppSettings settings, CancellationToken token, IProgress<AiEntry>? progress = null)
     {
-        string? last = null;
         for (int attempt = 0; ; attempt++)
         {
             try
             {
-                var result = await RunAsync(CodexDictionary.DefineRequest(query, online) + RetryInstruction(attempt), settings, token, text =>
-                {
-                    if (progress != null && StreamingEntry.Read(text, query) is { } preview)
-                    { var value = JsonSerializer.Serialize(preview, Json.Options); if (last != value) { last = value; progress.Report(preview); } }
-                });
+                var updates = new StreamingPreview<AiEntry>(text => StreamingEntry.Read(text, query), progress, token);
+                var result = await RunAsync(CodexDictionary.DefineRequest(query, online) + RetryInstruction(attempt), settings, token, updates.Report);
                 return CodexDictionary.ParseAndValidate(StreamingEntry.Unwrap(result), query, online, true);
             }
-            catch (Exception ex) when (attempt == 0 && !token.IsCancellationRequested && ex is JsonException or InvalidDataException) { last = null; }
+            catch (Exception ex) when (attempt == 0 && !token.IsCancellationRequested && ex is JsonException or InvalidDataException) { }
         }
     }
     public async Task<TranslationEntry> TranslateAsync(string text, string target, AppSettings settings, CancellationToken token, IProgress<TranslationEntry>? progress = null)
     {
-        string? last = null;
         for (int attempt = 0; ; attempt++)
         {
             try
             {
-                var result = await RunAsync(Translation.Request(text, target) + RetryInstruction(attempt), settings, token, json =>
-                {
-                    if (progress != null && Translation.Preview(json, text, target) is { } preview)
-                    { var value = JsonSerializer.Serialize(preview, Json.Options); if (last != value) { last = value; progress.Report(preview); } }
-                });
+                var updates = new StreamingPreview<TranslationEntry>(json => Translation.Preview(json, text, target), progress, token);
+                var result = await RunAsync(Translation.Request(text, target) + RetryInstruction(attempt), settings, token, updates.Report);
                 return Translation.Parse(result, text, target);
             }
-            catch (Exception ex) when (attempt == 0 && !token.IsCancellationRequested && ex is JsonException or InvalidDataException) { last = null; }
+            catch (Exception ex) when (attempt == 0 && !token.IsCancellationRequested && ex is JsonException or InvalidDataException) { }
         }
     }
     private static string RetryInstruction(int attempt) => attempt == 0 ? "" : "\nThe previous response failed structural validation. Regenerate one complete valid JSON object. Escape every embedded double quote and newline inside strings. Follow the requested schema and exact input identity. No commentary or markdown.";
