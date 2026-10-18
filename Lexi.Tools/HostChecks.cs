@@ -117,6 +117,15 @@ internal static class HostChecks
                 (await client.Call("history.remove", new { query = history[0].GetProperty("query").GetString(), translation = true })).GetProperty("result").GetProperty("removed").GetBoolean(),
                 "history exposes previews and kinds and removes single entries");
 
+            var notBackup = Path.Combine(work, "not-a-backup.lexibackup"); File.WriteAllText(notBackup, "plain text");
+            var inspected = (await client.Call("data.inspect", new { path = notBackup })).GetProperty("error");
+            var cleared = (await client.Call("data.clear", new { category = "keys" })).GetProperty("error");
+            var unwritable = (await client.Call("data.export", new { path = Path.Combine(work, "missing", "backup.lexibackup") })).GetProperty("error");
+            Check(inspected.GetProperty("code").GetString() == "invalid_data" && inspected.GetProperty("message").GetString() == "所选文件不是有效的 LeXi 备份。" &&
+                cleared.GetProperty("code").GetString() == "invalid_data" && cleared.GetProperty("message").GetString() == "未知缓存类别。" &&
+                unwritable.GetProperty("code").GetString() == "file_failed" && !unwritable.GetProperty("message").GetString()!.Contains(work),
+                "data errors keep Core's wording, name damaged archives and unwritable files plainly, and never echo a path");
+
             var page = (await client.Call("query.navigate", new { direction = -1 })).GetProperty("result").GetProperty("page");
             Check(page.GetProperty("query").GetString() == "hello" &&
                 (await client.Call("query.navigate", new { direction = 2 })).GetProperty("error").GetProperty("code").GetString() == "invalid_params",

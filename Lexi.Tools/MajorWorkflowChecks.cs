@@ -80,6 +80,9 @@ internal static class MajorWorkflowChecks
         {
             await reopened.SubmitAsync("retryfixture");
             Check(reopened.View.CanRetry && completedCalls == 1 && failedCalls == 1, "a saved incomplete result restores the exact retry checkpoint without new calls");
+            var checkpoint = File.ReadAllText(Directory.GetFiles(Path.Combine(retryRoot, SavedQueries.DictionaryKind)).Single());
+            Check(checkpoint.Contains("\"retryIdentity\"") && !checkpoint.Contains("\"speechProfiles\"") && !checkpoint.Contains("\"codexPath\""),
+                "a saved checkpoint keeps a settings hash rather than a copy of the settings");
             reopened.Settings.SpeechVoiceName = "unrelated speech preference";
             await reopened.RetryFailedAsync();
             Check(!reopened.View.CanRetry && completedCalls == 1 && failedCalls == 2 && reopened.View.Progress?.Outcome == QueryOutcome.Complete,
@@ -147,7 +150,7 @@ internal static class MajorWorkflowChecks
         {
             var bad = Path.Combine(work, Guid.NewGuid().ToString("N") + ".zip");
             using (var zip = ZipFile.Open(bad, ZipArchiveMode.Create)) { using var writer = new StreamWriter(zip.CreateEntry(badName).Open()); writer.Write("{}"); }
-            var rejected = false; try { targetData.Import(bad,targetSettings,targetHistory,true); } catch (InvalidDataException) { rejected = true; }
+            var rejected = false; try { targetData.Import(bad,targetSettings,targetHistory,true); } catch (UserDataException) { rejected = true; }
             Check(rejected && File.ReadAllBytes(Path.Combine(targetRoot,"history.json")).SequenceEqual(beforeHistory), "unsafe archive paths are rejected before any data mutation");
         }
         using var metadata = new SpeechClient(new ModelsHandler());
