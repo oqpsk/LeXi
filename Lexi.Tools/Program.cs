@@ -4,7 +4,7 @@ using System.Text.Json;
 using Microsoft.VisualBasic.FileIO;
 using Lexi.Core;
 
-if (args.Length < 1) throw new ArgumentException("build-data <csv> <folder> | check <folder> [--fixture] | stream-check | live <folder> <assets> <cache> <word> [model] | bench-claude <assets> <work-folder> <words...> | cancel-check <assets> <work-folder>");
+if (args.Length < 1) throw new ArgumentException("build-data <csv> <folder> | check <folder> [--fixture] | stream-check | live <folder> <assets> <cache> <word> [model] | bench-claude <assets> <work-folder> <words...> | cancel-check <assets> <work-folder> | timing-report <user-folder> [latest]");
 if (args[0] == "quality-check") QualityChecks.Check(args[1]);
 else if (args[0] == "quality-score") QualityChecks.Score(args[1], args[2]);
 else if (args[0] == "compatible-check") await CompatibleChecks.Run(args[1], args[2]);
@@ -94,6 +94,10 @@ else if (args[0] == "stream-check")
     Check(StreamingEntry.Read("{\"word\":\"mog\",\"senses\":[{\"english\":\"outshine\",\"chinese\":\"incomplete", "mog") == null, "incomplete bilingual pair stays hidden");
     var partial = "{\"word\":\"mog\",\"senses\":[{\"chinese\":\"胜过\",\"english\":\"outshine\",\"example\":\"unfinished";
     Check(StreamingEntry.Read(partial,"mog")?.Senses[0].Chinese == "胜过", "definitions appear before examples finish");
+    var cored = JsonSerializer.Serialize(original with { Senses = [original.Senses[0] with { Gloss = "胜过", CoreMeaning = true }] }, Json.Options);
+    Check(StreamingEntry.Read(cored, "mog")?.Senses[0] is { Gloss: "胜过", CoreMeaning: true }, "a finished streamed sense keeps its gloss and core flag");
+    var open = cored[..(cored.LastIndexOf("\"chineseTerm\"", StringComparison.Ordinal))];
+    Check(StreamingEntry.Read(open, "mog")?.Senses[0] is { Gloss: "", CoreMeaning: null }, "a sense still being written never claims the core meaning");
     for (var i = 0; i < json.Length; i++) _ = StreamingEntry.Read(json[..i], "mog");
     Check(true, "every possible character boundary parses safely");
     Console.WriteLine($"{count} stream checks passed");
@@ -148,6 +152,18 @@ else if (args[0] == "platform-check") PlatformChecks.Run(args[1]);
 else if (args[0] == "session-check") await SessionChecks.Run(args[1], args[2]);
 else if (args[0] == "host-check") await HostChecks.Run(args[1], args[2], args[3], args.ElementAtOrDefault(4));
 else if (args[0] == "parallel-check") await ParallelChecks.Run(args[1]);
+else if (args[0] == "timing-report")
+{
+    // Median and 90th percentile stage times from a LeXi user folder's local timing log.
+    var records = new TimingLog(args[1]).Read();
+    if (args.Length > 2 && int.TryParse(args[2], out var latest)) records = records[^Math.Min(latest, records.Length)..];
+    Console.WriteLine($"{records.Length} lookups");
+    foreach (var group in TimingLog.Summarize(records))
+    {
+        Console.WriteLine($"\n{group.Path} ({group.Count})");
+        foreach (var (stage, (p50, p90)) in group.Stages) Console.WriteLine(FormattableString.Invariant($"  {stage,-36} p50 {p50 / 1000.0,6:0.0} s   p90 {p90 / 1000.0,6:0.0} s"));
+    }
+}
 else if (args[0] == "parallel-live") await ParallelLive.Run(args[1], args[2], args[3], args.Skip(4));
 else if (args[0] == "inspect-library")
 {

@@ -44,7 +44,7 @@ public sealed class QueryPresentation
     }
 
     public void SetQuery(string query) => Query = query;
-    private void ClearSources() { Local = []; LocalHint = ""; Online = null; OnlineHint = ""; Answers = null; baseAnswers = null; Translation = null; }
+    private void ClearSources() { Local = []; LocalHint = ""; Online = null; OnlineHint = ""; Answers = null; baseAnswers = null; Snapshot = null; Translation = null; }
 
     // ---- Word forms ----
     public void ResetWordForms()
@@ -141,11 +141,13 @@ public sealed class QueryPresentation
         var meanings = QuickReadSelection(snapshot, uncovered);
         overviewFromModel = generated && meanings.Length > 0;
         if (meanings.Length == 0) { QuickRead = QuickRead with { Visible = false }; return; }
-        var state = !generated ? "词典摘录" : !finalized || snapshot.Provisional ? "预览" :
+        var streamed = meanings.All(m => m.Provisional);
+        var state = streamed ? "预览" : !generated ? "词典摘录" : !finalized || snapshot.Provisional ? "预览" :
             snapshot.MergeFailed || snapshot.Answers.Any(a => a.Phase == ModelPhase.Failed) ? "部分结果" : "已整理";
         overviewCore = meanings.All(m => m.Core);
         QuickRead = Caption(QuickRead, state) with { Visible = true, Text = string.Join("；", meanings.Select(m => m.Text)),
             Tooltip = string.Join("\n", meanings.Select(m => m.Label + "：" + m.Text)) };
+        if (streamed) QuickRead = QuickRead with { Explanation = "模型仍在生成，先显示它已写完的核心义项；全部完成后会更新。" };
     }
 
     // ---- The sentence the query was selected in ----
@@ -153,6 +155,8 @@ public sealed class QueryPresentation
     // stream, merge or retry rebuilds them and the pick is laid on again.
     private QuickReadView baseQuickRead = QuickReadView.Hidden;
     private AnswersView? baseAnswers;
+    // The model answers behind the senses on the page, for the context pick.
+    public LookupSnapshot? Snapshot { get; private set; }
     private (string Sentence, ContextPick? Pick)? context;
     public void BeginContext(string sentence) { context = (sentence, null); Overlay(); }
     public void ApplyContext(string sentence, ContextPick pick) { context = (sentence, pick); Overlay(); }
@@ -171,9 +175,15 @@ public sealed class QueryPresentation
             },
             _ => baseQuickRead
         };
+        // A pick made before the merge may name a sense that now sits among another's alternatives;
+        // the sense shown for that group carries the mark.
         var key = context?.Pick?.SenseId ?? "";
+        static SenseView Mark(SenseView s) => s with { Heading = s.Heading with { InContext = true } };
         Answers = baseAnswers == null || key.Length == 0 ? baseAnswers : baseAnswers with
-        { Senses = baseAnswers.Senses.Select(s => s.Key == key ? s with { Heading = s.Heading with { InContext = true } } : s).ToArray() };
+        {
+            Senses = baseAnswers.Senses.Select(s => s.Key == key ? Mark(s) : s.Alternatives.Any(a => a.Key == key)
+                ? Mark(s) with { Alternatives = s.Alternatives.Select(a => a.Key == key ? Mark(a) : a).ToArray() } : s).ToArray()
+        };
     }
     private QuickMeaning[] QuickReadSelection(LookupSnapshot snapshot, SpecialistReference[] uncovered) =>
         Lexi.Core.QuickRead.Create(snapshot.Groups, uncovered, overviewLocal);
@@ -237,6 +247,7 @@ public sealed class QueryPresentation
         ApplyModelEtymology(snapshot);
         var query = Query.Length > 0 ? Query : firstWord ?? evidence?.Word ?? "";
         var uncovered = SpecialistReferences.Uncovered(query, snapshot.Groups, evidence);
+        Snapshot = snapshot;
         ApplyQuickRead(snapshot, uncovered, finalized);
         baseQuickRead = QuickRead;
         baseAnswers = BuildAnswers(snapshot, evidence, uncovered);

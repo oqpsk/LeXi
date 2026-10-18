@@ -11,7 +11,7 @@ public sealed record ContextIdentity(int Version, string Query, string Sentence,
 public sealed record ContextPrompt(string Task, string InputHash, string Query, string Sentence, ContextSense[] Senses);
 public sealed record ContextRequest(string Query, string Sentence, ContextSense[] Senses)
 {
-    public string InputHash => Cache.Hash(JsonSerializer.Serialize(new ContextIdentity(1, Query, Sentence, Senses), Json.Options));
+    public string InputHash => Cache.Hash(JsonSerializer.Serialize(new ContextIdentity(2, Query, Sentence, Senses), Json.Options));
     public string Prompt => JsonSerializer.Serialize(new ContextPrompt("pick_context_sense", InputHash, Query, Sentence, Senses), Json.Options);
 }
 
@@ -41,10 +41,16 @@ public static class LookupContext
         return sentence.Length > selected.Length && Queries.Validate(sentence) == null ? sentence : null;
     }
 
-    public static ContextRequest? Request(string query, string? sentence, AnswersView? answers)
+    // Every completed sense, in model and answer order, whatever the merge later groups together:
+    // the same answers always make the same request, so a pick made while the merge runs is the
+    // one found again when the page is restored. Ids are the senses' view keys.
+    public static ContextRequest? Request(string query, string? sentence, LookupSnapshot? snapshot)
     {
-        if (string.IsNullOrWhiteSpace(sentence) || answers is not { Empty: false, Senses.Length: > 0 }) return null;
-        return new(query, sentence, answers.Senses.Select(s => new ContextSense(s.Key, s.Heading.PartOfSpeech, s.Chinese, s.English)).ToArray());
+        if (string.IsNullOrWhiteSpace(sentence) || snapshot == null) return null;
+        var senses = SenseMerging.Candidates(snapshot.Answers).Where(c => !c.Provisional)
+            .Select(c => new ContextSense(QueryPresentation.SenseKey(c), LexicalLabels.PartOfSpeech(c.Sense.PartOfSpeech),
+                QuickRead.ChineseDefinition(c.Sense), c.Sense.English)).DistinctBy(s => s.Id).ToArray();
+        return senses.Length == 0 ? null : new(query, sentence, senses);
     }
 
     public static ContextPick Parse(string json, ContextRequest request)

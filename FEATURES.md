@@ -15,7 +15,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 离线词典联合查询、简繁检索、词形匹配 | `OfflineLibrary`、`ChineseVariants`（内置 OpenCC 字表，各平台相同） | 已实现 | 已实现：词库位于 `~/Library/Application Support/LeXi/data` |
 | 输入停顿 TL;DR | `InputPreview` / `QuerySession.PreviewAsync`：先读已保存结果，再读启用的本地词库；显示实际匹配词；不联网，不写历史，不改变导航和当前结果 | 已实现：停顿 300 ms 显示紧凑 TL;DR，跟随建议选择；组字时等待，Esc/查询时取消；点击或 Enter 打开完整查询 | 已实现：通过 Host 的 `query.preview` 读取同一内容；相同停顿、组字与取消规则，原生卡片位于输入框下方 |
 | 选中或刚复制的文字直接查 | `LookupCandidates`（Host `query.candidate`）：去掉随词带来的引号和标点；单词、短语直接查，长文字只填入输入框；链接、路径不查 | 未实现 | 已实现：⌘2 呼出时读取其他应用中选中的文字（可选，需辅助功能权限）或几秒内刚复制的文字；只轮询剪贴板变化计数，⌘2 时才读取内容；LeXi 自己复制的内容不算 |
-| 本句语境 | `LookupContext`：从选区前后文字截出所在句子；释义定稿后由义项判断模型选出这句话里的义项并写一句简短中文，按句子缓存；TL;DR 改为本句意思，对应义项标记 `inContext`，其余义项与词条缓存不变 | 未实现：Core 已就绪，待读取选区所在文字 | 已实现：选中文字查询（辅助功能权限）时读取选区前后约 300 个字符；TL;DR 显示“本句语境”，对应义项带粉色“本句”标签 |
+| 本句语境 | `LookupContext`：从选区前后文字截出所在句子；各模型给出结果后（与合并同时）由义项判断模型选出这句话里的义项并写一句简短中文，按句子缓存；TL;DR 改为本句意思，对应义项标记 `inContext`，其余义项与词条缓存不变 | 未实现：Core 已就绪，待读取选区所在文字 | 已实现：选中文字查询（辅助功能权限）时读取选区前后约 300 个字符；TL;DR 显示“本句语境”，对应义项带粉色“本句”标签 |
 | 键盘浏览结果 | 不适用：前端按键 | 未实现 | 已实现：输入框中 ↓ 或 Tab 进入释义，↑ ↓ 切换，空格朗读，Return 展开例句，⌘C 复制释义，Esc 回到输入框；⌘D 朗读词头，⇧⌘C 复制 TL;DR 或译文 |
 | 输入建议 | `QuerySession.Suggest`：历史精确大小写、重复次数、近期查询优先，再接离线词库 | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原 | 已实现：列表悬于输入框下方；↑↓ 预览，Tab 或点击接受，Esc 还原；输入法组字时按键留给输入法 |
 | Wiktionary 在线来源与原文 | `OnlineDictionary`、`QueryView.Online` | 已实现：可展开原文与来源链接 | 已实现：可展开原文与来源链接 |
@@ -23,7 +23,8 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 双模型查词、流式预览、失败隔离 | `DictionaryCoordinator`、`QuerySession`；后台生成与预览采样、重复内容去重，最终结果完整校验 | 已实现：仅排队最新预览，输入/滚动/取消优先 | 已实现：Host 使用同一预览采样 |
 | OAuth 动态模型列表 | 官方客户端模型发现及能力缓存；在线时每次启动后在后台读取一次，失败时保留缓存与已选模型；隐藏模型单独标注；移除固定四项列表 | 已实现：启动后自动读取；打开 OAuth 连接时再次读取完整列表及各模型 effort/速度 | 已实现：Host 启动后自动读取；打开“查询”设置时等读取结束再刷新列表；打开 OAuth 连接时再次读取 |
 | 义项合并与其他表述 | `SenseMerging`、`AnswersView` | 已实现：折叠的“其他表述 / 用法细分” | 已实现：可展开的“其他表述 / 用法细分” |
-| TL;DR 概览 | `QueryPresentation`（`QuickReadView`） | 已实现：粉色 TL;DR 徽标与状态 | 已实现：粉底深色 TL;DR 标记与状态 |
+| TL;DR 概览 | `QueryPresentation`（`QuickReadView`）；模型写完核心义项即先显示为“预览”，本地摘录与完成的回答优先 | 已实现：粉色 TL;DR 徽标与状态 | 已实现：粉底深色 TL;DR 标记与状态 |
+| 查询耗时记录 | `LookupTiming` / `TimingLog`：每次查询记录各阶段耗时于本机，不含查询词与释义；`timing-report` 汇总中位数与 90 分位 | 已实现：同一 Core | 已实现：同一 Host/Core |
 | 音标及来源、AI 音标标记 | `QueryPresentation`（`SavedPronunciation`） | 已实现 | 已实现 |
 | 词形变化 | `QueryPresentation`（`WordFormRow`） | 已实现：右键复制词形 | 已实现：右键菜单复制词形 |
 | 词源 | `EtymologyView` | 已实现：词条旁罗塞塔石碑按钮弹出 | 已实现：词条旁罗塞塔石碑按钮弹出（与 Windows 同一图形） |
@@ -83,5 +84,5 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 设置布局与窗口记忆 | 平台原生窗口服务，独立于查词数据 | 左侧分类、分组卡片、独立 placement 文件 | 原生 NavigationSplitView、分组 Form、NSWindow frame autosave |
 | TTS 模型与重播 | `SpeechModels`：显式刷新 ElevenLabs 支持 TTS 的模型，保存目录和模型声线；音频缓存按文本/模型/声线区分 | 发音页刷新；文本右键再次播放上一段 | 发音页刷新；释义与例句右键“再次播放上一段”，未朗读过时置灰 |
 | 备份迁移 | `UserData`：预览、白名单、读取上限、校验后事务导入；合并历史，已有查询保留，设置可选 | 数据与迁移 | 原生文件面板与确认 |
-| 缓存管理 | `UserData`：中间缓存、语音、已保存查询分别统计/清理；与查询互斥 | 数据与迁移 | 数据与迁移 |
+| 缓存管理 | `UserData`：中间缓存（含本句语境判断与查询耗时记录）、语音、已保存查询分别统计/清理；与查询互斥 | 数据与迁移 | 数据与迁移 |
 | 干净分发 | 干净源码默认值；平台安全存储不进入程序 | ZIP 脚本已准备，未生成发布包 | 现有 bundle 构建；正式签名/公证仍待发布时完成 |
