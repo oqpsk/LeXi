@@ -2,6 +2,8 @@
 
 ## Unreleased — major-version preparation
 
+- Keep TL;DR first beneath the headword on Windows and macOS, ahead of word forms and one compact model-status row. Core publishes independent actor states; animate waiting, output and merging without repeating stage text or a query-field indicator. Successful live work retires with the approved CRT shutdown (vertical squeeze, bright line, central phosphor dot), then releases its space. Cached results skip the flourish; partial failures and cancellation retain accessible details and failed-step retry. Respect motion preferences and discard stale animation completions. No release generated.
+
 - Replace the query-row loading spinner with the same soft-matrix activity used in the footer on Windows and macOS. Share stage changes and motion preferences, keep the query-row mark unframed, and retain terminal check/warning symbols, keyboard/click stage details and stable control alignment.
 
 - Animate the footer with the approved soft matrix on Windows and macOS: a scanning dot grid while waiting, short unfolding lines when new definitions or translation arrive, and converging dots while merging. Restore a still ξ at every terminal state and preserve Windows' history action. Use native animation, retain the current phase across token updates, and stop motion when hidden, minimized/backgrounded or Reduce Motion is enabled. macOS uses its native system color and unframed mark. No release generated.

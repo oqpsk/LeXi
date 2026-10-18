@@ -43,7 +43,7 @@ public sealed partial class QuerySession
             if (maintaining) return;
             (id, token) = Begin(QueryViewKind.Dictionary, saved.Query, saved.Query);
             retry = saved;
-            progressId = progress.Begin(QueryProgressState.Dictionary(true, saved.Options.MergeSenses));
+            progressId = progress.Begin(QueryProgressState.Dictionary(true, saved.Options.MergeSenses).WithWork(saved.Options));
             status = "仅重试未完成步骤…"; Publish();
         }
         try
@@ -77,7 +77,7 @@ public sealed partial class QuerySession
             {
                 var coordinator = new DictionaryCoordinator(Cache, providers.Define, providers.Judge);
                 var report = Reporter<LookupSnapshot>(s => Step(id, () =>
-                { retry = stage with { Result = s }; Presentation.ApplyAnswers(s, saved.Evidence, false); progress.Update(progressId, QueryProgressState.Updating(s, saved.Options.MergeSenses)); }));
+                { retry = stage with { Result = s }; Presentation.ApplyAnswers(s, saved.Evidence, false); progress.Update(progressId, QueryProgressState.Updating(s, saved.Options.MergeSenses).WithWork(saved.Options, s)); }));
                 result = await Task.Run(() => coordinator.LookupAsync(saved.Query, saved.Evidence, saved.Options, true, token, report, saved.Result), token);
             }
             token.ThrowIfCancellationRequested();
@@ -86,16 +86,16 @@ public sealed partial class QuerySession
             Step(id, () => { retry = finished; Presentation.ApplyAnswers(result, saved.Evidence); });
             await SaveDictionaryAsync(saved.Query, local, online, saved.Evidence, result, saved.Options.MergeSenses, incomplete, token);
             timing.MarkFirst();
-            Step(id, () => { progress.Update(progressId, QueryProgressState.Finished(result, saved.Options.MergeSenses, incomplete)); status = timing.Finish("重试结束 · 已保留成功步骤"); });
+            Step(id, () => { progress.Update(progressId, QueryProgressState.Finished(result, saved.Options.MergeSenses, incomplete).WithWork(saved.Options, result)); status = timing.Finish("重试结束 · 已保留成功步骤"); });
         }
         catch (Exception e) when (DictionaryCoordinator.ExpectedFailure(e))
-        { Step(id, () => { retry = saved; status = "重试未完成，已有结果已保留。"; progress.Update(progressId, QueryProgressState.Dictionary(true, true).Interrupted("重试未完成", "仅未完成步骤可重试")); }); }
+        { Step(id, () => { retry = saved; status = "重试未完成，已有结果已保留。"; progress.Update(progressId, (progress.Current ?? QueryProgressState.Dictionary(true, true).WithWork(saved.Options)).Interrupted("重试未完成", "仅未完成步骤可重试")); }); }
         catch (OperationCanceledException) { Step(id, () => {
             var answers = (retry ?? saved).Result.Answers.Select(a => a.Phase is ModelPhase.Pending or ModelPhase.Streaming
                 ? new ModelAnswer(a.Model, ModelPhase.Failed, Error: "已停止") : a).ToArray();
             var mergingStopped = (retry ?? saved).Result.Merging || (retry ?? saved).Result.MergeFailed;
             retry = (retry ?? saved) with { Result = new(answers, SenseMerging.Group(answers), MergeFailed: mergingStopped, MergeFailure: mergingStopped ? MergeFailureKind.Cancelled : null) };
             Presentation.ApplyAnswers(retry.Result, saved.Evidence);
-            progress.Update(progressId, QueryProgressState.Dictionary(true, true).Interrupted("重试已停止", "已有结果已保留，可继续重试")); }); }
+            progress.Update(progressId, (progress.Current ?? QueryProgressState.Dictionary(true, true).WithWork(saved.Options)).Interrupted("重试已停止", "已有结果已保留，可继续重试")); }); }
     }
 }

@@ -39,6 +39,10 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 
 `progress.activity` 是可选的增量字段，取 `idle`、`querying`、`generating`、`merging`。Core 区分等待模型与收到新释义/译文，缓存文本不冒充新输出；终态与取消均为 `idle`。旧视图缺少字段时原生前端保留静态标志。该字段只驱动动效，不改变 `stage`、状态文字或查询生命周期。
 
+`progress.items` 是可选的增量数组，每项含 `key`、`name`、`state`、`detail`、`activity` 和 `accessibleName`。`state` 取 `pending`、`querying`、`generating`、`merging`、`complete`、`failed`；查询模型与义项判断模型各占一项，翻译只含主要模型。前端用图标表达状态、单行显示名称；详情保留在提示与辅助功能中。成功终态可播放一次 CRT 收束并移除该行；缓存直接恢复时不重播，部分失败与中断保留警示。`items` 不改变协议版本，旧前端可忽略，旧视图可缺省。TL;DR 始终位于状态行和词形变化之前，计时留在底栏。
+
+`progress.restored` 为可选布尔字段，明确标记本轮是否直接恢复完整缓存；为 `true` 时成功终态不播放退场动画，即使前端曾短暂显示等待。缺省为 `false`，不影响旧客户端。
+
 ## 方法
 
 | 方法 | 参数 | 结果 |

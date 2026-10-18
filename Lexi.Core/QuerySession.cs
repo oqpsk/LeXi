@@ -252,7 +252,7 @@ public sealed partial class QuerySession : IDisposable
         var query = Queries.LookupKey(raw);
         var modelsEnabled = Settings.Online && (Settings.AutoAi || force);
         var mergeEnabled = modelsEnabled && Settings.MergeSenses;
-        var initialProgress = QueryProgressState.Dictionary(modelsEnabled, mergeEnabled);
+        var initialProgress = QueryProgressState.Dictionary(modelsEnabled, mergeEnabled).WithWork(Settings);
         long id, progressId; CancellationToken token;
         lock (gate)
         {
@@ -307,7 +307,7 @@ public sealed partial class QuerySession : IDisposable
                 token.ThrowIfCancellationRequested(); timing.MarkFirst();
                 Step(id, () =>
                 {
-                    progress.Update(progressId, QueryProgressState.Finished(shown, Settings.MergeSenses, sourceIncomplete) with { Detail = "已恢复已有缓存 · 点击重新生成可更新" });
+                    progress.Update(progressId, QueryProgressState.Finished(shown, Settings.MergeSenses, sourceIncomplete).WithWork(Settings, shown, false) with { Restored = true, Detail = "已恢复已有缓存 · 点击重新生成可更新" });
                     status = timing.Finish("已显示缓存 · 重新生成可更新");
                 });
                 return;
@@ -317,7 +317,7 @@ public sealed partial class QuerySession : IDisposable
                 await pronunciationTask; token.ThrowIfCancellationRequested();
                 await SaveDictionaryAsync(query, local, online, evidence, cachedAnswers, false, sourceIncomplete, token);
                 token.ThrowIfCancellationRequested();
-                Step(id, () => { status = timing.Finish("离线模式 · 使用本地词库与已缓存释义"); progress.Update(progressId, QueryProgressState.SourcesFinished(true, sourceIncomplete)); });
+                Step(id, () => { status = timing.Finish("离线模式 · 使用本地词库与已缓存释义"); progress.Update(progressId, QueryProgressState.SourcesFinished(true, sourceIncomplete).WithWork(Settings)); });
                 return;
             }
             pronunciationTask = LoadPronunciationAsync(query, id, token, force);
@@ -361,12 +361,12 @@ public sealed partial class QuerySession : IDisposable
                 Step(id, () =>
                 {
                     status = timing.Finish(Status(notes, "查询完成 · 点击“重新生成”获取双语释义"));
-                    progress.Update(progressId, QueryProgressState.SourcesFinished(false, sourceIncomplete));
+                    progress.Update(progressId, QueryProgressState.SourcesFinished(false, sourceIncomplete).WithWork(Settings));
                 });
                 return;
             }
             Step(id, () => progress.Update(progressId, QueryProgressState.Updating(new(LookupModel.Selected(Settings)
-                .Select(m => new ModelAnswer(m, ModelPhase.Pending)).ToArray(), []), mergeEnabled)));
+                .Select(m => new ModelAnswer(m, ModelPhase.Pending)).ToArray(), []), mergeEnabled).WithWork(Settings)));
             var finished = false;
             try
             {
@@ -377,7 +377,7 @@ public sealed partial class QuerySession : IDisposable
                         if (finished || token.IsCancellationRequested || id != request) return;
                         Presentation.ApplyAnswers(snapshot, sourceEvidence, false);
                         if (snapshot.Groups.Length > 0) timing.MarkFirst();
-                        progress.Update(progressId, QueryProgressState.Updating(snapshot, mergeEnabled));
+                        progress.Update(progressId, QueryProgressState.Updating(snapshot, mergeEnabled).WithWork(Settings, snapshot));
                         status = snapshot.Merging ? "释义已显示 · 正在合并同义项…" : ModelStatus(snapshot);
                         Publish();
                     }
@@ -407,14 +407,14 @@ public sealed partial class QuerySession : IDisposable
                 Step(id, () =>
                 {
                     progress.Update(progressId, QueryProgressState.Finished(result, mergeEnabled, sourceIncomplete,
-                        SpecialistReferences.Uncovered(query, result.Groups, sourceEvidence).Length));
+                        SpecialistReferences.Uncovered(query, result.Groups, sourceEvidence).Length).WithWork(options, result));
                     status = timing.Finish(Status(notes, outcome));
                 });
             }
             finally { lock (gate) finished = true; }
         }
         catch (OperationCanceledException)
-        { Step(id, () => progress.Update(progressId, initialProgress.Interrupted("查询已中断", "本次查询已结束，可重新查询"))); }
+        { Step(id, () => progress.Update(progressId, (progress.Current ?? initialProgress).Interrupted("查询已中断", "本次查询已结束，可重新查询"))); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             if (token.IsCancellationRequested) return;
@@ -424,7 +424,7 @@ public sealed partial class QuerySession : IDisposable
             Step(id, () =>
             {
                 status = timing.Finish("读取失败，请检查词库文件是否完整。");
-                progress.Update(progressId, initialProgress.Interrupted("查询未完成", "读取失败 · 本次查询已结束，可重试"));
+                progress.Update(progressId, (progress.Current ?? initialProgress).Interrupted("查询未完成", "读取失败 · 本次查询已结束，可重试"));
             });
         }
     }
@@ -448,7 +448,7 @@ public sealed partial class QuerySession : IDisposable
     {
         var target = Translation.Target(text);
         var key = Translation.Key(text, target, Settings);
-        var initialProgress = QueryProgressState.Translating();
+        var initialProgress = QueryProgressState.Translating().WithWork(Settings);
         long id, progressId; CancellationToken token;
         lock (gate)
         {
@@ -465,7 +465,7 @@ public sealed partial class QuerySession : IDisposable
             {
                 Presentation.ShowTranslation(saved.Entry, true, false, saved.Model.Name);
                 status = timing.Finish("已显示缓存翻译 · 重新生成可更新", "首段译文");
-                progress.Update(progressId, QueryProgressState.Translated(true));
+                progress.Update(progressId, QueryProgressState.Translated(true).WithWork(Settings));
             });
             return;
         }
@@ -479,7 +479,7 @@ public sealed partial class QuerySession : IDisposable
                 Step(id, () => { Presentation.ShowTranslation(validated, true, false, ProviderName); status = timing.Finish("已显示缓存翻译", "首段译文"); });
                 await SaveTranslationAsync(text, target, validated, LookupModel.Primary(Settings), token);
                 if (token.IsCancellationRequested) return;
-                Step(id, () => progress.Update(progressId, QueryProgressState.Translated(true)));
+                Step(id, () => progress.Update(progressId, QueryProgressState.Translated(true).WithWork(Settings)));
                 return;
             }
             catch (InvalidDataException) { }
@@ -507,7 +507,7 @@ public sealed partial class QuerySession : IDisposable
                     if (fingerprint == lastPreview) return;
                     lastPreview = fingerprint;
                     Presentation.ShowTranslation(partial, false, true, ProviderName); timing.MarkFirst(); status = "翻译生成中…";
-                    progress.Update(progressId, QueryProgressState.Translating(partial.Paragraphs.Any(p => !string.IsNullOrWhiteSpace(p))));
+                    progress.Update(progressId, QueryProgressState.Translating(partial.Paragraphs.Any(p => !string.IsNullOrWhiteSpace(p))).WithWork(Settings));
                     Publish();
                 }
             });
@@ -521,7 +521,7 @@ public sealed partial class QuerySession : IDisposable
             token.ThrowIfCancellationRequested();
             await SaveTranslationAsync(text, target, entry, LookupModel.Primary(Settings), token);
             token.ThrowIfCancellationRequested();
-            Step(id, () => { status = timing.Finish("翻译完成", "首段译文"); progress.Update(progressId, QueryProgressState.Translated()); });
+            Step(id, () => { status = timing.Finish("翻译完成", "首段译文"); progress.Update(progressId, QueryProgressState.Translated().WithWork(Settings)); });
         }
         catch (OperationCanceledException)
         { Step(id, () => progress.Update(progressId, initialProgress.Interrupted("翻译已中断", "本次翻译已结束，可重新翻译"))); }
@@ -574,7 +574,7 @@ public sealed partial class QuerySession : IDisposable
         timing.MarkFirst();
         var state = (saved.Result.Answers.Length > 0 ? QueryProgressState.Finished(saved.Result, saved.MergeEnabled,
             saved.SourceIncomplete, SpecialistReferences.Uncovered(query, saved.Result.Groups, saved.Evidence).Length) :
-            QueryProgressState.SourcesFinished(false, saved.SourceIncomplete)) with { Detail = "已恢复保存的结果 · 点击重新生成可更新" };
+            QueryProgressState.SourcesFinished(false, saved.SourceIncomplete)).WithWork(Settings, saved.Result, false) with { Restored = true, Detail = "已恢复保存的结果 · 点击重新生成可更新" };
         progress.Update(progressId, state);
         status = timing.Finish(state.Warning ? "已显示缓存 · 部分结果 · 重新生成可重试" : "已显示缓存 · 重新生成可更新");
         return state;

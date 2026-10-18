@@ -29,8 +29,8 @@ internal static partial class Program
             buttons.All(b => !Theme.CanDragFrom(b)), "dedicated drag strip is discoverable and excludes every window action");
         Check(!back.IsEnabled && !forward.IsEnabled && AutomationProperties.GetName(back) == "后退" &&
             AutomationProperties.GetName(forward) == "前进", "initial navigation controls expose disabled accessible states");
-        Check(((Panel)main.FindName("SearchActions")).Children.Count == 2 &&
-            AutomationProperties.GetName(close) == "最小化", "query row retains only status and submit while close describes its configured action");
+        Check(((Panel)main.FindName("SearchActions")).Children.Count == 1 &&
+            AutomationProperties.GetName(close) == "最小化", "query row retains submit without duplicate progress while close describes its configured action");
         foreach (var name in new[] { "BackIcon", "ForwardIcon" })
             Check(!Theme.Icon(name).Data.Bounds.IsEmpty, name + " is a vector icon");
         var tabs = Contents(settings).OfType<TabControl>().Single();

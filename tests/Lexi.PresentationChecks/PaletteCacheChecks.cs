@@ -36,8 +36,8 @@ internal static partial class Program
         foreach (var width in new[] {558,718,1078})
         {
             Measure((FrameworkElement)main.Content, width, 618);
-            Check(lower.Length == 2 && Enumerable.Range(0,2).All(i => Math.Abs(upper[i].TranslatePoint(new Point(16,16),main).X -
-                lower[i].TranslatePoint(new Point(16,16),main).X) < 0.1), $"upper-right controls share two exact column centers at {width} DIP");
+            Check(lower.Length == 1 && Math.Abs(upper[1].TranslatePoint(new Point(16,16),main).X -
+                lower[0].TranslatePoint(new Point(16,16),main).X) < 0.1, $"remaining right-column controls stay aligned without duplicate progress at {width} DIP");
         }
         main.ShowHistory(); main.ResetWordForms();
         var model = new LookupModel("codex","previous-model");

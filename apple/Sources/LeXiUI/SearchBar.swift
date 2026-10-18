@@ -48,7 +48,6 @@ public struct SearchBar: View {
                 .onChange(of: text) { _, value in edited(value) }
                 .accessibilityLabel("查询")
                 .accessibilityHint("Return 查询，Shift-Return 换行")
-            StatusRing(progress: store.view.progress)
             Button { finish() } label: {
                 Image(systemName: "return").font(.system(size: 16, weight: .medium)).frame(width: 26, height: 26).contentShape(.rect)
             }
@@ -157,39 +156,5 @@ public struct SuggestionList: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("输入建议")
         .accessibilityHint("上下方向键预览，Tab 选用，Return 查询，Escape 还原")
-    }
-}
-
-// Indeterminate while the query runs, then a check or an incomplete symbol. Details and stages
-// are in a popover and in the accessibility label; there are no percentages or estimates.
-struct StatusRing: View {
-    let progress: QueryProgress?
-    @State private var showDetails = false
-
-    var body: some View {
-        if let progress {
-            Button { showDetails.toggle() } label: {
-                Group {
-                    if progress.busy { QueryActivityMark(activity: progress.activity ?? .querying, size: 24).foregroundStyle(.secondary) }
-                    else { Image(systemName: progress.warning ? "exclamationmark.circle" : "checkmark.circle")
-                        .foregroundStyle(progress.warning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary)) }
-                }
-                .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.borderless)
-            .help(progress.title + " · " + progress.detail)
-            .accessibilityLabel(progress.accessibleName)
-            .popover(isPresented: $showDetails, arrowEdge: .bottom) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(progress.title).font(.headline).foregroundStyle(progress.warning ? AnyShapeStyle(.orange) : AnyShapeStyle(.primary))
-                    Text(progress.detail).font(.callout).foregroundStyle(.secondary).frame(maxWidth: 300, alignment: .leading)
-                    Text(progress.stageLabels.joined(separator: "\n")).font(.caption).foregroundStyle(.secondary)
-                }
-                .padding(14)
-            }
-            .onChange(of: progress.title) { _, title in
-                AccessibilityNotification.Announcement(title).post()
-            }
-        }
     }
 }
