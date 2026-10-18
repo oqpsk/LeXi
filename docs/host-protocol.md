@@ -54,6 +54,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |
 | `settings.update` | `settings`（只含要修改的字段） | 与 Windows 设置相同的校验（修改 `speech*` 字段时也校验发声模型与声线），保存后返回 `settings.get` 的内容 |
 | `inference.models` | — | 通过官方 Codex `model/list` 和 Claude 初始化接口更新订阅模型能力，返回 `settings.get`；不访问凭据文件，离线时不发请求 |
+| `inference.catalog` | — | 等本次启动的后台 OAuth 模型读取结束（在线时 Host 启动后自动读取一次官方 Codex/Claude 客户端的模型列表；离线或已结束时立即返回），然后返回 `settings.get` 的内容 |
 | `inference.configure` | `provider`、`model`、`effort`、`speed` | 按当前模型能力校验并保存两个配置项，返回 `settings.get`；空字符串使用服务默认；不自动降低档位 |
 | `settings.setOnline` | `online` | 切换在线补充并返回设置 |
 | `dictionaries.list` | — | `{dictionaries, folder}` |
