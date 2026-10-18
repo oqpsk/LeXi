@@ -1,9 +1,9 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Documents;
+using System.Reflection;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using Lexi;
 using Lexi.Core;
 
@@ -11,97 +11,84 @@ internal static partial class Program
 {
     private static void CheckQueryProgress(App app, MainWindow main)
     {
-        int count = 0;
-        void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
+        void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); }
         var view = (QueryProgressView)main.FindName("QueryProgress");
-        var scroll = (ScrollViewer)main.FindName("ResultsScroll");
-        var activity = Contents(view).OfType<QueryActivityMark>().Single();
-        Check(activity.Width == 24 && activity.Height == 24 && !activity.IsHitTestVisible && !Contents(activity).OfType<Border>().Any(),
-            "query-row activity reuses the soft matrix without a second logo plate or input target");
-        Check(view.Visibility == Visibility.Hidden && view.Parent is StackPanel && !Contents(scroll).Contains(view) && !Theme.CanDragFrom(view),
-            "compact progress reserves space beside the query controls and never starts a window drag");
-        var primary = new LookupModel("codex", "gpt-6.1-sol"); var secondary = new LookupModel("claude", "haiku");
-        AiSense Sense(int i) => new("noun", "Synthetic meaning " + i, "合成释义 " + i, "standard", "Example.", "例句。", []);
-        AiEntry Entry(params int[] values) => new("fixture", true, values.Select(Sense).ToArray(), "", "unverified");
-        var first = new[] { new ModelAnswer(primary, ModelPhase.Streaming, Entry(1, 2)), new ModelAnswer(secondary, ModelPhase.Pending) };
-        var complete = new[] { new ModelAnswer(primary, ModelPhase.Complete, Entry(1, 2, 3)), new ModelAnswer(secondary, ModelPhase.Complete, Entry(4, 5, 6)) };
-        var two = new LookupSnapshot(first, SenseMerging.Group(first));
-        var six = new LookupSnapshot(complete, SenseMerging.Group(complete));
-        var four = new LookupSnapshot(complete, SenseMerging.Group(complete,
-            new("fixture", [new("m0s0", "m1s0", "equivalent", 0.99), new("m0s1", "m1s1", "equivalent", 0.99)])), MergeNote: "同义项已整理");
-        string[] CardLabels() => Contents((Panel)main.FindName("AiPanel"), true).OfType<TextBlock>().Select(t => t.Text).ToArray();
-        var request = view.Begin(QueryProgressState.Dictionary(true, true));
-        Check(view.Current is { Busy: true, Stage: QueryStage.Dictionary } && activity.Activity == QueryActivity.Querying, "dictionary reads start a visible busy lifecycle");
-        main.RenderAnswers(two, null, false); view.Update(request, QueryProgressState.Updating(two, true));
-        Check(view.Current is { Busy: true, Stage: QueryStage.Supplement } && activity.Activity == QueryActivity.Generating && view.Current.Detail.Contains("预览 · 2 条候选"),
-            "two early senses are labeled as preview candidates");
-        main.RenderAnswers(six, null, false); view.Update(request, QueryProgressState.Updating(six, true));
-        Check(!six.Provisional && view.Current is { Busy: true, Stage: QueryStage.Supplement } && view.Current.Detail.Contains("预览 · 6 条候选"),
-            "both models completing does not prematurely finalize six candidates");
-        view.Update(request, QueryProgressState.Updating(six with { Merging = true }, true));
-        Check(view.Current is { Busy: true, Stage: QueryStage.Merge } && activity.Activity == QueryActivity.Merging && view.Current.Detail.Contains("可能减少"),
-            "merge stage explicitly explains why the displayed count can shrink");
-        main.RenderAnswers(four, null); view.Update(request, QueryProgressState.Finished(four, true));
-        Check(view.Current is { Busy: false, Outcome: QueryOutcome.Complete } && view.Current.Title.Contains("4 个义项") &&
-            !CardLabels().Contains("双语释义") && AutomationProperties.GetName(view).Contains("结果已稳定"),
-            "only the final return marks four stable senses and announces completion");
-        view.Update(request, QueryProgressState.Updating(two, true));
-        Check(view.Current?.Busy == false && activity.Activity == QueryActivity.Idle, "late streaming callbacks cannot revive a finished query or its animation");
-        var next = view.Begin(QueryProgressState.Translating());
-        view.Update(request, QueryProgressState.Finished(four, true));
-        view.Update(request, QueryProgressState.Dictionary(true, true).Interrupted("已取消", "old query"));
-        Check(view.Current is { Busy: true, Translation: true }, "a previous query's completion or cancellation cannot overwrite the new query");
-        view.Update(next, QueryProgressState.Translated());
-        Check(view.Current is { Busy: false, Translation: true, MergeEnabled: false }, "translation has its own generating-to-complete lifecycle");
-        next = view.Begin(QueryProgressState.Translating()); view.Update(next, QueryProgressState.Translated(true));
-        Check(view.Current is { Busy: false } && view.Current.Detail.Contains("完整缓存"), "a complete cached translation settles immediately");
-        var failedMerge = six with { MergeFailed = true, MergeNote = "整理模型响应超时；已保留全部释义", MergeFailure = MergeFailureKind.Timeout };
-        next = view.Begin(QueryProgressState.Dictionary(true, true));
-        main.RenderAnswers(failedMerge, null); view.Update(next, QueryProgressState.Finished(failedMerge, true));
-        Check(view.Current is { Busy: false, Warning: true } && view.Current.Detail.Contains("保留 6 条") &&
-            CardLabels().Contains(failedMerge.MergeNote) && view.Current.Detail.Contains("响应超时") &&
-            view.Current.Detail.Contains("重试未完成") && AutomationProperties.GetName(view).Contains("合并：未完成") &&
-            AutomationProperties.GetName(view).Contains("完成：部分完成"), "judge failure ends loading without presenting an unmerged list as successfully merged");
-        Check(QueryProgressState.Finished(failedMerge with { MergeFailure=null },true).Detail.Contains("未记录具体失败原因"),
-            "legacy failed views do not invent a timeout or account diagnosis");
-        var oneFailed = new LookupSnapshot([complete[0], new(secondary, ModelPhase.Failed)], SenseMerging.Group([complete[0]]));
-        var allFailed = new LookupSnapshot([new(primary, ModelPhase.Failed), new(secondary, ModelPhase.Failed)], []);
-        Check(QueryProgressState.Finished(oneFailed, true) is { Busy: false, Outcome: QueryOutcome.Partial } &&
-            QueryProgressState.Finished(allFailed, true) is { Busy: false, Outcome: QueryOutcome.Failed },
-            "one or both model failures terminate with distinct incomplete outcomes");
-        Check(QueryProgressState.SourcesFinished(true, false) is { Busy: false, ModelsEnabled: false, MergeEnabled: false } &&
-            QueryProgressState.SourcesFinished(false, false) is { Busy: false, ModelsEnabled: false } &&
-            QueryProgressState.SourcesFinished(false, true) is { Busy: false, Warning: true },
-            "offline, AI-disabled and source-error exits all stop loading and skip unused stages");
-        Check(QueryProgressState.Finished(new([complete[0]], SenseMerging.Group([complete[0]])), false) is { Busy: false, MergeEnabled: false } &&
-            QueryProgressState.Finished(new([new(primary, ModelPhase.Complete, Entry())], []), false) is { Busy: false },
-            "single-model and no-sense results both settle without waiting for a merge");
-        next = view.Begin(QueryProgressState.Translating());
-        view.Update(next, QueryProgressState.Translating().Interrupted("翻译未完成", "本次翻译已结束，可重试"));
-        Check(view.Current is { Busy: false, Outcome: QueryOutcome.Failed }, "translation failure or cancellation terminates the busy indicator");
-        var states = new[] { QueryProgressState.Dictionary(true, true), QueryProgressState.Updating(two, true),
-            QueryProgressState.Updating(six with { Merging = true }, true), QueryProgressState.Finished(four, true),
-            QueryProgressState.Finished(failedMerge, true), QueryProgressState.Finished(allFailed, true),
-            QueryProgressState.SourcesFinished(true, false), QueryProgressState.Translating(), QueryProgressState.Translated(true) };
-        var fits = true;
-        foreach (var state in states)
+        var entry = (StackPanel)main.FindName("EntryPanel");
+        var quick = (Border)main.FindName("QuickReadCard");
+        var forms = (StackPanel)main.FindName("FormsPanel");
+        Check(view.Visibility == Visibility.Collapsed && entry.Children.IndexOf(quick) < entry.Children.IndexOf(view) &&
+            entry.Children.IndexOf(view) < entry.Children.IndexOf(forms) && !Contents((FrameworkElement)main.FindName("QueryBar")).Contains(view),
+            "TLDR precedes result progress and late word forms; the search row has no duplicate progress");
+        var options = new AppSettings { Provider="codex", Model="gpt-6-luna", ParallelLookup=true, SecondaryProvider="claude", SecondaryModel="sonnet", JudgeProvider="codex", JudgeModel="gpt-6.1-sol" };
+        var primary = LookupModel.Primary(options); var secondary = LookupModel.Secondary(options);
+        var answers = new[] { new ModelAnswer(primary, ModelPhase.Streaming),new ModelAnswer(secondary, ModelPhase.Pending) };
+        var snapshot = new LookupSnapshot(answers, []);
+        var request = view.Begin(QueryProgressState.Dictionary(true,true).WithWork(options));
+        entry.Visibility = Visibility.Visible; quick.Visibility = Visibility.Visible;
+        ((TextBox)main.FindName("QuickReadText")).Text = "幂等性：重复执行同一操作，效果与执行一次相同。";
+        Measure(entry, 510, 800);
+        var anchor = quick.TranslatePoint(new Point(),entry).Y;
+        var waiting = QueryProgressState.Updating(snapshot,true).WithWork(options,snapshot);
+        view.Update(request,waiting);
+        var marks = Contents(view).OfType<QueryActivityMark>().ToArray();
+        Check(marks.Length==3 && marks[0].Activity==QueryActivity.Querying && marks[1].Activity==QueryActivity.Querying && marks[2].Activity==QueryActivity.Idle,
+            "result actors use independent soft matrices from the shared work states");
+        view.Update(request,waiting with { Detail="new preview text" });
+        Check(Contents(view).OfType<QueryActivityMark>().SequenceEqual(marks), "token updates retain actor controls and animation clocks");
+        var finishedAnswers = answers.Select(a=>a with { Phase=ModelPhase.Complete }).ToArray();
+        var merging = new LookupSnapshot(finishedAnswers,[],Merging:true);
+        view.Update(request, QueryProgressState.Updating(merging,true).WithWork(options,merging));
+        Measure(entry,510,800);
+        Check(quick.TranslatePoint(new Point(),entry).Y==anchor && view.ActualHeight==46 && marks[2].Activity==QueryActivity.Merging &&
+            Contents(view).OfType<TextBlock>().Where(t=>t.IsVisible).All(t=>!t.Text.Contains("进行中")),
+            "progress occupies one line below a stable TLDR anchor during merging");
+        var done = merging with { Merging=false, MergeNote="同义项已整理" };
+        view.Update(request, QueryProgressState.Finished(done,true).WithWork(options,done));
+        Measure(entry,510,800);
+        Check(view.Visibility==Visibility.Collapsed && view.Height==0 && !view.Retiring && quick.TranslatePoint(new Point(),entry).Y==anchor,
+            "unloaded or motionless completion releases the whole row without moving TLDR or leaving a done label");
+        view.Update(request,waiting);
+        Check(view.Current?.Busy==false && view.Visibility==Visibility.Collapsed, "late streaming cannot revive a terminal result row");
+        request=view.Begin(QueryProgressState.Finished(done,true).WithWork(options,done));
+        Check(view.Visibility==Visibility.Collapsed && !view.Retiring, "restored completed results do not replay shutdown");
+        // Native clocks can be sampled without showing a window or driving the desktop.
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        typeof(QueryProgressView).GetMethod("StartRetirement",flags)!.Invoke(view,null);
+        var shutdown=(Storyboard)typeof(QueryProgressView).GetField("retirement",flags)!.GetValue(view)!;
+        shutdown.SeekAlignedToLastTick(view,TimeSpan.FromMilliseconds(950*.45),TimeSeekOrigin.BeginTime);
+        var display=(FrameworkElement)typeof(QueryProgressView).GetField("screen",flags)!.GetValue(view)!;
+        var scale=(ScaleTransform)display.RenderTransform;
+        var brightLine=(FrameworkElement)typeof(QueryProgressView).GetField("line",flags)!.GetValue(view)!;
+        Check(scale.ScaleY<.06 && scale.ScaleX==1 && brightLine.Opacity>.99,
+            "native CRT clocks compress vertically into a bright line before horizontal closure");
+        shutdown.SeekAlignedToLastTick(view,TimeSpan.FromMilliseconds(950*.78),TimeSeekOrigin.BeginTime);
+        var phosphor=(FrameworkElement)typeof(QueryProgressView).GetField("dot",flags)!.GetValue(view)!;
+        Check(scale.ScaleX<.01 && phosphor.Opacity>.99, "native CRT clocks end the line in a central phosphor dot");
+        var failed = done with { MergeFailed=true, MergeFailure=MergeFailureKind.Timeout };
+        view.Begin(QueryProgressState.Finished(failed,true).WithWork(options,failed));
+        Measure(entry,510,800);
+        Check(view.Visibility==Visibility.Visible && view.Height==46 && !view.Retiring && AutomationProperties.GetName(view).Contains("合并未完成"),
+            "a replacement failure cancels old CRT clocks and retains full failure details");
+        var retry=false; view.RetryRequested += (_,_)=>retry=true;
+        var failedButton=Contents(view).OfType<Button>().Single(b=>AutomationProperties.GetName(b).Contains("响应超时"));
+        failedButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Check(retry, "clicking the failed actor requests only the existing failed-step retry path");
+        var current=view.Begin(QueryProgressState.Translating().WithWork(options));
+        view.Update(request, QueryProgressState.Finished(done,true).WithWork(options,done));
+        Check(view.Current?.Translation==true && view.Current.Busy, "a retired query cannot overwrite a new translation");
+        view.Update(current,QueryProgressState.Translating().WithWork(options).Interrupted("已停止","已有结果已保留"));
+        Check(view.Current?.Warning==true && Contents(view).OfType<QueryActivityMark>().All(m=>m.Activity==QueryActivity.Idle),
+            "cancelled translation retains a static warning instead of playing success retirement");
+        foreach(var width in new[] { 510d, 720d, 1040d })
         {
-            view.Begin(state); Measure((FrameworkElement)main.Content, 558, 398);
-            var tooltip = (ToolTip)view.ToolTip;
-            fits &= Contents(tooltip).OfType<TextBlock>().Any(t => t.Text.Contains(state.Detail)) &&
-                view.Content is FrameworkElement glyph && glyph.Width == 24 && glyph.Height == 24 &&
-                activity.Activity == state.Activity && activity.Visibility == (state.Busy ? Visibility.Visible : Visibility.Collapsed) &&
-                view.ActualHeight <= 32 && view.ActualWidth <= 32 && scroll.ActualHeight > 200;
+            var longOptions=new AppSettings { Model="very-long-provider-name/very-long-model-name-with-capabilities", ParallelLookup=true, SecondaryProvider="claude", SecondaryModel="sonnet" };
+            view.Begin(QueryProgressState.Dictionary(true,true).WithWork(longOptions)); Measure(entry,width,800);
+            var buttons=Contents(view).OfType<Button>().OrderBy(b=>b.TranslatePoint(new Point(),view).X).ToArray();
+            Check(buttons.Length==3 && buttons.All(b=>b.ActualHeight<=36) && buttons.Zip(buttons.Skip(1)).All(pair=>
+                pair.First.TranslatePoint(new Point(pair.First.ActualWidth,0),view).X <= pair.Second.TranslatePoint(new Point(),view).X + .1),
+                "long model names truncate without overlapping or adding rows at width " + width);
         }
-        Check(fits, "phase-aware activity and terminal symbols fit the query row and retain full stage information");
-        var accent = ((SolidColorBrush)app.FindResource("Accent")).Color;
-        var selection = ((SolidColorBrush)app.FindResource("Selection")).Color;
-        var ink = ((SolidColorBrush)app.FindResource("Canvas")).Color;
-        Check(accent.R > accent.B && accent.B > accent.G && selection.R > selection.B && selection.B > selection.G &&
-            Contrast(ink, selection) >= 4.5 && Contrast(accent, ((SolidColorBrush)app.FindResource("Surface")).Color) >= 4.5,
-            "pale pink accent and selection retain readable foreground contrast");
-        Check(AutomationProperties.GetLiveSetting(view) == AutomationLiveSetting.Polite &&
-            states.All(s => !s.Detail.Contains('%') && !s.Detail.Contains("秒")), "progress offers polite stage announcements without fabricated percentages or estimates");
-        Console.WriteLine($"{count} query-progress checks passed without displaying windows");
+        Check(AutomationProperties.GetLiveSetting(view)==AutomationLiveSetting.Polite,"result progress retains polite accessibility announcements");
+        view.Reset(); entry.Visibility=Visibility.Collapsed; quick.Visibility=Visibility.Collapsed;
     }
 }

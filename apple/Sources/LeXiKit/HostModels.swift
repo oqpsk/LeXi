@@ -7,9 +7,18 @@ public enum QueryViewKind: String, Decodable, Sendable { case home, dictionary, 
 public enum QueryStage: String, Decodable, Sendable { case dictionary, supplement, merge, finished }
 public enum QueryOutcome: String, Decodable, Sendable { case running, complete, partial, failed }
 public enum QueryActivity: String, Decodable, Sendable { case idle, querying, generating, merging }
+public enum QueryWorkState: String, Decodable, Sendable { case pending, querying, generating, merging, complete, failed }
+public struct QueryWorkItem: Decodable, Equatable, Sendable, Identifiable {
+    public let key, name, detail, accessibleName: String
+    public let state: QueryWorkState
+    public let activity: QueryActivity
+    public var id: String { key }
+}
 public enum OriginalsMode: String, Decodable, Sendable { case keep, collapse, expand }
 
 public struct QueryProgress: Decodable, Equatable, Sendable {
+    public let items: [QueryWorkItem]?
+    public let restored: Bool?
     public let stage: QueryStage
     public let activity: QueryActivity?
     public let title: String

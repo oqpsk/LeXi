@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        QueryProgress.RetryRequested += (_, _) => Retry_Click(this, new RoutedEventArgs());
         InitializeInputPreview();
         shown = session.View;
         viewDelivery = new(Dispatcher, Render);
@@ -147,7 +148,7 @@ public partial class MainWindow : Window
         if (Changed(v => v.Pronunciation)) RenderPronunciation(view.Pronunciation);
         if (Changed(v => v.WordForms)) RenderFormRows(view.WordForms);
         if (Changed(v => v.Etymology)) RenderEtymology(view.Etymology);
-        if (Changed(v => v.QuickRead)) RenderQuickRead(view.QuickRead);
+        if (fresh || Changed(v => v.QuickRead) || previous.Progress?.Busy != view.Progress?.Busy) RenderQuickRead(view.QuickRead);
         if (view.Kind == QueryViewKind.Translation)
         {
             if (fresh) { LocalPanel.Children.Clear(); OnlinePanel.Children.Clear(); }

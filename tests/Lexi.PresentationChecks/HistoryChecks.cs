@@ -36,7 +36,7 @@ internal static partial class Program
         ((FrameworkElement)main.FindName("EntryPanel")).Visibility=Visibility.Visible;
         main.ShowHistory();
         progress.Update(oldRequest,QueryProgressState.Dictionary(true,true));
-        Check(progress.Current==null && progress.Visibility==Visibility.Hidden && ((FrameworkElement)main.FindName("EntryPanel")).Visibility==Visibility.Collapsed &&
+        Check(progress.Current==null && progress.Visibility==Visibility.Collapsed && ((FrameworkElement)main.FindName("EntryPanel")).Visibility==Visibility.Collapsed &&
             ((FrameworkElement)main.FindName("Welcome")).Visibility==Visibility.Visible,
             "returning home clears results and rejects late progress from the previous query");
         main.RenderHistory([]);

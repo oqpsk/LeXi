@@ -10,18 +10,34 @@ public struct EntryView: View {
 
     public var body: some View {
         let view = store.view
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 10) {
-                HeadingRow(view: view, store: store, speech: speech)
-                if !view.wordForms.isEmpty { WordFormsView(rows: view.wordForms) }
+        VStack(alignment: .leading, spacing: 0) {
+            HeadingRow(view: view, store: store, speech: speech).padding(.bottom, 18)
+            VStack(alignment: .leading, spacing: 0) {
+                if view.quickRead.visible {
+                    QuickReadCard(quickRead: view.quickRead).padding(.bottom, 10)
+                } else if view.kind == .dictionary && view.progress?.busy == true {
+                    HStack(spacing: 12) {
+                        QuickReadBadge()
+                        RoundedRectangle(cornerRadius: 4).fill(.quaternary).frame(maxWidth: 340).frame(height: 12)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(LexiTheme.pink.opacity(0.12), in: .rect(cornerRadius: 18, style: .continuous))
+                    .accessibilityLabel("TL;DR 等待释义").padding(.bottom, 10)
+                }
+                ResultProgressBar(progress: view.progress, generation: view.progressGeneration) {
+                    speech.stop(); Task { await store.retryFailed() }
+                }
             }
-            if view.quickRead.visible { QuickReadCard(quickRead: view.quickRead) }
+            if !view.wordForms.isEmpty { WordFormsView(rows: view.wordForms).padding(.bottom, 14) }
             if view.kind == .translation {
                 if let translation = view.translation { TranslationCard(translation: translation) }
             } else {
-                if let answers = view.answers, !answers.empty { AnswersCard(answers: answers, store: store) }
-                LocalSourcesView(view: view, store: store)
-                OnlineSourceView(view: view, store: store)
+                VStack(alignment: .leading, spacing: 18) {
+                    if let answers = view.answers, !answers.empty { AnswersCard(answers: answers, store: store) }
+                    LocalSourcesView(view: view, store: store)
+                    OnlineSourceView(view: view, store: store)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

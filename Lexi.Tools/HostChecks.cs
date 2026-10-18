@@ -90,6 +90,11 @@ internal static class HostChecks
                 .Select(v => v.GetProperty("progress").GetProperty("activity").GetString()).ToArray();
             Check(activities.Contains("querying") && activities.Contains("generating") && activities.Contains("merging") && activities.Last()=="idle",
                 "native clients receive Core's query, output, merge and idle animation states");
+            var actorStates = views.Where(v => v.GetProperty("progress").ValueKind == JsonValueKind.Object)
+                .SelectMany(v => v.GetProperty("progress").GetProperty("items").EnumerateArray()).ToArray();
+            Check(new[] { "pending", "querying", "generating", "merging", "complete" }.All(state => actorStates.Any(i=>i.GetProperty("state").GetString()==state)) &&
+                actorStates.All(i=>i.GetProperty("name").GetString()?.Length>0 && i.GetProperty("accessibleName").GetString()?.Length>0),
+                "native result rows receive named, accessible per-actor states including the independent judge");
             Check(final.GetProperty("answers").GetProperty("senses")[0].GetProperty("alternativesLabel").GetString() == "其他表述 · 1" &&
                 final.GetProperty("quickRead").GetProperty("caption").GetString() == "TL;DR · 已整理",
                 "merged senses and the overview reach the front end fully worded");

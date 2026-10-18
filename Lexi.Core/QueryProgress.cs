@@ -3,12 +3,23 @@ namespace Lexi.Core;
 public enum QueryStage { Dictionary, Supplement, Merge, Finished }
 public enum QueryOutcome { Running, Complete, Partial, Failed }
 public enum QueryActivity { Idle, Querying, Generating, Merging }
+public enum QueryWorkState { Pending, Querying, Generating, Merging, Complete, Failed }
+public sealed record QueryWorkItem(string Key, string Name, QueryWorkState State, string Detail)
+{
+    public QueryActivity Activity => State switch
+    { QueryWorkState.Querying => QueryActivity.Querying, QueryWorkState.Generating => QueryActivity.Generating,
+      QueryWorkState.Merging => QueryActivity.Merging, _ => QueryActivity.Idle };
+    public string AccessibleName => Name + "：" + Detail;
+}
 
 // Only the caller that has awaited the whole query may publish a terminal state.
 // A snapshot with two completed models can still be waiting for the sense judge.
 public sealed record QueryProgressState(QueryStage Stage, string Title, string Detail,
     QueryOutcome Outcome = QueryOutcome.Running, bool ModelsEnabled = true, bool MergeEnabled = true, bool Translation = false, QueryStage? FailedStage = null, bool OutputStarted = false)
 {
+    // Per-actor state is shared with Host clients. The UI never guesses it from text or token counts.
+    public QueryWorkItem[] Items { get; init; } = [];
+    public bool Restored { get; init; }
     public bool Busy => Outcome == QueryOutcome.Running;
     public bool Warning => Outcome is QueryOutcome.Partial or QueryOutcome.Failed;
     // A visual activity, separate from the stage: waiting for a model is not received output.
@@ -55,10 +66,40 @@ public sealed record QueryProgressState(QueryStage Stage, string Title, string D
     public static QueryProgressState Translating(bool outputStarted = false) => new(QueryStage.Supplement, "正在翻译",
         "译文逐步显示，生成中的内容尚未完整", MergeEnabled: false, Translation: true, OutputStarted: outputStarted);
     public static QueryProgressState Translated(bool cached = false) => new(QueryStage.Finished, "翻译完成",
-        cached ? "已使用完整缓存 · 本次翻译已结束" : "译文已完整，本次翻译已结束", QueryOutcome.Complete, MergeEnabled: false, Translation: true);
+        cached ? "已使用完整缓存 · 本次翻译已结束" : "译文已完整，本次翻译已结束", QueryOutcome.Complete, MergeEnabled: false, Translation: true) { Restored = cached };
 
     public QueryProgressState Interrupted(string title, string detail) => this with
-    { Stage = QueryStage.Finished, Title = title, Detail = detail, Outcome = QueryOutcome.Failed };
+    { Stage = QueryStage.Finished, Title = title, Detail = detail, Outcome = QueryOutcome.Failed,
+      Items = Items.Select(i => i.State == QueryWorkState.Complete ? i : i with { State = QueryWorkState.Failed, Detail = detail }).ToArray() };
+
+    public QueryProgressState WithWork(AppSettings settings, LookupSnapshot? snapshot = null, bool includeJudge = true)
+    {
+        QueryWorkItem Item(string key, string name, QueryWorkState state, string? detail = null) => new(key, name, state, detail ?? (state switch
+        { QueryWorkState.Pending => "等待前置步骤", QueryWorkState.Querying => "等待返回", QueryWorkState.Generating => "正在输出",
+          QueryWorkState.Merging => "正在合并义项", QueryWorkState.Complete => "已完成", _ => "未完成，可重试" }));
+        if (Translation)
+            return this with { Items = [Item("translation", LookupModel.Primary(settings).Name, !Busy ? Warning ? QueryWorkState.Failed : QueryWorkState.Complete :
+                OutputStarted ? QueryWorkState.Generating : QueryWorkState.Querying)] };
+        if (!ModelsEnabled)
+            return this with { Items = [Item("sources", "词典", Busy ? QueryWorkState.Querying : Warning ? QueryWorkState.Failed : QueryWorkState.Complete, Detail)] };
+        var answers = snapshot?.Answers ?? LookupModel.Selected(settings).Select(m => new ModelAnswer(m, ModelPhase.Pending)).ToArray();
+        var items = answers.Select((answer, index) => Item("model:" + index, answer.Model.Name, answer.Phase switch
+        {
+            ModelPhase.Pending => Stage == QueryStage.Dictionary ? QueryWorkState.Pending : QueryWorkState.Querying,
+            ModelPhase.Streaming => answer.Entry?.Senses.Length > 0 && !answer.Cached ? QueryWorkState.Generating : QueryWorkState.Querying,
+            ModelPhase.Complete => QueryWorkState.Complete,
+            ModelPhase.Offline => answer.Cached ? QueryWorkState.Complete : QueryWorkState.Pending,
+            _ => QueryWorkState.Failed
+        })).ToList();
+        if (MergeEnabled && includeJudge)
+            items.Add(Item("judge", new LookupModel(settings.JudgeProvider, settings.JudgeModel).Name,
+                snapshot?.MergeFailed == true ? QueryWorkState.Failed : snapshot?.Merging == true ? QueryWorkState.Merging :
+                !Busy && !string.IsNullOrEmpty(snapshot?.MergeNote) ? QueryWorkState.Complete : QueryWorkState.Pending,
+                snapshot?.MergeFailed == true ? Detail : !Busy && string.IsNullOrEmpty(snapshot?.MergeNote) ? "无需调用整理模型" : null));
+        if (Warning && items.All(i => i.State != QueryWorkState.Failed))
+            items.Add(Item("failure", FailedStage == QueryStage.Merge ? "义项整理" : "参考资料", QueryWorkState.Failed, Detail));
+        return this with { Items = items.ToArray() };
+    }
 
     // Stage details shown in the status-ring popover and announced to assistive technology.
     public string[] StageLabels

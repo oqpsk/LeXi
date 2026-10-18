@@ -48,7 +48,10 @@ public partial class MainWindow
 
     private void RenderQuickRead(QuickReadView view)
     {
-        QuickReadCard.Visibility = view.Visible ? Visibility.Visible : Visibility.Collapsed;
+        var pending = !view.Visible && shown.Kind == QueryViewKind.Dictionary && shown.Progress?.Busy == true;
+        QuickReadCard.Visibility = view.Visible || pending ? Visibility.Visible : Visibility.Collapsed;
+        QuickReadPlaceholder.Visibility = pending ? Visibility.Visible : Visibility.Collapsed;
+        QuickReadText.Visibility = pending ? Visibility.Collapsed : Visibility.Visible;
         QuickReadText.Text = view.Text;
         QuickReadText.ToolTip = view.Tooltip.Length > 0 ? view.Tooltip : null;
         if (view.Caption.Length == 0) return;
