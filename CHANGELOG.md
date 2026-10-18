@@ -26,6 +26,11 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.19 (Windows)
+
+- Prime the default audio output with 350 ms of played silence before starting each synthesized clip, keeping the silent stream open across the handoff. Wait for media readiness and start speech at position zero, so output startup does not consume the first syllable. Apply this to words, definitions, examples, selected text and settings previews, including cache hits.
+- Keep original audio caches intact, avoid extra synthesis requests, and close both streams on stop, replacement, failure or completion. No idle keep-alive, system audio changes or new dependencies. macOS retains its native playback.
+
 ## 0.9.18 (Windows)
 
 - Make each read-aloud row include its speaker gutter and disclosure indentation in one transparent hit area, so moving from the text to the speaker cannot hide it in the gap. Preserve the existing text positions and speaker column.

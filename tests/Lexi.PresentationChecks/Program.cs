@@ -67,6 +67,7 @@ internal static partial class Program
         CheckDensity(main);
         CheckQueryProgress(app, main);
         CheckSpeechPresentation(main, settings);
+        CheckSpeechPlayback().GetAwaiter().GetResult();
         CheckDictionaryUsability(main, settings);
         CheckModelMorphology(main);
         CheckLexicalDetails(main);
