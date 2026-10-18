@@ -17,13 +17,10 @@ import Testing
         #expect(abs((waiting.first!.minX + waiting.last!.maxX)/2 - box.midX) < 0.001)
     }
 
-    @Test(arguments: [14.0, 18.0]) func staticAndReducedMotionRenderWithoutAWindow(_ size: Double) throws {
-        for reduceMotion in [false, true] {
-            let content = SpeechWaveform(animate: false, size: size).foregroundStyle(.pink)
-                .environment(\.accessibilityReduceMotion, reduceMotion)
-            let renderer = ImageRenderer(content: content)
-            let image = try #require(renderer.nsImage)
-            #expect(image.size.width == size && image.size.height == size)
-        }
+    @Test(arguments: [14.0, 18.0]) func staticWaveformRendersWithoutAWindow(_ size: Double) throws {
+        // accessibilityReduceMotion is a read-only system value; never mutate the user's setting.
+        let renderer = ImageRenderer(content: SpeechWaveform(animate: false, size: size).foregroundStyle(.pink))
+        let image = try #require(renderer.nsImage)
+        #expect(image.size.width == size && image.size.height == size)
     }
 }
