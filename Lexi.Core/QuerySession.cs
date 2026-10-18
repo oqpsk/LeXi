@@ -95,6 +95,9 @@ public sealed class QuerySession : IDisposable
 
     public string[] Suggest(string text) => Settings.OfflineEnabled && Library.IsCompletedSuccessfully ? Library.Result.Suggest(text, Settings) : [];
 
+    public Task<InputPreviewView?> PreviewAsync(string text, CancellationToken token = default) =>
+        InputPreview.ReadAsync(text, Saved, Library, Settings, token);
+
     public void Cancel() { lock (gate) lookup?.Cancel(); }
 
     // ---- Settings ----

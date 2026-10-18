@@ -13,6 +13,9 @@ public final class LexiStore {
     public private(set) var settings: SettingsPayload?
     public private(set) var history: HistoryList = .empty
     public private(set) var suggestions: [String] = []
+    public private(set) var inputPreview: InputPreview?
+    @ObservationIgnored private var previewWork: Task<Void, Never>?
+    private var previewRequest = 0
     public private(set) var dictionaries: DictionaryList?
     public private(set) var version = ""
     public private(set) var compatibleModels: [ModelChoice] = []
@@ -51,7 +54,7 @@ public final class LexiStore {
         }
     }
 
-    public func stop() async { await client?.stop() }
+    public func stop() async { clearInputPreview(); await client?.stop() }
     public func failToStart(_ message: String) { phase = .failed(message) }
 
     private func handle(_ event: HostEvent) {
@@ -96,19 +99,20 @@ public final class LexiStore {
 
     // ---- Queries ----
     public func submit(_ text: String, force: Bool = false, scroll: Double = 0) async {
-        suggestions = []
+        clearSuggestions()
         await provideTextCredentials()
         _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll)) as SubmitResult?
         await refreshHistoryIfHome()
     }
-    public func regenerate() async { await provideTextCredentials(); _ = try? await client?.call("query.regenerate") as SubmitResult? }
+    public func regenerate() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.regenerate") as SubmitResult? }
     public func navigate(_ direction: Int, scroll: Double = 0) async -> QueryPage? {
+        clearSuggestions()
         await provideTextCredentials()
         let result = try? await client?.call("query.navigate", Navigate(direction: direction, scroll: scroll)) as NavigateResult?
         return result?.page
     }
     public func home(scroll: Double = 0) async {
-        suggestions = []
+        clearSuggestions()
         _ = try? await client?.call("query.home", Scroll(scroll: scroll)) as SubmitResult?
         await refreshHistory()
     }
@@ -121,7 +125,25 @@ public final class LexiStore {
         let result = try? await client?.call("suggest", ["text": text]) as Suggestions?
         if request == suggestionRequest { suggestions = result?.suggestions ?? [] }
     }
-    public func clearSuggestions() { suggestionRequest += 1; suggestions = [] }
+    public func clearSuggestions() { suggestionRequest += 1; suggestions = []; clearInputPreview() }
+
+    // Only the shared, read-only preview endpoint runs after the typing pause. Cancellation
+    // also cancels its host request; a late reply cannot repopulate a submitted/dismissed draft.
+    public func previewInput(_ text: String) {
+        clearInputPreview()
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let request = previewRequest
+        previewWork = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+                let result = try await client?.callOptional("query.preview", ["text": text], as: InputPreview.self)
+                if !Task.isCancelled && request == previewRequest { inputPreview = result }
+            } catch { }
+        }
+    }
+    public func clearInputPreview() {
+        previewRequest += 1; previewWork?.cancel(); previewWork = nil; inputPreview = nil
+    }
 
     // ---- History ----
     public func refreshHistory() async {

@@ -190,6 +190,14 @@ public struct QueryView: Decodable, Equatable, Sendable {
 public struct SubmitResult: Decodable, Sendable { public let request: Int64; public let revision: Int64 }
 public struct QueryPage: Decodable, Sendable { public let query: String; public let translation: Bool; public let scrollOffset: Double }
 public struct NavigateResult: Decodable, Sendable { public let page: QueryPage? }
+public struct InputPreview: Decodable, Equatable, Sendable {
+    public let query, headword, text, source: String
+    public init(query: String, headword: String, text: String, source: String) {
+        self.query = query; self.headword = headword; self.text = text; self.source = source
+    }
+    public var label: String { query == headword ? headword : query + " → " + headword }
+}
+
 public struct Suggestions: Decodable, Sendable { public let suggestions: [String] }
 
 public struct HistoryEntry: Decodable, Equatable, Sendable, Identifiable {

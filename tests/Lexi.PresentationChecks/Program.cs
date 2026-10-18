@@ -82,6 +82,7 @@ internal static partial class Program
         CheckNativeFrame();
         CheckStreamingDispatch(main);
         CheckSpeechWaveform(main);
+        CheckInputPreview(main);
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)
     {

@@ -49,6 +49,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `query.cancel` | — | 停止当前查询，保留已显示内容 |
 | `query.view` | — | 当前 `QueryView` |
 | `suggest` | `text` | `{suggestions}` |
+| `query.preview` | `text` | `{query, headword, text, source}` 或 `null`。只读已保存的 TL;DR 和启用的本地词库；保持大小写缓存身份，显示实际匹配词；不联网、不记录历史、不发布或改变当前视图；支持 `cancel` |
 | `history.list` | — | `{entries: [{query, translation, queriedAt, preview, kind}], error}` |
 | `history.remove` | `query`、`translation` | `{removed, history}` |
 | `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |

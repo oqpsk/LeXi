@@ -20,6 +20,7 @@ public struct SearchBar: View {
     @Binding var cursor: SuggestionCursor
     var focused: FocusState<Bool>.Binding
     let submit: (String) -> Void
+    @State private var editing = false
 
     public init(store: LexiStore, text: Binding<String>, programmatic: Binding<Bool>, cursor: Binding<SuggestionCursor>,
                 focused: FocusState<Bool>.Binding, submit: @escaping (String) -> Void) {
@@ -39,7 +40,7 @@ public struct SearchBar: View {
                     guard !Self.composing, press.modifiers.contains(.shift) else { return .ignored }
                     text.append("\n"); return .handled
                 }
-                .onSubmit { accept(); submit(text) }
+                .onSubmit { finish() }
                 .onKeyPress(.downArrow) { !Self.composing && move(1) ? .handled : .ignored }
                 .onKeyPress(.upArrow) { !Self.composing && move(-1) ? .handled : .ignored }
                 .onKeyPress(.tab) { !Self.composing && accept() ? .handled : .ignored }
@@ -48,7 +49,7 @@ public struct SearchBar: View {
                 .accessibilityLabel("查询")
                 .accessibilityHint("Return 查询，Shift-Return 换行")
             StatusRing(progress: store.view.progress)
-            Button { accept(); submit(text) } label: {
+            Button { finish() } label: {
                 Image(systemName: "return").font(.system(size: 16, weight: .medium)).frame(width: 26, height: 26).contentShape(.rect)
             }
                 .buttonStyle(.borderless)
@@ -59,6 +60,14 @@ public struct SearchBar: View {
         .padding(.horizontal, 18).padding(.vertical, 12)
         // A Spotlight-like capsule that grows into a rounded rectangle for multi-line text.
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24, style: .continuous))
+        .onChange(of: store.view.request) { _, _ in editing = false }
+        .onChange(of: focused.wrappedValue) { _, active in if !active { editing = false; store.clearInputPreview() } }
+        .onReceive(NotificationCenter.default.publisher(for: NSText.didChangeNotification)) { _ in
+            // Committing marked text may leave the bound string unchanged. The notification
+            // supplies that final composition boundary without reacting to other text fields.
+            guard editing && focused.wrappedValue else { return }
+            if Self.composing { store.clearInputPreview() } else { store.previewInput(text) }
+        }
     }
 
     private static var composing: Bool {
@@ -69,12 +78,18 @@ public struct SearchBar: View {
     private func edited(_ value: String) {
         if programmatic { programmatic = false; return }
         cursor = SuggestionCursor()
+        editing = true
+        if Self.composing { store.clearInputPreview() } else { store.previewInput(value) }
         if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             store.clearSuggestions()
             if store.view.kind != .home { Task { await store.home() } }
             return
         }
         Task { await store.suggest(value) }
+    }
+
+    private func finish() {
+        accept(); editing = false; store.clearSuggestions(); submit(text)
     }
 
     private func setText(_ value: String) { if text != value { programmatic = true; text = value } }
@@ -91,6 +106,7 @@ public struct SearchBar: View {
             cursor.selection = selection
             setText(store.suggestions[selection])
         }
+        editing = true; store.previewInput(text)
         return true
     }
 
@@ -98,11 +114,13 @@ public struct SearchBar: View {
         guard let selection = cursor.selection, selection < store.suggestions.count else { return false }
         setText(store.suggestions[selection])
         dismiss(restore: false)
+        editing = true; store.previewInput(text)
         return true
     }
 
     @discardableResult private func dismiss(restore: Bool) -> Bool {
-        guard !store.suggestions.isEmpty else { return false }
+        guard !store.suggestions.isEmpty || store.inputPreview != nil else { return false }
+        editing = false
         if restore, let draft = cursor.draft { setText(draft) }
         cursor = SuggestionCursor()
         store.clearSuggestions()

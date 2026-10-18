@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        InitializeInputPreview();
         shown = session.View;
         viewDelivery = new(Dispatcher, Render);
         session.Changed += Render;
@@ -32,7 +33,7 @@ public partial class MainWindow : Window
         UpdateOnlineButton(); UpdateNavigation(session.View.Navigation); UpdateCloseAction();
         LocationChanged += (_, _) => EtymologyPopup.IsOpen = false;
         SizeChanged += (_, _) => EtymologyPopup.IsOpen = false;
-        Deactivated += (_, _) => { CancelSearchFocus(); EtymologyPopup.IsOpen = false; };
+        Deactivated += (_, _) => { CancelSearchFocus(); CancelInputPreview(); EtymologyPopup.IsOpen = false; };
         ContentRendered += (_, _) => QueueSearchFocus();
         StateChanged += (_, _) => { if (WindowState == WindowState.Minimized) CancelSearchFocus(); else QueueSearchFocus(); };
         PreviewMouseDown += (_, _) => CancelSearchFocus();
@@ -42,7 +43,7 @@ public partial class MainWindow : Window
         {
             if (!quit && settings.MinimizeOnClose && !Dispatcher.HasShutdownStarted) { e.Cancel = true; WindowState = WindowState.Minimized; }
         };
-        Closed += (_, _) => { focusClosed = true; CancelSearchFocus(); session.Cancel(); StopSpeech(); speech.Dispose(); session.Dispose(); };
+        Closed += (_, _) => { focusClosed = true; CancelInputPreview(); CancelSearchFocus(); session.Cancel(); StopSpeech(); speech.Dispose(); session.Dispose(); };
     }
     public void Restore()
     {
@@ -53,13 +54,14 @@ public partial class MainWindow : Window
     private void Window_Activated(object? sender, EventArgs e) { FocusSearch(); QueueSearchFocus(); }
     private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        if (inputComposing && e.Key is Key.Enter or Key.Up or Key.Down or Key.Escape) return;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (Keyboard.Modifiers == ModifierKeys.Alt && key is Key.Left or Key.Right)
         { e.Handled = true; await NavigateAsync(key == Key.Left ? -1 : 1); return; }
         if (e.Key == Key.Escape)
         {
             if (EtymologyPopup.IsOpen) DismissEtymology();
-            else if (Suggestions.Visibility == Visibility.Visible) DismissSuggestions(restoreDraft: true);
+            else if (Suggestions.Visibility == Visibility.Visible || InputPreviewCard.Visibility == Visibility.Visible) DismissSuggestions(restoreDraft: true);
             else WindowState = WindowState.Minimized;
             e.Handled = true;
         }

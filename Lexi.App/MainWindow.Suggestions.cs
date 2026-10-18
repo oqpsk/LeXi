@@ -28,6 +28,7 @@ public partial class MainWindow
         // Real edits start a fresh candidate list; previews keep the original list intact.
         DismissSuggestions();
         if (string.IsNullOrWhiteSpace(SearchBox.Text) && current.Length > 0) ShowHistory(false);
+        QueueInputPreview();
         if (!settings.OfflineEnabled || !session.Library.IsCompletedSuccessfully) return;
         var suggestions = session.Suggest(SearchBox.Text);
         Suggestions.ItemsSource = suggestions;
@@ -39,6 +40,7 @@ public partial class MainWindow
         if (Suggestions.Visibility != Visibility.Visible || Suggestions.SelectedItem is not string text) return;
         suggestionDraft ??= SearchBox.Text;
         SetSearchText(text);
+        QueueInputPreview();
     }
 
     internal bool MoveSuggestion(int direction)
@@ -50,6 +52,7 @@ public partial class MainWindow
             Suggestions.SelectedIndex = -1;
             if (suggestionDraft is { } draft) SetSearchText(draft);
             suggestionDraft = null;
+            QueueInputPreview();
         }
         else
         {
@@ -65,11 +68,13 @@ public partial class MainWindow
         SetQuery(text);
         SearchBox.Focus();
         SearchBox.Select(text.Length, 0);
+        QueueInputPreview();
         return true;
     }
 
     internal void DismissSuggestions(bool restoreDraft = false)
     {
+        CancelInputPreview();
         var draft = suggestionDraft;
         suggestionDraft = null;
         Suggestions.SelectedIndex = -1;
@@ -79,6 +84,7 @@ public partial class MainWindow
 
     private async void SearchBox_KeyDown(object sender, KeyEventArgs e)
     {
+        if (inputComposing) return;
         if (e.Key == Key.Enter && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
         {
             e.Handled = true;

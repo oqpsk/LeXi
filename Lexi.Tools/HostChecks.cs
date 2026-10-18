@@ -67,6 +67,13 @@ internal static class HostChecks
             Check((await client.Call("suggest", new { text = "wal" })).GetProperty("result").GetProperty("suggestions").EnumerateArray().Any(s => s.GetString() == "walk"),
                 "suggestions come from the shared offline library");
 
+            var beforePreview = session.View;
+            var inputPreview = (await client.Call("query.preview",new { text="hello" })).GetProperty("result");
+            Check(inputPreview.GetProperty("query").GetString()=="hello" && inputPreview.GetProperty("headword").GetString()=="hello" &&
+                inputPreview.GetProperty("text").GetString()=="你好" && ReferenceEquals(beforePreview,session.View) && session.History.Entries.Count==0 &&
+                (await client.Call("query.preview",new {text="hel"})).GetProperty("result").ValueKind==JsonValueKind.Null,
+                "the native preview endpoint exposes shared local glosses without publishing a query or recording history");
+
             var submitted = (await client.Call("query.submit", new { text = "serendipity" })).GetProperty("result");
             var request = submitted.GetProperty("request").GetInt64();
             var views = client.Views(request);
