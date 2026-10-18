@@ -142,6 +142,10 @@ public final class LexiStore {
             } catch { }
         }
     }
+    // Core's rule for text taken from another app when LeXi is summoned (query.candidate).
+    public func candidate(_ text: String) async -> LookupCandidate? {
+        try? await client?.callOptional("query.candidate", ["text": text], as: LookupCandidate.self)
+    }
     public func clearInputPreview() {
         previewRequest += 1; previewWork?.cancel(); previewWork = nil; inputPreview = nil
     }

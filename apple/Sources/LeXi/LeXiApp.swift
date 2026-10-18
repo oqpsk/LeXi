@@ -56,6 +56,9 @@ struct LexiCommands: Commands {
         CommandMenu("查询") {
             Button("查一个新词") { actions?.focusSearch() }.keyboardShortcut("l")
             Button("重新生成") { actions?.regenerate() }.keyboardShortcut("r").disabled(actions?.canRegenerate != true)
+            Button("朗读词头") { actions?.speak() }.keyboardShortcut("d").disabled(actions?.canSpeak != true)
+            Button(actions?.copyTitle ?? "复制 TL;DR") { actions?.copySummary() }.keyboardShortcut("c", modifiers: [.command, .shift])
+                .disabled(actions?.canCopySummary != true)
             Divider()
             Button("后退") { actions?.back() }.keyboardShortcut("[").disabled(actions?.canBack != true)
             Button("前进") { actions?.forward() }.keyboardShortcut("]").disabled(actions?.canForward != true)

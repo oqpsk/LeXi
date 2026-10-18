@@ -211,6 +211,7 @@ public struct InputPreview: Decodable, Equatable, Sendable {
 }
 
 public struct Suggestions: Decodable, Sendable { public let suggestions: [String] }
+public struct LookupCandidate: Decodable, Equatable, Sendable { public let text: String; public let submit: Bool }
 
 public struct HistoryEntry: Decodable, Equatable, Sendable, Identifiable {
     public let query: String

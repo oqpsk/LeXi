@@ -158,6 +158,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             case "query.view": return session.View;
             case "suggest": return new { suggestions = session.Suggest(Text(p, "text")) };
             case "query.preview": return await session.PreviewAsync(Text(p, "text"), token);
+            case "query.candidate": return LookupCandidates.From(Text(p, "text", ""));
             case "history.list": return History(Text(p, "text", ""), (int)Number(p, "offset"));
             case "history.remove":
             {

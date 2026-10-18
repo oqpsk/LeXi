@@ -2,6 +2,9 @@
 
 ## Unreleased — major-version preparation
 
+- Look up without typing on macOS: ⌘2 in another app takes the text copied there in the last few seconds, or, once allowed in 设置 → 通用, the selection itself (Accessibility permission). Core's new `query.candidate` decides: words and short phrases are looked up at once with stray quotes and punctuation removed, longer text only fills the query field, and links or paths are ignored. Only the pasteboard's change count is polled; its contents are read once, at ⌘2, and LeXi's own copies never count.
+- Use results from the keyboard on macOS: ↓ or Tab in the query field moves into the senses, ↑ ↓ move between them, Space reads the focused sense, Return opens its examples, ⌘C copies it and Escape returns to the query. ⌘D reads the headword and ⇧⌘C copies the TL;DR or translation. The query window no longer sets a default focus, which had pulled focus back to the query field.
+
 - Keep TL;DR first beneath the headword on Windows and macOS, ahead of word forms and one compact model-status row. Core publishes independent actor states; animate waiting, output and merging without repeating stage text or a query-field indicator. Successful live work retires with the approved CRT shutdown (vertical squeeze, bright line, central phosphor dot), then releases its space. Cached results skip the flourish; partial failures and cancellation retain accessible details and failed-step retry. Respect motion preferences and discard stale animation completions. No release generated.
 
 - Replace the query-row loading spinner with the same soft-matrix activity used in the footer on Windows and macOS. Share stage changes and motion preferences, keep the query-row mark unframed, and retain terminal check/warning symbols, keyboard/click stage details and stable control alignment.

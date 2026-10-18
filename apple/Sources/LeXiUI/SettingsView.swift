@@ -171,7 +171,10 @@ struct QuerySettings: View {
 struct GeneralSettings: View {
     @AppStorage(AppearanceChoice.key) private var appearance = AppearanceChoice.system.rawValue
     @AppStorage(GlobalShortcut.key) private var shortcut = true
+    @AppStorage(InstantLookup.clipboardKey) private var copiedText = true
+    @AppStorage(InstantLookup.selectionKey) private var selectedText = false
     @State private var loginItem = LoginItem.enabled
+    @State private var trusted = SelectedText.trusted
     @State private var message: String?
 
     var body: some View {
@@ -201,6 +204,28 @@ struct GeneralSettings: View {
                 if GlobalShortcut.shared.unavailable { message = "⌘2 已被其他应用注册为全局快捷键，暂时无法使用。" }
                 else if LoginItem.needsApproval { message = "请在“系统设置 → 通用 → 登录项”中允许 LeXi。" }
             }
+            Section {
+                Toggle(isOn: $selectedText) {
+                    SettingLabel("查询选中的文字", "在其他应用中选中文字后按 \(GlobalShortcut.keys)，不用复制")
+                }
+                if selectedText && !trusted {
+                    LabeledContent {
+                        Button("打开授权…") { SelectedText.requestTrust() }
+                    } label: {
+                        SettingLabel("需要辅助功能权限", "在“系统设置 → 隐私与安全性 → 辅助功能”中允许 LeXi。重新构建的本机版本需要再次允许")
+                    }
+                }
+                Toggle(isOn: $copiedText) {
+                    SettingLabel("查询刚复制的文字", "\(GlobalShortcut.keys) 前几秒内复制的文字直接查询。首次读取时 macOS 会询问是否允许粘贴，可在“隐私与安全性”中设为始终允许")
+                }
+            } header: {
+                Text("\(GlobalShortcut.keys) 呼出时")
+            } footer: {
+                Note("单词和短语直接查询；较长或多行的文字只填入输入框，按 Return 再翻译。链接与文件路径不会查询。")
+            }
+            .disabled(!shortcut)
+            // Accessibility is granted in System Settings; check again whenever the pane comes back.
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in trusted = SelectedText.trusted }
             Section("键盘快捷键") {
                 ForEach(Self.shortcuts, id: \.0) { action, keys in
                     LabeledContent(action) { Text(keys).foregroundStyle(.secondary).monospaced() }
@@ -211,6 +236,8 @@ struct GeneralSettings: View {
     }
 
     private static let shortcuts = [("呼出 / 隐藏 LeXi（任何应用中）", GlobalShortcut.keys), ("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
+        ("朗读词头", "⌘D"), ("复制 TL;DR / 译文", "⇧⌘C"), ("进入释义", "↓  Tab"), ("切换释义", "↑  ↓"), ("朗读释义 / 停止", "Space"),
+        ("展开例句", "Return"), ("复制释义", "⌘C"), ("回到输入框", "Esc"),
         ("重新生成", "⌘R"), ("后退 / 前进", "⌘[  ⌘]"), ("查询历史", "⌘Y"), ("设置", "⌘,")]
 }
 

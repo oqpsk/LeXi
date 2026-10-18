@@ -5,7 +5,8 @@ import SwiftUI
 
 // ⌘2 from any app brings LeXi forward, ready to type (MainView focuses the query on activation);
 // pressed again while LeXi's window is in front, it hides LeXi and returns to the previous app, as
-// Win+2 does on Windows. It is a system hot key: it takes precedence over every app's own ⌘2 and
+// Win+2 does on Windows. Text selected in that app, or copied just before, is looked up at once
+// (InstantLookup). It is a system hot key: it takes precedence over every app's own ⌘2 and
 // needs no Accessibility permission. Settings → 通用 can turn it off.
 @MainActor public final class GlobalShortcut {
     public static let shared = GlobalShortcut()
@@ -24,7 +25,7 @@ import SwiftUI
 
     // Holds or releases ⌘2 to match the setting.
     public func apply() {
-        if enabled { register() } else { release() }
+        if enabled { register(); InstantLookup.shared.watch() } else { release() }
     }
 
     private func register() {
@@ -53,6 +54,7 @@ import SwiftUI
             NSApp.hide(nil)
             return
         }
+        InstantLookup.shared.capture()
         NSApp.unhide(nil)
         NSApp.activate(ignoringOtherApps: true)
         if let window, window.isMiniaturized { window.deminiaturize(nil) }

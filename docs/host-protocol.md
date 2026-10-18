@@ -56,6 +56,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `query.view` | — | 当前 `QueryView` |
 | `suggest` | `text` | `{suggestions}` |
 | `query.preview` | `text` | `{query, headword, text, source}` 或 `null`。只读已保存的 TL;DR 和启用的本地词库；保持大小写缓存身份，显示实际匹配词；不联网、不记录历史、不发布或改变当前视图；支持 `cancel` |
+| `query.candidate` | `text` | `{text, submit}` 或 `null`。用户在其他应用中按全局快捷键呼出 LeXi 时，前端把选中的文字或刚复制的文字交给 Core 判断：去掉随词带来的引号和标点；单行且不超过 64 个字符时 `submit` 为 `true`，直接查询；更长或多行的文字只填入输入框；链接、路径、邮箱和无效输入返回 `null`。不发起查询、不记录历史 |
 | `history.list` | — | `{entries: [{query, translation, queriedAt, preview, kind}], error}` |
 | `history.remove` | `query`、`translation` | `{removed, history}` |
 | `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |
