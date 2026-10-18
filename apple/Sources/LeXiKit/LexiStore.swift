@@ -149,17 +149,21 @@ public final class LexiStore {
     // ---- History ----
     public private(set) var historyFilter = ""
     private var historyRequest = 0
+    private var historyShown = 0
     private var historyPaging = false
+    // A home view refreshes the list on its own while home() refreshes it too. A reply is dropped
+    // only when a later one is already shown, so it never waits on a request still in flight.
     public func refreshHistory() async {
         historyRequest += 1; let request = historyRequest; let text = historyFilter
-        if let list = try? await client?.call("history.list", ["text": text]) as HistoryList?, request == historyRequest { history = list }
+        if let list = try? await client?.call("history.list", ["text": text]) as HistoryList?,
+           request > historyShown, text == historyFilter { history = list; historyShown = request }
     }
     public func searchHistory(_ text: String) async { historyFilter = text; await refreshHistory() }
     public func moreHistory() async {
         guard !historyPaging else { return }; historyPaging = true; defer { historyPaging = false }
-        let request = historyRequest; let text = historyFilter; let offset = history.entries.count
+        let shown = historyShown; let text = historyFilter; let offset = history.entries.count
         let parameters: [String: SettingValue] = ["text": .string(text), "offset": .integer(offset)]
-        if let next = try? await client?.call("history.list", parameters) as HistoryList?, request == historyRequest, text == historyFilter, offset == history.entries.count {
+        if let next = try? await client?.call("history.list", parameters) as HistoryList?, shown == historyShown, text == historyFilter, offset == history.entries.count {
             var list = HistoryList(entries: history.entries + next.entries, error: next.error); list.total = next.total; history = list
         }
     }
@@ -177,7 +181,7 @@ public final class LexiStore {
     private func refreshHistoryIfHome() async { if view.kind == .home { await refreshHistory() } }
     public func remove(_ entry: HistoryEntry) async {
         if let result = try? await client?.call("history.remove", RemoveHistory(query: entry.query, translation: entry.translation)) as HistoryRemoval? {
-            history = result.history
+            history = result.history; historyShown = historyRequest
             if !historyFilter.isEmpty { await refreshHistory() }
         }
     }
