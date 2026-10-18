@@ -52,23 +52,23 @@ struct QuerySettings: View {
                     toggle(SettingLabel("自动补充双语释义", "查词时自动请模型补充；关闭后可点“重新生成”手动获取。"), settings.autoAi, "autoAi")
                 }
                 Section {
-                    modelPicker(SettingLabel("主要模型", "用于查词与文本翻译"), payload.models, selected: settings.provider + ":" + settings.model) { choice in
+                    modelPicker(SettingLabel("主要模型", "用于查词与文本翻译"), store.queryModels, selected: settings.provider + ":" + settings.model) { choice in
                         ["provider": .string(choice.provider), "model": .string(choice.id)]
                     }
                     toggle(SettingLabel("双模型同时查词", "两个模型独立查词，先返回的释义先显示"), settings.parallelLookup, "parallelLookup")
-                    modelPicker(SettingLabel("第二个查询模型", "须与主要模型不同"), payload.models, selected: secondaryKey(settings)) { choice in
+                    modelPicker(SettingLabel("第二个查询模型", "须与主要模型不同"), store.queryModels, selected: secondaryKey(settings)) { choice in
                         ["secondaryProvider": .string(choice.provider), "secondaryModel": .string(choice.id)]
                     }
                     .disabled(!settings.parallelLookup)
                 } header: {
                     Text("查询模型")
                 } footer: {
-                    Note("使用本机 Codex 与 Claude Code 的订阅登录。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Claude 关闭额外思考，Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。")
+                    Note("使用本机模型订阅或“账号”中连接的自定义文本服务。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Claude 关闭额外思考，Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。")
                 }
                 Section {
                     toggle(SettingLabel("自动整理同类义项", "合并重复的说法，包含单个模型内部"), settings.mergeSenses, "mergeSenses")
-                    modelPicker(SettingLabel("义项判断模型", "使用 Codex 订阅"), payload.judgeModels, selected: "codex:" + settings.judgeModel) { choice in
-                        ["judgeModel": .string(choice.id)]
+                    modelPicker(SettingLabel("义项判断模型", "Codex 订阅或自定义服务"), store.judgeChoices, selected: (settings.judgeProvider ?? "codex") + ":" + settings.judgeModel) { choice in
+                        ["judgeProvider": .string(choice.provider), "judgeModel": .string(choice.id)]
                     }
                     .disabled(!settings.mergeSenses)
                 } header: {
@@ -200,6 +200,7 @@ struct ConnectionSettings: View {
 
     var body: some View {
         Form {
+            CompatibleConnectionSettings(store: store)
             Section {
                 ProviderRow(store: store, provider: "codex", title: "ChatGPT · Codex", symbol: "sparkles", install: "https://learn.chatgpt.com/docs/cli")
                 LabeledContent {

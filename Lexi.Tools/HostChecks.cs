@@ -47,10 +47,17 @@ internal static class HostChecks
                 ? new(HttpStatusCode.OK) { Content = new StringContent("{\"voices\":[{\"voice_id\":\"voice_b\",\"name\":\"Beta\"},{\"voice_id\":\"voice_a\",\"name\":\"Alpha\"}],\"has_more\":false}") }
                 : new(HttpStatusCode.OK) { Content = new ByteArrayContent(syntheticAudio) };
         }));
+        using var textClient = new CompatibleTextClient(new SpeechHandler(request =>
+        {
+            var allowed = request.Headers.GetValues("CF-Access-Client-Id").Single() == "synthetic-id" &&
+                request.Headers.GetValues("CF-Access-Client-Secret").Single() == "synthetic-secret";
+            return new HttpResponseMessage(allowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden)
+            { Content = new StringContent(JsonSerializer.Serialize(new { data = new[] { new { id = "synthetic-model" } } })) };
+        }));
         using (var session = new QuerySession(new(Path.Combine(work, "assets"), Path.GetFullPath(fixture), user), providers: providers, network: new NoNetwork()))
         {
             var client = new Client();
-            var server = new HostServer(session, client.Input, client.Output, speechClient).RunAsync();
+            var server = new HostServer(session, client.Input, client.Output, speechClient, textClient).RunAsync();
             var init = await client.Call("initialize");
             Check(init.GetProperty("result") is var ready && ready.GetProperty("protocol").GetInt32() == HostServer.Protocol &&
                 ready.GetProperty("view").GetProperty("kind").GetString() == "home" &&
@@ -115,6 +122,17 @@ internal static class HostChecks
             Check(!updated.GetProperty("mergeSenses").GetBoolean() && updated.GetProperty("reasoningEffort").GetString() == "low" &&
                 !AppSettings.Load(user).MergeSenses, "valid settings are saved with the fixed Codex options");
             await CheckSpeech(client, user, speechKey, syntheticAudio, speechRequests, Check);
+            var textRequest = new { baseUrl = "https://example.org/v1", clientId = "synthetic-id", clientSecret = "synthetic-secret", apiKey = "" };
+            var availableText = await client.Call("text.models", textRequest);
+            Check(availableText.GetProperty("result").GetProperty("models")[0].GetProperty("provider").GetString() == "compatible" &&
+                availableText.GetProperty("result").GetProperty("models")[0].GetProperty("id").GetString() == "synthetic-model" &&
+                !availableText.GetRawText().Contains("synthetic-secret"), "the host returns authenticated model choices without echoing the Access credentials");
+            Check((await client.Call("text.models", textRequest with { clientSecret = "wrong" })).GetProperty("error").GetProperty("code").GetString() == "authentication_failed" &&
+                (await client.Call("text.models", new { textRequest.baseUrl })).GetProperty("error").GetProperty("code").GetString() == "missing_credentials",
+                "host text discovery preserves explicit authentication and missing-credential failures");
+            var configuredText = await client.Call("text.credentials", textRequest);
+            Check(configuredText.GetProperty("result").EnumerateObject().Count() == 0 &&
+                !File.ReadAllText(Path.Combine(user, "settings.json")).Contains("synthetic-secret"), "text credentials stay in process memory and outside host settings and responses");
             var offline = (await client.Call("settings.setOnline", new { online = false })).GetProperty("result");
             Check(offline.GetProperty("controls").GetProperty("onlineLabel").GetString() == "离线查询" && !AppSettings.Load(user).Online &&
                 client.Latest().GetProperty("status").GetString()!.StartsWith("查询模式已更改"), "the online switch saves and keeps the current result");

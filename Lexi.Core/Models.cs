@@ -79,6 +79,9 @@ public sealed class AppSettings
     public string SecondaryModel { get; set; } = "";
     public bool MergeSenses { get; set; } = true;
     public string JudgeModel { get; set; } = "gpt-6-luna";
+    public string JudgeProvider { get; set; } = "codex";
+    public string CompatibleBaseUrl { get; set; } = CompatibleText.DefaultBaseUrl;
+    public bool CompatibleStreaming { get; set; } = true;
     public string SpeechProvider { get; set; } = SpeechCatalog.Local.Provider;
     public string SpeechModel { get; set; } = SpeechCatalog.Local.Id;
     public string SpeechVoice { get; set; } = "auto";

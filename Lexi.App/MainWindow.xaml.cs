@@ -10,7 +10,7 @@ namespace Lexi;
 
 public partial class MainWindow : Window
 {
-    private readonly QuerySession session = new(App.Paths);
+    private readonly QuerySession session = new(App.Paths, textCredentials: url => new TextProviderKeys(App.UserRoot).Read(url));
     private AppSettings settings => session.Settings;
     private bool quit;
     private readonly WindowPlacement windowPlacement;

@@ -16,7 +16,7 @@ public sealed class HostException(string code, string message) : Exception(messa
 // One JSON object per line in each direction (docs/host-protocol.md). Every request id gets
 // exactly one response; "view" events stream each QueryView the session publishes, in order.
 // speechClient replaces the online speech transport in offline checks.
-public sealed class HostServer(QuerySession session, TextReader input, TextWriter output, SpeechClient? speechClient = null)
+public sealed class HostServer(QuerySession session, TextReader input, TextWriter output, SpeechClient? speechClient = null, CompatibleTextClient? textClient = null)
 {
     public const int Protocol = 1;
     public const int MaxLine = 1 << 20;
@@ -31,6 +31,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
     private readonly Channel<string> outgoing = Channel.CreateUnbounded<string>(new() { SingleReader = true });
     private readonly ConcurrentDictionary<string, CancellationTokenSource> running = new();
     private readonly SpeechAudio speech = new(session.Paths.UserRoot, speechClient);
+    private readonly CompatibleTextClient text = textClient ?? new();
 
     public async Task RunAsync(CancellationToken token = default)
     {
@@ -59,7 +60,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             foreach (var request in running.Values) request.Cancel();
             await Task.WhenAll(handlers);
             session.Changed -= Publish;
-            speech.Dispose();
+            speech.Dispose(); if (textClient == null) text.Dispose();
             if (shutdown != null) Reply(shutdown, new { });
             outgoing.Writer.TryComplete();
             await writer;
@@ -94,6 +95,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
         using var cancel = new CancellationTokenSource();
         if (!running.TryAdd(key, cancel)) { Fail(id, "invalid_request", "A request with this id is still running."); return; }
         try { Reply(id, await DispatchAsync(method, parameters, cancel.Token)); }
+        catch (CompatibleException e) { Fail(id, e.Code, e.Message); }
         catch (HostException e) { Fail(id, e.Code, e.Message); }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested) { Fail(id, "cancelled", "Request cancelled."); }
         catch (JsonException e) { Fail(id, "invalid_params", e.Message); }
@@ -146,6 +148,14 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
                 var entry = session.History.Entries.FirstOrDefault(e => e.Query == query && e.Translation == translation);
                 return new { removed = entry != null && session.RemoveHistory(entry), history = History() };
             }
+            case "text.models":
+                if (!session.Settings.Online) throw new HostException("offline", "请先开启在线补充，再读取模型列表。");
+                return new { models = (await text.ModelsAsync(Text(p, "baseUrl"), TextCredentials(p), token))
+                    .Select(id => new ModelChoice("自定义 · " + id, id, CompatibleText.Provider)).ToArray() };
+            case "text.credentials":
+                // Process memory only; the front end owns Keychain storage. No secret is echoed.
+                session.SetTextCredentials(Text(p, "baseUrl"), TextCredentials(p));
+                return new { };
             case "settings.get": return Settings();
             case "settings.update": return UpdateSettings(p);
             case "settings.setOnline":
@@ -218,6 +228,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
         };
     }
 
+    private static CompatibleCredentials TextCredentials(JsonElement p) => new(Text(p, "clientId", ""), Text(p, "clientSecret", ""), Text(p, "apiKey", ""));
     private static SpeechOptions SpeechRequest(JsonElement p) => new(Text(p, "provider"), Text(p, "model"), Text(p, "voice"));
     private static async Task<T> Speech<T>(Func<Task<T>> run)
     {

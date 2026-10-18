@@ -57,6 +57,8 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `dictionaries.list` | — | `{dictionaries, folder}` |
 | `connection.status` | `provider`（`codex` 或 `claude`），可选 `codexPath` | `{installed, signedIn, message}`，只含经过清理的摘要 |
 | `connection.loginCommand` | `provider`，可选 `codexPath` | `{fileName, arguments, path, clearEnvironment}` 或 `null`。前端仅在用户点击后在终端中运行，并清除 `clearEnvironment` 中的变量 |
+| `text.models` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{models: [{provider, id, label}]}`；鉴权后读取列表，API Key 可留空；不保存凭据、不自动选择模型；离线时不发请求 |
+| `text.credentials` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{}`；按端点绑定到本次 Host 的进程内存，用于后续查词、翻译和义项整理；前端负责 Keychain 持久化，Host 不回传或记录这些值 |
 | `speech.models` | — | `{models: [{provider, id, name, local}]}`；第一项是本机系统声线（`local` 为 `true`），其余为在线模型 |
 | `speech.voices` | `provider`、`model` | `{voices: [{id, name}]}`：该模型的在线声线；本机声线由前端从系统读取，这里为空 |
 | `speech.elevenVoices` | 可选 `key` | `{voices}`：ElevenLabs 账号可用声线。离线模式下不发请求 |
@@ -64,6 +66,14 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `speech.synthesize` | `text`、`provider`、`model`、`voice`，可选 `key` | `{path}`：缓存中的 MP3 路径，缺失时用在线服务生成。已缓存时不需要 `key`；离线模式下缺失则返回“离线模式下没有此声线的缓存发音。” |
 | `cancel` | `id` | 取消仍在运行的请求，`{cancelled}` |
 | `shutdown` | — | 等待其余请求结束后最后响应，然后退出 |
+
+## 自定义文本服务
+
+`provider = compatible` 可用于主要模型、第二模型，以及 `judgeProvider = compatible` 的义项判断模型。普通设置只包含 `compatibleBaseUrl`、`compatibleStreaming`、模型 ID 和服务标识；`judgeProvider` 默认 `codex`，保留旧设置的含义。模型列表先通过 `text.models` 获取，再由用户明确选择。
+
+原生前端从本机 Keychain 读取凭据，通过私有标准输入管道调用 `text.credentials`；Host 仅在进程内持有，并直接向配置的服务发出 HTTPS 请求，不经过额外服务器。不要记录请求参数或私有管道消息。错误只返回经过清理的中文提示及 `missing_credentials` / `authentication_failed` / `invalid_response` 等代码。401/403 不降级或重试；取消同时作用于 HTTP 发送及响应读取。SSE 未正常结束时不能作为完成结果缓存。
+
+Windows 直接引用 Core，通过当前用户加密存储的读取函数提供凭据，无需 Host 的内存配置方法。TTS 的服务、密钥与请求路径独立。
 
 ## 发音
 

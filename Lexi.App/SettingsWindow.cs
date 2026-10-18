@@ -12,7 +12,7 @@ public sealed partial class SettingsWindow : Window
     private static Brush Accent => Theme.Brush("Accent");
     private static TextBlock Text(string text, double size = 15, Brush? color = null) => new() { Text = text, FontSize = size, Foreground = color ?? Theme.Brush("Ink"), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,10) };
     public SettingsWindow(AppSettings settings, InstalledDictionary[] installed) : this(settings, installed, null) { }
-    internal SettingsWindow(AppSettings settings, InstalledDictionary[] installed, SpeechClient? speechMetadata)
+    internal SettingsWindow(AppSettings settings, InstalledDictionary[] installed, SpeechClient? speechMetadata, CompatibleTextClient? textMetadata = null, string? textRoot = null)
     {
         Title = "LeXi 设置"; Width = 620; Height = 665; MinWidth = 540; MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -38,7 +38,7 @@ public sealed partial class SettingsWindow : Window
         var online = new CheckBox { Content = "在线补充", IsChecked = settings.Online, Margin = new(0,0,0,14) };
         var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
         general.Children.Add(online); general.Children.Add(ai);
-        general.Children.Add(Text("使用本机 Claude Code / Codex 的订阅登录。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。", 14, Muted));
+        general.Children.Add(Text("使用本机模型订阅或自定义文本服务。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。", 14, Muted));
         general.Children.Add(Text("查过的内容直接使用缓存。切换模型后，点击“重新生成”才会更新已有结果。", 14, Muted));
         var label = Text("主要模型 · 查词与翻译"); label.Margin = new(0,13,0,8); general.Children.Add(label);
         var choices = ModelCatalog.Choices(settings);
@@ -56,8 +56,8 @@ public sealed partial class SettingsWindow : Window
         var secondary = ModelSelector(secondChoice, choices); secondaryPanel.Children.Add(secondary);
         var merge = new CheckBox { Content = "自动整理同类义项（包含单模型内部）", IsChecked = settings.MergeSenses, Margin = new(0,6,0,12) }; general.Children.Add(merge);
         var judgePanel = new StackPanel(); general.Children.Add(judgePanel);
-        judgePanel.Children.Add(Text("义项判断模型 · 使用 Codex 订阅"));
-        var judge = ModelSelector(new("codex", settings.JudgeModel), ModelCatalog.JudgeChoices(choices)); judgePanel.Children.Add(judge);
+        judgePanel.Children.Add(Text("义项判断模型 · Codex 或自定义服务"));
+        var judge = ModelSelector(new(settings.JudgeProvider, settings.JudgeModel), ModelCatalog.JudgeChoices(choices)); judgePanel.Children.Add(judge);
         general.Children.Add(Text("同一词义的细分用法可归为一组，优先展示涵盖更完整的原文；其他表述保留在“用法细分”中。不同含义和分歧仍分开。", 14, Muted));
         void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true; }
         parallel.Checked += (_, _) => UpdateParallelControls(); parallel.Unchecked += (_, _) => UpdateParallelControls();
@@ -66,6 +66,18 @@ public sealed partial class SettingsWindow : Window
         general.Children.Add(Text("Claude 关闭额外思考，释义生成后立即显示。Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。", 14, Muted));
         var path = new TextBox { Text = settings.CodexPath, FontSize = 14 };
         var connectionTab = AddConnectionsTab(tabs, path);
+        void RefreshModels(string[] available)
+        {
+            var primary = model.SelectedItem as ModelChoice; var second = secondary.SelectedItem as ModelChoice; var judgment = judge.SelectedItem as ModelChoice;
+            choices = ModelCatalog.Choices(settings, available);
+            void Set(ComboBox picker, ModelChoice[] values, ModelChoice? selected)
+            { picker.ItemsSource = values; picker.SelectedItem = values.FirstOrDefault(c => c.Id == selected?.Id && c.Provider == selected?.Provider); }
+            Set(model, choices, primary); Set(secondary, choices, second); Set(judge, ModelCatalog.JudgeChoices(choices), judgment);
+        }
+        var custom = AddCompatibleConnection(connectionTab, settings, RefreshModels, () => online.IsChecked == true, textMetadata, textRoot);
+        var customEntry = ConnectionButton("自定义文本服务…"); customEntry.HorizontalAlignment = HorizontalAlignment.Left;
+        general.Children.Insert(general.Children.IndexOf(accounts) + 1, customEntry);
+        customEntry.Click += (_, _) => { tabs.SelectedItem = connectionTab; ((ScrollViewer)connectionTab.Content).ScrollToTop(); };
         accounts.Click += (_, _) => tabs.SelectedItem = connectionTab;
         general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+, 设置 · Ctrl+Q 退出\n固定到任务栏第 2 位后用 Win+2 切换", 14,Muted));
 
@@ -109,12 +121,19 @@ public sealed partial class SettingsWindow : Window
         windowOptions.Children.Add(Text("Alt+← 后退 · Alt+→ 前进\n顶部中间的 LeXi 区域可拖动窗口。", 14, Muted));
         save.Click += (_, _) =>
         {
-            var primaryValue = (ModelChoice)model.SelectedItem; var secondaryValue = (ModelChoice)secondary.SelectedItem;
+            if (model.SelectedItem is not ModelChoice primaryValue || secondary.SelectedItem is not ModelChoice secondaryValue || judge.SelectedItem is not ModelChoice judgeValue)
+            { modelError.Text = "请先读取模型列表并选择模型。"; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
             var candidate = settings.ForModel(new(primaryValue.Provider, primaryValue.Id));
+            try { candidate.CompatibleBaseUrl = custom.BaseUrl(); }
+            catch (CompatibleException ex) { modelError.Text = ex.Message; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
+            candidate.JudgeProvider = judgeValue.Provider; candidate.JudgeModel = judgeValue.Id;
             candidate.ParallelLookup = parallel.IsChecked == true; candidate.SecondaryProvider = secondaryValue.Provider; candidate.SecondaryModel = secondaryValue.Id;
             if (ModelCatalog.Validate(candidate) is { } invalid)
             { modelError.Text = invalid; modelError.Visibility = Visibility.Visible; modelError.BringIntoView(); return; }
+            if (!custom.Save()) return;
             if (!saveSpeech()) return;
+            settings.CompatibleBaseUrl = candidate.CompatibleBaseUrl; settings.CompatibleStreaming = custom.Streaming();
+            settings.JudgeProvider = judgeValue.Provider;
             settings.MinimizeOnClose = closeBehavior.SelectedIndex == 0;
             settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
             settings.OfflineEnabled = master.IsChecked == true;

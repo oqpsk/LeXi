@@ -25,6 +25,13 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.20 (Windows / macOS)
+
+- Add a direct OpenAI-compatible text service for dictionary lookup, translation and optional sense judging. Configure its HTTPS Base URL, enter CF Access Client ID / Client Secret and an optional API key, fetch the authenticated server model list, then explicitly choose a model. Keep existing subscriptions and selections until the user changes them.
+- Send Access headers and a versioned LeXi User-Agent on every models/completions request. Support ordinary JSON and incremental Chat Completions SSE, cancel the active HTTP request/response on stop, and report authentication or incomplete-output failures without anonymous retries, redirects or provider fallbacks.
+- Protect endpoint-bound credentials with Windows current-user encryption or the macOS Keychain; keep them out of settings, logs, results and repository data. Scope model caches by endpoint, preserve complete saved views, and keep TTS independent.
+- Add synthetic transport, cancellation, cache, Windows secure-storage/settings, Host protocol and Swift credential checks. iOS integration remains outside this desktop update.
+
 ## 0.9.19 (Windows)
 
 - Prime the default audio output with 350 ms of played silence before starting each synthesized clip, keeping the silent stream open across the handoff. Wait for media readiness and start speech at position zero, so output startup does not consume the first syllable. Apply this to words, definitions, examples, selected text and settings previews, including cache hits.

@@ -28,6 +28,8 @@ try {
     if ($LASTEXITCODE) { throw 'Parallel dictionary checks failed' }
     & dotnet $runner lexical-check
     if ($LASTEXITCODE) { throw 'Lexical coverage checks failed' }
+    & dotnet $runner compatible-check (Join-Path $root 'Lexi.Core') (Join-Path $root '.cache/compatible-checks')
+    if ($LASTEXITCODE) { throw 'Custom text provider checks failed' }
     & dotnet $runner speech-check
     if ($LASTEXITCODE) { throw 'Pronunciation and speech checks failed' }
     & dotnet $runner platform-check (Join-Path $root '.cache/platform-checks')
