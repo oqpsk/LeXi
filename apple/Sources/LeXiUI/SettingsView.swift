@@ -172,6 +172,9 @@ struct QuerySettings: View {
 
 struct GeneralSettings: View {
     @AppStorage(AppearanceChoice.key) private var appearance = AppearanceChoice.system.rawValue
+    @AppStorage(GlobalShortcut.key) private var shortcut = true
+    @State private var loginItem = LoginItem.enabled
+    @State private var message: String?
 
     var body: some View {
         Form {
@@ -180,6 +183,25 @@ struct GeneralSettings: View {
                     ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0.rawValue) }
                 } label: { SettingLabel("外观", "LeXi 的窗口使用浅色、深色，或跟随系统") }
                 .pickerStyle(.segmented)
+            }
+            Section {
+                Toggle(isOn: Binding(get: { shortcut }, set: { on in
+                    shortcut = on
+                    GlobalShortcut.shared.apply()
+                    message = GlobalShortcut.shared.unavailable ? "⌘2 已被其他应用注册为全局快捷键，暂时无法使用。" : nil
+                })) { SettingLabel("用 \(GlobalShortcut.keys) 呼出 LeXi", "在任何应用中按 \(GlobalShortcut.keys) 呼出 LeXi，再按一次隐藏；优先于其他应用自己的 \(GlobalShortcut.keys)") }
+                Toggle(isOn: Binding(get: { loginItem }, set: { on in
+                    message = LoginItem.set(on)
+                    loginItem = LoginItem.enabled
+                })) { SettingLabel("登录时打开 LeXi", "登录 Mac 后即可用 \(GlobalShortcut.keys) 呼出") }
+                if let message {
+                    Label(message, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
+                }
+            }
+            .onAppear {
+                loginItem = LoginItem.enabled
+                if GlobalShortcut.shared.unavailable { message = "⌘2 已被其他应用注册为全局快捷键，暂时无法使用。" }
+                else if LoginItem.needsApproval { message = "请在“系统设置 → 通用 → 登录项”中允许 LeXi。" }
             }
             Section("键盘快捷键") {
                 ForEach(Self.shortcuts, id: \.0) { action, keys in
@@ -190,7 +212,7 @@ struct GeneralSettings: View {
         .formStyle(.grouped)
     }
 
-    private static let shortcuts = [("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
+    private static let shortcuts = [("呼出 / 隐藏 LeXi（任何应用中）", GlobalShortcut.keys), ("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
         ("重新生成", "⌘R"), ("后退 / 前进", "⌘[  ⌘]"), ("查询历史", "⌘Y"), ("设置", "⌘,")]
 }
 
