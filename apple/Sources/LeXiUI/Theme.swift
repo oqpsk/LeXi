@@ -21,6 +21,11 @@ public enum LexiTheme {
             : .labelColor
     })
     public static let gold = Color(nsColor: goldColor)
+    // The TL;DR card: a clear pale pink on light glass, a soft rose wash on dark glass.
+    static let quickReadFill = Color(nsColor: NSColor(name: "LexiQuickRead") { appearance in
+        NSColor(srgbRed: 1, green: 0xAD / 255.0, blue: 0xD2 / 255.0,
+                alpha: appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? 0.12 : 0.26)
+    })
     public static func lexical(_ size: CGFloat, weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .serif) }
     public static func chineseExample(_ size: CGFloat) -> Font { .custom("Songti SC", size: size) }
 }
@@ -28,7 +33,9 @@ public enum LexiTheme {
 // Every LeXi window is a pane of Liquid Glass, like Control Center: the desktop shows through,
 // blurred and refracted, as light or dark glass that follows the appearance (and takes on the
 // wallpaper's color, as system glass does). Light windows keep regular glass: clear glass leaves
-// text unreadable over a busy desktop. With Reduce Transparency the system makes it more opaque.
+// text unreadable over a busy desktop. Light glass is also tinted toward white, so over a dark
+// desktop it reads as frosted white rather than grey. With Reduce Transparency the system makes
+// it more opaque.
 struct WindowGlass: NSViewRepresentable {
     func makeNSView(context: Context) -> WindowGlassView { WindowGlassView() }
     func updateNSView(_ view: WindowGlassView, context: Context) {}
@@ -36,6 +43,8 @@ struct WindowGlass: NSViewRepresentable {
 
 final class WindowGlassView: NSView {
     let glass = NSGlassEffectView()
+    // Light glass over a dark desktop turns grey; a white wash above it keeps it frosted white.
+    let wash = NSView()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -43,9 +52,25 @@ final class WindowGlassView: NSView {
         glass.frame = bounds
         glass.autoresizingMask = [.width, .height]
         addSubview(glass)
+        wash.wantsLayer = true
+        wash.frame = bounds
+        wash.autoresizingMask = [.width, .height]
+        addSubview(wash)
+        updateWash()
     }
 
     required init?(coder: NSCoder) { nil }
+
+    private func updateWash() {
+        let light = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) != .darkAqua
+        // A shade under white, so the white glass of the query capsule and buttons still stands out.
+        wash.layer?.backgroundColor = light ? NSColor(white: 0.965, alpha: 0.6).cgColor : NSColor.clear.cgColor
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateWash()
+    }
 
     // The glass reaches the desktop only through a transparent window.
     override func viewDidMoveToWindow() {
@@ -80,9 +105,19 @@ public enum AppearanceChoice: String, CaseIterable, Identifiable, Sendable {
 }
 
 extension View {
-    // A grouped content surface, like the groups in System Settings.
+    // A grouped content surface, like the groups in System Settings: white on light glass, a faint
+    // lift on dark glass.
     func contentGroup(cornerRadius: CGFloat = 18) -> some View {
-        background(.quinary, in: .rect(cornerRadius: cornerRadius, style: .continuous))
+        modifier(ContentGroup(cornerRadius: cornerRadius))
+    }
+}
+
+private struct ContentGroup: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var scheme
+    func body(content: Content) -> some View {
+        content.background(scheme == .dark ? AnyShapeStyle(.quinary) : AnyShapeStyle(.white.opacity(0.7)),
+                           in: .rect(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 
@@ -160,4 +195,24 @@ struct FlowLayout: Layout {
 @MainActor func copyToPasteboard(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
+}
+
+extension View {
+    // The query capsule's glass on near-white light glass needs an edge to be seen; dark glass
+    // carries its own.
+    func lightGlassEdge(cornerRadius: CGFloat) -> some View {
+        modifier(LightGlassEdge(shape: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)))
+    }
+}
+
+private struct LightGlassEdge<S: InsettableShape>: ViewModifier {
+    let shape: S
+    @Environment(\.colorScheme) private var scheme
+    func body(content: Content) -> some View {
+        if scheme == .dark { content } else {
+            content
+                .overlay(shape.strokeBorder(.black.opacity(0.07), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.07), radius: 6, y: 2)
+        }
+    }
 }

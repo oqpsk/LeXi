@@ -62,6 +62,7 @@ public struct SearchBar: View {
         .padding(.horizontal, 18).padding(.vertical, 12)
         // A Spotlight-like capsule that grows into a rounded rectangle for multi-line text.
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24, style: .continuous))
+        .lightGlassEdge(cornerRadius: 24)
         .onChange(of: store.view.request) { _, _ in editing = false }
         .onChange(of: focused.wrappedValue) { _, active in if !active { editing = false; store.clearInputPreview() } }
         .onReceive(NotificationCenter.default.publisher(for: NSText.didChangeNotification)) { _ in
