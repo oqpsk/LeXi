@@ -446,7 +446,14 @@ struct SpeechSettings: View {
                     HStack {
                         TextField("试听文字", text: $sample).labelsHidden()
                         Button { preview(model, settings) } label: {
-                            Label(speech.speaking ? "停止" : "试听", systemImage: speech.speaking ? "stop.fill" : "play.fill")
+                            Label {
+                                Text(speech.speaking ? "停止" : "试听")
+                            } icon: {
+                                if speech.speaking {
+                                    SpeechWaveform(animate: speech.audioPlaying, size: 14)
+                                        .foregroundStyle(LexiTheme.speechAccent)
+                                } else { Image(systemName: "play.fill") }
+                            }
                         }
                     }
                     if !speech.status.isEmpty {

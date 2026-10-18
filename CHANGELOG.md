@@ -28,6 +28,10 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.25 (Windows / macOS)
+
+- Replace the speech playback square with the approved soft five-bar waveform on headwords, definitions, examples and the settings preview. Keep existing hit targets, hover behavior, optical alignment and click-to-stop. Preparation uses a static waveform; actual playback starts the independent rounded-bar rhythm. Native animation pauses for reduced motion, hidden/unloaded content or minimized/background windows and releases its clocks on removal. Use the shared pink for the headword on dark surfaces and the existing gold for read-aloud blocks; macOS keeps a contrasting native foreground on light glass. Speech providers, audio warm-up, caches and keys are unchanged.
+
 ## 0.9.24 (Windows / macOS)
 
 - Reduce sense-judge output without changing the selected models, effort/speed preferences or the conservative grouping rules. Judges still review every requested pair and select the overview, but return only positive links at confidence >= 0.95 plus the reviewed pair count. Core validates identities/counts and expands omitted pairs to uncertain, so missing links cannot merge senses or create a transitive bridge. Fully enumerated plans remain readable; new judgments use versioned comparison caches. Windows and macOS use the same prompt, schema and decoder through Core/Host; completed saved query views remain unchanged.

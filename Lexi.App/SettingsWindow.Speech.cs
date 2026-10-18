@@ -161,10 +161,15 @@ public sealed partial class SettingsWindow
             {
                 var chosen = SpeechVoiceChoices.Pick(selected.Provider, voice.SelectedItem as SpeechVoice, manual.Text);
                 if (chosen == null) throw new InvalidOperationException("请选择可用声线。");
-                playing = true; preview.Content = "停止";
+                playing = true;
+                var wave = new SpeechWaveform(size: 14);
+                var active = new StackPanel { Orientation = Orientation.Horizontal };
+                active.Children.Add(wave); active.Children.Add(new TextBlock { Text = "停止", Margin = new(6,0,0,0) });
+                preview.Content = active;
                 var key = selected.Provider == "windows" ? null : SuppliedKey(selected.Provider);
                 await playback.PlayAsync(sample.Text, new(selected.Provider, selected.Id, chosen.Id), settings.Online,
-                    text => { if (!closed && request == generation) status.Text = text; }, key);
+                    text => { if (!closed && request == generation) status.Text = text; }, key,
+                    started: () => { if (!closed && request == generation) wave.IsAnimating = true; });
                 if (!closed && request == generation) status.Text = "试听结束";
             }
             catch (OperationCanceledException) { }

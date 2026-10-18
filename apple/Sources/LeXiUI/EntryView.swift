@@ -59,7 +59,12 @@ struct HeadingRow: View {
                 if !view.speechText.isEmpty {
                     let playing = speech.speakingID == "heading"
                     Button { speech.toggle(view.speechText, using: store) } label: {
-                        Image(systemName: playing ? "stop.fill" : "speaker.wave.2.fill")
+                        if playing {
+                            SpeechWaveform(animate: speech.audioPlaying)
+                                .foregroundStyle(LexiTheme.speechAccent)
+                        } else {
+                            Image(systemName: "speaker.wave.2.fill")
+                        }
                     }
                     .help(playing ? "停止播放" : "播放合成发音")
                     .accessibilityLabel(playing ? "停止合成发音" : "播放合成发音")
