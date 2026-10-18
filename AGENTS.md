@@ -48,7 +48,7 @@ Rules are grouped by where they apply. Shared behavior belongs to `Lexi.Core` an
 - Preserve existing executable, IPC, AppUserModelID and userdata identities for upgrade compatibility. Windows keeps the portable `userdata` and `data` folders beside the program.
 - Use vector geometry for UI icons. Keep selected text legible and exclude interactive controls from window dragging; system backdrops must retain an opaque fallback.
 - Keep bilingual definitions readable at 20/18 DIP. Use English serif italic parts of speech in the warm accent, upright serif spellings, italic English serif examples and upright Chinese serif example translations. Keep mixed-font word-form labels and spellings on one typographic baseline.
-- Keep search-row controls aligned with consistent icon and hit-target sizes. Use a compact indeterminate status ring with hover and keyboard-accessible stage details, a completion check and a distinct incomplete-state symbol.
+- Keep search-row controls aligned with consistent icon and hit-target sizes. Use the shared phase-aware soft matrix while busy, with hover and keyboard-accessible stage details, a completion check and a distinct incomplete-state symbol. Keep the query-row mark unframed and the existing hit target fixed.
 - Keep IPA legible at 20 DIP on the same text baseline as the headword, with model-only provenance in a smaller adjacent label; allow long headings to wrap.
 - Keep query status in the single bottom bar, regeneration visibly styled as a button and online mode as an accessible two-state switch.
 - Local speech uses Windows SAPI voices; speech keys use Windows current-user data protection.
