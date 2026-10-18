@@ -13,7 +13,7 @@ internal static partial class Program
         var tabs = Contents(settings).OfType<TabControl>().Single();
         tabs.SelectedIndex = 0;
         Measure((FrameworkElement)settings.Content, 538, 478);
-        var models = Descendants((DependencyObject)settings.Content).OfType<ComboBox>().ToArray();
+        var models = Descendants((DependencyObject)settings.Content).OfType<ComboBox>().Where(p => p.ItemsSource is System.Collections.Generic.IEnumerable<ModelChoice>).ToArray();
         Check(models.Length == 3 && models[0].SelectedItem.ToString()!.Contains("Sol") &&
             models[1].SelectedItem.ToString()!.Contains("Haiku") && models[2].SelectedItem.ToString()!.Contains("Luna"),
             "settings show the preserved primary, complementary secondary and independent judge");

@@ -8,7 +8,7 @@ namespace Lexi;
 public sealed partial class SettingsWindow
 {
     private sealed record CompatibleDraft(Func<string> BaseUrl, Func<bool> Streaming, Func<bool> Save);
-    private CompatibleDraft AddCompatibleConnection(TabItem tab, AppSettings settings, Action<string[]> models,
+    private CompatibleDraft AddCompatibleConnection(TabItem tab, AppSettings settings, Action<string, ModelChoice[]> models,
         Func<bool> online, CompatibleTextClient? suppliedClient, string? suppliedRoot)
     {
         var client = suppliedClient ?? new();
@@ -48,7 +48,7 @@ public sealed partial class SettingsWindow
         {
             generation++; request?.Cancel(); refresh.IsEnabled = true;
             if (endpointChanged) { id.Clear(); secret.Clear(); api.Clear(); remove.IsChecked = false; }
-            models([]); SavedState(); status.Text = "请读取模型列表，再选择要使用的模型。";
+            models(url.Text, []); SavedState(); status.Text = "请读取模型列表，再选择要使用的模型。";
         }
         CompatibleCredentials Credentials()
         {
@@ -70,14 +70,18 @@ public sealed partial class SettingsWindow
             try
             {
                 if (!online()) throw new CompatibleException("offline", "请先开启在线补充，再读取模型列表。");
-                var available = await client.ModelsAsync(Endpoint(), Credentials(), token);
+                var available = await client.ModelChoicesAsync(Endpoint(), Credentials(), token);
                 if (current != generation || token.IsCancellationRequested) return;
-                models(available);
+                models(Endpoint(), available);
+                var endpoint = Endpoint();
                 status.Text = available.Length == 0 ? "鉴权成功，服务端暂未提供可用模型。" : $"已读取 {available.Length} 个模型。返回“查询与模型”选择主要模型、第二模型或义项判断模型。";
+                await InferenceOptions.Remember(suppliedRoot ?? App.UserRoot, CompatibleText.Provider, endpoint, available, token);
             }
             catch (OperationCanceledException) { }
             catch (CompatibleException e) { if (current == generation) status.Text = e.Message; }
-            finally { if (current == generation && !connectionLifetime.IsCancellationRequested) refresh.IsEnabled = true; }
+            catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException)
+            { if (current == generation) _ = Dispatcher.BeginInvoke(() => status.Text = "模型已读取，能力信息暂时无法保存到本机。请检查文件夹权限。"); }
+            finally { if (current == generation && !connectionLifetime.IsCancellationRequested) _ = Dispatcher.BeginInvoke(() => refresh.IsEnabled = true); }
         };
         Closed += (_, _) => { request?.Cancel(); request?.Dispose(); if (suppliedClient == null) client.Dispose(); };
         SavedState();

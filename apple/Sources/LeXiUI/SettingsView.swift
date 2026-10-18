@@ -55,15 +55,17 @@ struct QuerySettings: View {
                     modelPicker(SettingLabel("主要模型", "用于查词与文本翻译"), store.queryModels, selected: settings.provider + ":" + settings.model) { choice in
                         ["provider": .string(choice.provider), "model": .string(choice.id)]
                     }
+                    inferenceControls(store.queryModels, selected: settings.provider + ":" + settings.model)
                     toggle(SettingLabel("双模型同时查词", "两个模型独立查词，先返回的释义先显示"), settings.parallelLookup, "parallelLookup")
                     modelPicker(SettingLabel("第二个查询模型", "须与主要模型不同"), store.queryModels, selected: secondaryKey(settings)) { choice in
                         ["secondaryProvider": .string(choice.provider), "secondaryModel": .string(choice.id)]
                     }
                     .disabled(!settings.parallelLookup)
+                    inferenceControls(store.queryModels, selected: secondaryKey(settings)).disabled(!settings.parallelLookup)
                 } header: {
                     Text("查询模型")
                 } footer: {
-                    Note("使用本机模型订阅或“账号”中连接的自定义文本服务。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Claude 关闭额外思考，Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。")
+                    Note("使用本机模型订阅或“账号”中连接的自定义文本服务。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Effort 和速度分别控制思考深度与服务档位。同一模型共用配置；OAuth 订阅与自定义 API 分开保存。")
                 }
                 Section {
                     toggle(SettingLabel("自动整理同类义项", "合并重复的说法，包含单个模型内部"), settings.mergeSenses, "mergeSenses")
@@ -71,6 +73,7 @@ struct QuerySettings: View {
                         ["judgeProvider": .string(choice.provider), "judgeModel": .string(choice.id)]
                     }
                     .disabled(!settings.mergeSenses)
+                    inferenceControls(store.judgeChoices, selected: (settings.judgeProvider ?? "codex") + ":" + settings.judgeModel).disabled(!settings.mergeSenses)
                 } header: {
                     Text("义项整理")
                 } footer: {
@@ -106,6 +109,25 @@ struct QuerySettings: View {
         } label: { label }
     }
 
+    @ViewBuilder
+    private func inferenceControls(_ models: [ModelChoice], selected: String) -> some View {
+        if let model = models.first(where: { $0.key == selected }), let options = model.options {
+            inferencePicker("Effort · 思考深度", options.effortChoices, value: model.effort ?? "") { value in
+                Task { error = await store.configureInference(model, effort: value, speed: model.speed ?? "") }
+            }
+            inferencePicker("速度", options.speedChoices, value: model.speed ?? "") { value in
+                Task { error = await store.configureInference(model, effort: model.effort ?? "", speed: value) }
+            }
+            if !options.note.isEmpty { Text(options.note).font(.callout).foregroundStyle(.secondary) }
+        }
+    }
+    private func inferencePicker(_ title: String, _ options: [InferenceOption], value: String, change: @escaping (String) -> Void) -> some View {
+        Picker(title, selection: Binding(get: { value }, set: change)) {
+            ForEach(options) { Text($0.label).tag($0.id) }
+            if !options.contains(where: { $0.id == value }) { Text(value + "（当前不可用）").tag(value) }
+        }
+        .disabled(options.count <= 1 && value.isEmpty)
+    }
     private func apply(_ changes: [String: SettingValue]) {
         Task { error = await store.update(changes) }
     }
@@ -197,10 +219,22 @@ struct DictionarySettings: View {
 struct ConnectionSettings: View {
     @Bindable var store: LexiStore
     @State private var codexPath = ""
+    @State private var readingModels = false
+    @State private var modelStatus = ""
 
     var body: some View {
         Form {
             CompatibleConnectionSettings(store: store)
+            Section {
+                Button(readingModels ? "正在读取…" : "读取 OAuth 订阅模型") {
+                    readingModels = true
+                    Task {
+                        modelStatus = await store.readSubscriptionModels() ?? "已更新订阅模型与可用档位。"
+                        readingModels = false
+                    }
+                }.disabled(readingModels)
+                if !modelStatus.isEmpty { Text(modelStatus).font(.callout).foregroundStyle(.secondary) }
+            }
             Section {
                 ProviderRow(store: store, provider: "codex", title: "ChatGPT · Codex", symbol: "sparkles", install: "https://learn.chatgpt.com/docs/cli")
                 LabeledContent {

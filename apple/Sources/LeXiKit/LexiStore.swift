@@ -146,6 +146,20 @@ public final class LexiStore {
         catch let error as HostError { return error.message }
         catch { return error.localizedDescription }
     }
+    public func configureInference(_ model: ModelChoice, effort: String, speed: String) async -> String? {
+        guard let client else { return nil }
+        do {
+            settings = try await client.call("inference.configure", ["provider": model.provider, "model": model.id, "effort": effort, "speed": speed])
+            return nil
+        } catch let error as HostError { return error.message }
+        catch { return error.localizedDescription }
+    }
+    public func readSubscriptionModels() async -> String? {
+        guard let client else { return nil }
+        do { settings = try await client.call("inference.models"); return nil }
+        catch let error as HostError { return error.message }
+        catch { return error.localizedDescription }
+    }
     public func refreshSettings() async {
         if let payload = try? await client?.call("settings.get") as SettingsPayload? { settings = payload }
     }
@@ -171,7 +185,9 @@ public final class LexiStore {
     public func clearCompatibleModels() { compatibleModels = []; compatibleModelsEndpoint = "" }
     public func textModels(_ baseUrl: String, credentials: TextCredentials) async throws -> [ModelChoice] {
         guard let client else { throw HostError.exited }
-        return try await client.call("text.models", TextRequest(baseUrl: baseUrl, credentials: credentials), as: TextModels.self).models
+        let models = try await client.call("text.models", TextRequest(baseUrl: baseUrl, credentials: credentials), as: TextModels.self).models
+        await refreshSettings()
+        return models
     }
     public func keepTextModels(_ models: [ModelChoice], baseUrl: String) {
         compatibleModels = models; compatibleModelsEndpoint = (try? TextCredentials.endpoint(baseUrl)) ?? ""

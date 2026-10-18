@@ -34,6 +34,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 功能 | 共享行为（Lexi.Core） | Windows | macOS |
 |---|---|---|---|
 | 查询与模型设置 | `AppSettings`、`ModelCatalog`（模型选项与校验）、`QuerySession.SettingsSaved` | 已实现 | 已实现：系统设置风格的分组表单，修改即生效，校验与提示同 Windows |
+| 模型 effort / 速度与接入模式标注 | `InferenceOptions`、模型能力缓存、Chat Completions 参数和官方 CLI 参数 | 已实现：各模型下共用两个配置项；OAuth/API 分开保存；读取列表更新能力 | 已实现：原生设置使用 Host 同一能力和校验；无固定 Low/Fast 标签 |
 | 离线词典启停与信息 | `DictionaryCatalog` | 已实现：设置 → 离线词典 | 已实现：设置 → 离线词典；安装词库需 PowerShell 7 运行同一安装脚本 |
 | 自定义 OpenAI 兼容文本服务 | `CompatibleTextClient` / `CompatibleDictionary`：直接请求 HTTPS `/models`、`/chat/completions`；每次携带 CF Access 鉴权与 LeXi/版本号，API Key 可留空；JSON/SSE、取消、错误清理及端点隔离的缓存；用于查词、翻译和义项整理 | 已实现：设置 → 账号连接 → 自定义文本服务；读取列表后在“查询与模型”明确选择，凭据按地址由 Windows 当前用户加密 | 已实现：设置 → 账号 → 自定义文本服务；读取列表并保存连接后在“查询”选择，凭据按地址保存在 Keychain；内置本地 Host 直接请求服务 |
 | 官方客户端登录与状态 | `ProviderConnection`、`ToolLocator`（不依赖 shell PATH） | 已实现：设置 → 账号连接 | 已实现：在“终端”中打开官方登录，完成后点击“检查状态” |

@@ -1,11 +1,15 @@
 namespace Lexi.Core;
 
-public sealed class CompatibleDictionary(string assets, CompatibleTextClient client, Func<string, CompatibleCredentials> credentials)
+public sealed class CompatibleDictionary(string assets, CompatibleTextClient client, Func<string, CompatibleCredentials> credentials, string userRoot)
 {
-    private Task<string> Run(string prompt, string schema, string instructions, AppSettings settings, CancellationToken token, Action<string>? preview = null) =>
-        client.CompleteAsync(settings.CompatibleBaseUrl, settings.Model, settings.CompatibleStreaming, credentials(settings.CompatibleBaseUrl),
+    private Task<string> Run(string prompt, string schema, string instructions, AppSettings settings, CancellationToken token, Action<string>? preview = null)
+    {
+        InferenceOptions.ValidateRequest(settings, userRoot);
+        var selected = InferenceOptions.Selected(settings, LookupModel.Primary(settings));
+        return client.CompleteAsync(settings.CompatibleBaseUrl, settings.Model, settings.CompatibleStreaming, credentials(settings.CompatibleBaseUrl),
             File.ReadAllText(Path.Combine(assets, instructions)) + "\nReturn one complete JSON object only, using this schema:\n" + File.ReadAllText(Path.Combine(assets, schema)),
-            prompt, token, preview);
+            prompt, token, preview, selected.Effort, selected.Speed);
+    }
     public async Task<AiEntry> LookupAsync(string query, OnlineEntry? evidence, AppSettings settings, CancellationToken token, IProgress<AiEntry> preview)
     {
         var result = await Run(CodexDictionary.DefineRequest(query, evidence), "dictionary.schema.json", "dictionary.instructions.txt", settings, token, text =>

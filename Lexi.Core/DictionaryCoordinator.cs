@@ -16,7 +16,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         legacy = saved == null;
         if (legacy) saved = cache.Read<AiEnvelope>("ai-v5", model.CacheKey(query, settings)) ?? cache.Read<AiEnvelope>("ai-v4", model.CacheKey(query, settings)) ?? cache.Read<AiEnvelope>("ai-v3", model.CacheKey(query, settings));
         if (saved == null || saved.Provider != model.Provider || saved.Model != model.Model ||
-            saved.ReasoningEffort != settings.ReasoningEffort || (saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence) && !(legacy && query == Queries.Normalize(query) && saved.EvidenceHash == CodexDictionary.LegacyEvidenceHash(evidence)))) return null;
+            saved.ReasoningEffort != InferenceOptions.EnvelopeEffort(settings, model) || (saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence) && !(legacy && query == Queries.Normalize(query) && saved.EvidenceHash == CodexDictionary.LegacyEvidenceHash(evidence)))) return null;
         try { return saved with { Entry = CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(saved.Entry, Json.Options), query, evidence) }; }
         catch (Exception e) when (ExpectedFailure(e)) { return null; }
     }
@@ -75,7 +75,7 @@ public sealed class DictionaryCoordinator(Cache cache,
                 lock (sync) { closed[i] = true; answers[i] = new(model, ModelPhase.Complete, result); Publish(); }
                 if (result.Found)
                     await Write(CacheKind, model.CacheKey(query, settings), new AiEnvelope(result, CodexDictionary.EvidenceHash(evidence),
-                        DateTimeOffset.UtcNow, model.Model, settings.ReasoningEffort, model.Provider), token);
+                        DateTimeOffset.UtcNow, model.Model, InferenceOptions.EnvelopeEffort(settings, model), model.Provider), token);
             }
             catch (Exception ex) when (ExpectedFailure(ex) || ex is OperationCanceledException && !token.IsCancellationRequested)
             {
@@ -122,8 +122,8 @@ public sealed class DictionaryCoordinator(Cache cache,
     }
 
     private static string MergeKey(SenseMergeRequest request, AppSettings settings) => settings.JudgeProvider == CompatibleText.Provider
-        ? request.InputHash + ":compatible:" + CompatibleText.Scope(settings) + ":" + settings.JudgeModel
-        : request.InputHash + ":" + settings.JudgeModel;
+        ? request.InputHash + ":compatible:" + CompatibleText.Scope(settings) + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, new(settings.JudgeProvider, settings.JudgeModel))
+        : request.InputHash + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, new(settings.JudgeProvider, settings.JudgeModel));
 
     private async Task Write<T>(string kind, string key, T value, CancellationToken token)
     {

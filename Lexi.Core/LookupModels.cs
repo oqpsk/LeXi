@@ -4,8 +4,8 @@ namespace Lexi.Core;
 
 public sealed record LookupModel(string Provider, string Model)
 {
-    public string Name => Provider == CompatibleText.Provider ? "自定义 · " + Model : Provider == "claude" ? Model switch
-    { "haiku" => "Claude Haiku", "sonnet" => "Claude Sonnet", "opus" => "Claude Opus", _ => "Claude " + Model } : Model switch
+    public string Name => Provider == CompatibleText.Provider ? Model : Provider == "claude" ? Model switch
+    { "haiku" => "Claude Haiku", "sonnet" => "Claude Sonnet", "opus" => "Claude Opus", "default" => "Claude 默认", _ => "Claude " + Model } : Model switch
     { "gpt-6-luna" => "GPT-6 Luna", "gpt-6.1-sol" => "GPT-6.1 Sol", "" => "Codex 默认", _ => Model };
     public static LookupModel Primary(AppSettings settings) => new(settings.Provider, settings.Model);
     public static LookupModel Secondary(AppSettings settings) => string.IsNullOrWhiteSpace(settings.SecondaryProvider)
@@ -13,9 +13,13 @@ public sealed record LookupModel(string Provider, string Model)
         : new(settings.SecondaryProvider, settings.SecondaryModel);
     public static LookupModel[] Selected(AppSettings settings) =>
         (settings.ParallelLookup ? new[] { Primary(settings), Secondary(settings) } : [Primary(settings)]).Distinct().ToArray();
-    public string CacheKey(string query, AppSettings settings) => Provider == CompatibleText.Provider
+    public string CacheKey(string query, AppSettings settings)
+    {
+        if (InferenceOptions.Profile(settings, this) is { } profile) return JsonSerializer.Serialize(new { query, Provider, Model, endpoint = Provider == CompatibleText.Provider ? CompatibleText.Scope(settings) : "", profile.Effort, speed = InferenceOptions.CanonicalSpeed(profile.Speed) }, Json.Options);
+        return Provider == CompatibleText.Provider
         ? JsonSerializer.Serialize(new { query, Provider, Model, endpoint = CompatibleText.Scope(settings), settings.ReasoningEffort, settings.ServiceTier }, Json.Options)
         : JsonSerializer.Serialize(new { query, Provider, Model, settings.ReasoningEffort, settings.ServiceTier }, Json.Options);
+    }
 }
 
 public enum ModelPhase { Pending, Streaming, Complete, Failed, Offline }

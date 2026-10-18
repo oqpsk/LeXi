@@ -41,7 +41,10 @@ public sealed partial class SettingsWindow : Window
         general.Children.Add(Text("使用本机模型订阅或自定义文本服务。两个模型独立查词，先返回的释义先显示。文本翻译使用主要模型。", 14, Muted));
         general.Children.Add(Text("查过的内容直接使用缓存。切换模型后，点击“重新生成”才会更新已有结果。", 14, Muted));
         var label = Text("主要模型 · 查词与翻译"); label.Margin = new(0,13,0,8); general.Children.Add(label);
-        var choices = ModelCatalog.Choices(settings);
+        var draft = settings.ForModel(LookupModel.Primary(settings));
+        var modelRoot = textRoot ?? App.UserRoot;
+        var details = InferenceOptions.Load(modelRoot, "codex").Concat(InferenceOptions.Load(modelRoot, "claude")).Concat(InferenceOptions.Load(modelRoot, CompatibleText.Provider, settings.CompatibleBaseUrl)).ToArray();
+        var choices = ModelCatalog.Choices(draft, details: details);
         var primaryChoice = LookupModel.Primary(settings); var secondChoice = LookupModel.Secondary(settings);
         ComboBox ModelSelector(LookupModel selected, IEnumerable<ModelChoice> available) => new()
         {
@@ -49,31 +52,63 @@ public sealed partial class SettingsWindow : Window
             SelectedItem = choices.First(x => x.Id == selected.Model && x.Provider == selected.Provider), Margin = new(0,0,0,12)
         };
         var model = ModelSelector(primaryChoice, choices); general.Children.Add(model);
+        var primaryOptions = new InferencePicker(draft, "主要模型"); general.Children.Add(primaryOptions);
         var accounts = ConnectionButton("账号登录与连接…"); accounts.HorizontalAlignment = HorizontalAlignment.Left; general.Children.Add(accounts);
         var parallel = new CheckBox { Content = "双模型同时查词", IsChecked = settings.ParallelLookup, Margin = new(0,12,0,12) }; general.Children.Add(parallel);
         var secondaryPanel = new StackPanel(); general.Children.Add(secondaryPanel);
         secondaryPanel.Children.Add(Text("第二个查询模型"));
         var secondary = ModelSelector(secondChoice, choices); secondaryPanel.Children.Add(secondary);
+        var secondaryOptions = new InferencePicker(draft, "第二个模型"); secondaryPanel.Children.Add(secondaryOptions);
         var merge = new CheckBox { Content = "自动整理同类义项（包含单模型内部）", IsChecked = settings.MergeSenses, Margin = new(0,6,0,12) }; general.Children.Add(merge);
         var judgePanel = new StackPanel(); general.Children.Add(judgePanel);
         judgePanel.Children.Add(Text("义项判断模型 · Codex 或自定义服务"));
         var judge = ModelSelector(new(settings.JudgeProvider, settings.JudgeModel), ModelCatalog.JudgeChoices(choices)); judgePanel.Children.Add(judge);
+        var judgeOptions = new InferencePicker(draft, "义项判断模型"); judgePanel.Children.Add(judgeOptions);
+        void RefreshOptions()
+        {
+            primaryOptions.Refresh(model.SelectedItem as ModelChoice); secondaryOptions.Refresh(secondary.SelectedItem as ModelChoice); judgeOptions.Refresh(judge.SelectedItem as ModelChoice);
+        }
+        model.SelectionChanged += (_, _) => RefreshOptions(); secondary.SelectionChanged += (_, _) => RefreshOptions(); judge.SelectionChanged += (_, _) => RefreshOptions();
+        primaryOptions.Changed += RefreshOptions; secondaryOptions.Changed += RefreshOptions; judgeOptions.Changed += RefreshOptions; RefreshOptions();
         general.Children.Add(Text("同一词义的细分用法可归为一组，优先展示涵盖更完整的原文；其他表述保留在“用法细分”中。不同含义和分歧仍分开。", 14, Muted));
         void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true; }
         parallel.Checked += (_, _) => UpdateParallelControls(); parallel.Unchecked += (_, _) => UpdateParallelControls();
         merge.Checked += (_, _) => UpdateParallelControls(); merge.Unchecked += (_, _) => UpdateParallelControls(); UpdateParallelControls();
         var modelError = Text("", 14, Theme.Brush("Warning")); modelError.Visibility = Visibility.Collapsed; general.Children.Add(modelError);
-        general.Children.Add(Text("Claude 关闭额外思考，释义生成后立即显示。Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。", 14, Muted));
+        general.Children.Add(Text("Effort 和速度分别控制思考深度与服务档位。同一模型共用所选配置；OAuth 订阅与自定义 API 分开保存。", 14, Muted));
         var path = new TextBox { Text = settings.CodexPath, FontSize = 14 };
         var connectionTab = AddConnectionsTab(tabs, path);
-        void RefreshModels(string[] available)
+        void RefreshModels(string endpoint, ModelChoice[] available)
         {
             var primary = model.SelectedItem as ModelChoice; var second = secondary.SelectedItem as ModelChoice; var judgment = judge.SelectedItem as ModelChoice;
-            choices = ModelCatalog.Choices(settings, available);
+            draft.CompatibleBaseUrl = endpoint;
+            details = details.Where(m => m.Provider != CompatibleText.Provider).Concat(available).ToArray();
+            choices = ModelCatalog.Choices(draft, details: details);
             void Set(ComboBox picker, ModelChoice[] values, ModelChoice? selected)
             { picker.ItemsSource = values; picker.SelectedItem = values.FirstOrDefault(c => c.Id == selected?.Id && c.Provider == selected?.Provider); }
             Set(model, choices, primary); Set(secondary, choices, second); Set(judge, ModelCatalog.JudgeChoices(choices), judgment);
         }
+        var subscriptions = ConnectionButton("读取 OAuth 订阅模型"); subscriptions.HorizontalAlignment = HorizontalAlignment.Left;
+        var subscriptionStatus = Text("通过官方 Codex / Claude Code 客户端读取模型与可用档位。", 13, Muted);
+        var connectionPanel = (StackPanel)((ScrollViewer)connectionTab.Content).Content;
+        connectionPanel.Children.Insert(0, subscriptions); connectionPanel.Children.Insert(1, subscriptionStatus);
+        subscriptions.Click += async (_, _) =>
+        {
+            subscriptions.IsEnabled = false;
+            try
+            {
+                if (online.IsChecked != true) { subscriptionStatus.Text = "请先开启在线补充，再读取订阅模型。"; return; }
+                var available = await InferenceOptions.ReadSubscriptions(path.Text.Trim(), connectionLifetime.Token);
+                await InferenceOptions.RememberSubscriptions(modelRoot, available, connectionLifetime.Token);
+                details = details.Where(m => !available.Any(a => a.Provider == m.Provider)).Concat(available).ToArray();
+                RefreshModels(draft.CompatibleBaseUrl, details.Where(m => m.Provider == CompatibleText.Provider).ToArray());
+                subscriptionStatus.Text = $"已读取 {available.Length} 个 OAuth 订阅模型。";
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception e) when (e is InvalidOperationException or TimeoutException or System.ComponentModel.Win32Exception or System.IO.IOException)
+            { subscriptionStatus.Text = "无法读取订阅模型，请检查官方客户端版本、登录状态和网络。"; }
+            finally { if (!connectionLifetime.IsCancellationRequested) subscriptions.IsEnabled = true; }
+        };
         var custom = AddCompatibleConnection(connectionTab, settings, RefreshModels, () => online.IsChecked == true, textMetadata, textRoot);
         var customEntry = ConnectionButton("自定义文本服务…"); customEntry.HorizontalAlignment = HorizontalAlignment.Left;
         general.Children.Insert(general.Children.IndexOf(accounts) + 1, customEntry);
@@ -127,6 +162,13 @@ public sealed partial class SettingsWindow : Window
             try { candidate.CompatibleBaseUrl = custom.BaseUrl(); }
             catch (CompatibleException ex) { modelError.Text = ex.Message; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
             candidate.JudgeProvider = judgeValue.Provider; candidate.JudgeModel = judgeValue.Id;
+            candidate.InferenceProfiles = [.. draft.InferenceProfiles];
+            foreach (var selected in new[] { primaryValue }.Concat(candidate.ParallelLookup ? new[] { secondaryValue } : []).Concat(merge.IsChecked == true ? new[] { judgeValue } : []))
+            {
+                var options = InferenceOptions.Selected(candidate, new(selected.Provider, selected.Id));
+                if (InferenceOptions.ValidateSelection(selected.Capabilities, options.Effort, options.Speed) is { } error)
+                { modelError.Text = error; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
+            }
             candidate.ParallelLookup = parallel.IsChecked == true; candidate.SecondaryProvider = secondaryValue.Provider; candidate.SecondaryModel = secondaryValue.Id;
             if (ModelCatalog.Validate(candidate) is { } invalid)
             { modelError.Text = invalid; modelError.Visibility = Visibility.Visible; modelError.BringIntoView(); return; }
@@ -143,7 +185,7 @@ public sealed partial class SettingsWindow : Window
             settings.ParallelLookup = parallel.IsChecked == true; settings.MergeSenses = merge.IsChecked == true;
             settings.SecondaryProvider = secondaryValue.Provider; settings.SecondaryModel = secondaryValue.Id;
             settings.JudgeModel = ((ModelChoice)judge.SelectedItem).Id;
-            ModelCatalog.ApplyFixedOptions(settings); DialogResult = true;
+            settings.InferenceProfiles = [.. draft.InferenceProfiles]; DialogResult = true;
         };
     }
     private static void Open(string target)

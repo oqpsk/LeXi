@@ -25,6 +25,12 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.21 (Windows / macOS)
+
+- Separate model identity from inference preferences. Label subscription choices as OAuth and direct endpoint choices as custom API; show effort and speed beneath each model using the same shared capability rules. Save explicit preferences per provider/model and, for APIs, per endpoint. The same model selected in multiple roles shares its settings.
+- Read effort levels and service tiers from authenticated API model metadata and the official Codex model-list and Claude initialization interfaces, retaining public capability metadata locally for reopening. Offer defaults for unadvertised capabilities; offer Fast or faster tiers only when advertised. Preserve an unsupported saved choice visibly until the user changes it.
+- Send selected `reasoning_effort` and `service_tier` in JSON and SSE Chat Completions requests, apply Codex/Claude CLI options without global configuration changes, and include preferences in prepared-worker and generation-cache identities. Remove forced Low/Fast and disabled-thinking settings; keep legacy Codex preferences and complete saved results. Reject unavailable options without silently downgrading or retrying.
+
 ## 0.9.20 (Windows / macOS)
 
 - Add a direct OpenAI-compatible text service for dictionary lookup, translation and optional sense judging. Configure its HTTPS Base URL, enter CF Access Client ID / Client Secret and an optional API key, fetch the authenticated server model list, then explicitly choose a model. Keep existing subscriptions and selections until the user changes them.

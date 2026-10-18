@@ -126,6 +126,7 @@ internal static class CompatibleChecks
             Translation.Key("Text.", "zh", settings) != Translation.Key("Text.", "zh", alternate), "dictionary and translation model caches separate identical model IDs on different endpoints");
         Check(ModelCatalog.Validate(settings) == null && ModelCatalog.Choices(settings, ["new-model", "model-a"]).Any(m => m.Provider == "compatible" && m.Id == "new-model") &&
             ModelCatalog.JudgeChoices(ModelCatalog.Choices(settings)).Any(m => m.Provider == "compatible"), "discovered text models can be selected for lookup, translation and explicit sense judging");
+        await InferenceChecks.Run(root, Check);
         await CheckDictionary(assets, root, settings, credentials, Check);
         Console.WriteLine($"{count} custom text provider checks passed");
     }
@@ -134,7 +135,7 @@ internal static class CompatibleChecks
         var entry = new AiEntry("synthetic", true, [new("noun", "A synthetic concept.", "合成概念", "", "A synthetic example.", "一个合成例句。", [], ChineseTerm: "合成概念", CoreMeaning: true)], "", "unverified", WordForms: [], Etymology: "这是测试词条的语源说明。");
         var json = JsonSerializer.Serialize(entry, Lexi.Core.Json.Options);
         using var client = new CompatibleTextClient(new Handler((_, _) => Task.FromResult(Json(JsonSerializer.Serialize(new { choices = new[] { new { message = new { content = json }, finish_reason = "stop" } } })))));
-        var dictionary = new CompatibleDictionary(assets, client, _ => credentials);
+        var dictionary = new CompatibleDictionary(assets, client, _ => credentials, root);
         var previews = new List<AiEntry>();
         var result = await dictionary.LookupAsync("synthetic", null, settings, default, new ProgressInline<AiEntry>(previews.Add));
         check(result.Senses[0].Chinese == "合成概念" && result.EvidenceStatus == "unverified" && previews.Count > 0,

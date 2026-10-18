@@ -73,7 +73,9 @@ public sealed class CompatibleTextClient : IDisposable
         if (credentials.ApiKey.Length > 0) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", credentials.ApiKey);
         return request;
     }
-    public Task<string[]> ModelsAsync(string baseUrl, CompatibleCredentials credentials, CancellationToken token) => Guard(async cancel =>
+    public async Task<string[]> ModelsAsync(string baseUrl, CompatibleCredentials credentials, CancellationToken token) =>
+        (await ModelChoicesAsync(baseUrl, credentials, token)).Select(m => m.Id).ToArray();
+    public Task<ModelChoice[]> ModelChoicesAsync(string baseUrl, CompatibleCredentials credentials, CancellationToken token) => Guard(async cancel =>
     {
         using var request = Request(HttpMethod.Get, baseUrl, "models", credentials);
         request.Headers.Accept.Add(new("application/json"));
@@ -84,19 +86,21 @@ public sealed class CompatibleTextClient : IDisposable
             throw Protocol();
         var ids = models.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString()! : "").ToArray();
         if (ids.Length > 10000 || ids.Any(id => !CompatibleText.ValidModel(id))) throw Protocol();
-        return ids.Distinct(StringComparer.Ordinal).ToArray();
+        return models.EnumerateArray().Select(m => ModelCatalog.Choice(CompatibleText.Provider, m.GetProperty("id").GetString()!, InferenceOptions.Parse(m))).DistinctBy(m => m.Id).ToArray();
     }, token);
 
     public Task<string> CompleteAsync(string baseUrl, string model, bool streaming, CompatibleCredentials credentials,
-        string instructions, string prompt, CancellationToken token, Action<string>? preview = null) => Guard(async cancel =>
+        string instructions, string prompt, CancellationToken token, Action<string>? preview = null, string effort = "", string speed = "") => Guard(async cancel =>
     {
         if (!CompatibleText.ValidModel(model)) throw new CompatibleException("missing_model", "请先连接自定义文本服务，读取模型列表并选择模型。");
         using var request = Request(HttpMethod.Post, baseUrl, "chat/completions", credentials);
         request.Headers.Accept.Add(new(streaming ? "text/event-stream" : "application/json"));
-        request.Content = new StringContent(JsonSerializer.Serialize(new
-        {
-            model, messages = new[] { new { role = "system", content = instructions }, new { role = "user", content = prompt } }, stream = streaming
-        }, Json.Options), Encoding.UTF8, "application/json");
+        if (!InferenceOptions.ValidEffort(effort) || !InferenceOptions.ValidSpeed(speed)) throw new CompatibleException("invalid_options", "模型 effort 或速度配置无效，请重新选择。");
+        var body = new Dictionary<string, object> { ["model"] = model,
+            ["messages"] = new[] { new { role = "system", content = instructions }, new { role = "user", content = prompt } }, ["stream"] = streaming };
+        if (effort.Length > 0) body["reasoning_effort"] = effort;
+        if (speed.Length > 0) body["service_tier"] = speed;
+        request.Content = new StringContent(JsonSerializer.Serialize(body, Json.Options), Encoding.UTF8, "application/json");
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancel);
         CheckStatus(response);
         var contentType = response.Content.Headers.ContentType?.MediaType;
@@ -120,6 +124,8 @@ public sealed class CompatibleTextClient : IDisposable
         // Never reflect a provider body, redirect location, reason phrase or exception message.
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden || (int)response.StatusCode is >= 300 and <= 399)
             throw new CompatibleException("authentication_failed", $"HTTP {(int)response.StatusCode} · " + CompatibleText.AuthenticationFailed);
+        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)
+            throw new CompatibleException("invalid_options", $"自定义文本服务拒绝了请求（HTTP {(int)response.StatusCode}），请检查模型、effort 和速度档位。未自动降低档位。");
         if (response.StatusCode == HttpStatusCode.TooManyRequests)
             throw new CompatibleException("rate_limited", "自定义文本服务请求过多或额度不足，请稍后重试。");
         if (!response.IsSuccessStatusCode)

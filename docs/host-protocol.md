@@ -53,11 +53,13 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `history.remove` | `query`、`translation` | `{removed, history}` |
 | `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |
 | `settings.update` | `settings`（只含要修改的字段） | 与 Windows 设置相同的校验（修改 `speech*` 字段时也校验发声模型与声线），保存后返回 `settings.get` 的内容 |
+| `inference.models` | — | 通过官方 Codex `model/list` 和 Claude 初始化接口更新订阅模型能力，返回 `settings.get`；不访问凭据文件，离线时不发请求 |
+| `inference.configure` | `provider`、`model`、`effort`、`speed` | 按当前模型能力校验并保存两个配置项，返回 `settings.get`；空字符串使用服务默认；不自动降低档位 |
 | `settings.setOnline` | `online` | 切换在线补充并返回设置 |
 | `dictionaries.list` | — | `{dictionaries, folder}` |
 | `connection.status` | `provider`（`codex` 或 `claude`），可选 `codexPath` | `{installed, signedIn, message}`，只含经过清理的摘要 |
 | `connection.loginCommand` | `provider`，可选 `codexPath` | `{fileName, arguments, path, clearEnvironment}` 或 `null`。前端仅在用户点击后在终端中运行，并清除 `clearEnvironment` 中的变量 |
-| `text.models` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{models: [{provider, id, label}]}`；鉴权后读取列表，API Key 可留空；不保存凭据、不自动选择模型；离线时不发请求 |
+| `text.models` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{models: [{provider, id, label, options}]}`；鉴权后读取列表，API Key 可留空；不保存凭据、不自动选择模型；离线时不发请求 |
 | `text.credentials` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{}`；按端点绑定到本次 Host 的进程内存，用于后续查词、翻译和义项整理；前端负责 Keychain 持久化，Host 不回传或记录这些值 |
 | `speech.models` | — | `{models: [{provider, id, name, local}]}`；第一项是本机系统声线（`local` 为 `true`），其余为在线模型 |
 | `speech.voices` | `provider`、`model` | `{voices: [{id, name}]}`：该模型的在线声线；本机声线由前端从系统读取，这里为空 |
@@ -69,7 +71,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 
 ## 自定义文本服务
 
-`provider = compatible` 可用于主要模型、第二模型，以及 `judgeProvider = compatible` 的义项判断模型。普通设置只包含 `compatibleBaseUrl`、`compatibleStreaming`、模型 ID 和服务标识；`judgeProvider` 默认 `codex`，保留旧设置的含义。模型列表先通过 `text.models` 获取，再由用户明确选择。
+`provider = compatible` 可用于主要模型、第二模型，以及 `judgeProvider = compatible` 的义项判断模型。普通设置只包含 `compatibleBaseUrl`、`compatibleStreaming`、模型 ID、服务标识和非敏感的 `inferenceProfiles`；`judgeProvider` 默认 `codex`，保留旧设置的含义。模型列表先通过 `text.models` 获取，再由用户明确选择。模型选项附带 `options`（`efforts`、`speeds`、`effortChoices`、`speedChoices`、`note`），`settings.get` 的模型还附带当前 `effort`、`speed`；旧客户端可忽略新增字段。只有服务端提供的档位可选，能力元数据按端点缓存且不含凭据。`inferenceProfiles` 按服务、模型和端点哈希区分，原有 Codex 选项继续作为尚未配置模型的兼容默认值。
 
 原生前端从本机 Keychain 读取凭据，通过私有标准输入管道调用 `text.credentials`；Host 仅在进程内持有，并直接向配置的服务发出 HTTPS 请求，不经过额外服务器。不要记录请求参数或私有管道消息。错误只返回经过清理的中文提示及 `missing_credentials` / `authentication_failed` / `invalid_response` 等代码。401/403 不降级或重试；取消同时作用于 HTTP 发送及响应读取。SSE 未正常结束时不能作为完成结果缓存。
 

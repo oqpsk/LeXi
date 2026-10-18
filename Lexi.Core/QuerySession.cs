@@ -43,16 +43,16 @@ public sealed class QuerySession : IDisposable
         claude = new(paths.AssetRoot, paths.UserRoot); secondaryClaude = new(paths.AssetRoot, paths.UserRoot);
         compatibleClient = textClient ?? new(); ownsCompatibleClient = textClient == null;
         var compatible = new CompatibleDictionary(paths.AssetRoot, compatibleClient, textCredentials ?? (url =>
-            compatibleCredentials.GetValueOrDefault(CompatibleText.NormalizeBase(url)) ?? new()));
+            compatibleCredentials.GetValueOrDefault(CompatibleText.NormalizeBase(url)) ?? new()), paths.UserRoot);
         warmClients = providers == null;
         this.providers = providers ?? new((model, query, evidence, options, token, preview) => model.Provider == CompatibleText.Provider
                 ? compatible.LookupAsync(query, evidence, options, token, preview) : model.Provider == "claude"
-                ? (model == LookupModel.Primary(Settings) ? claude : secondaryClaude).LookupAsync(query, evidence, model.Model, token, preview)
+                ? (model == LookupModel.Primary(Settings) ? claude : secondaryClaude).LookupAsync(query, evidence, options, token, preview)
                 : codex.LookupAsync(query, evidence, options, token),
             (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.JudgeAsync(request, options, token) : codex.JudgeSensesAsync(request, options, token),
             (text, target, options, token, preview) => options.Provider == CompatibleText.Provider
                 ? compatible.TranslateAsync(text, target, options, token, preview) : options.Provider == "claude"
-                ? claude.TranslateAsync(text, target, options.Model, token, preview) : codex.TranslateAsync(text, target, options, token));
+                ? claude.TranslateAsync(text, target, options, token, preview) : codex.TranslateAsync(text, target, options, token));
         this.clock = clock ?? TimeProvider.System;
         View = Build();
     }
@@ -137,10 +137,10 @@ public sealed class QuerySession : IDisposable
     public void UpdatePreparedModel()
     {
         if (!warmClients) return;
-        if (Settings.Online && Settings.AutoAi && Settings.Provider == "claude") claude.Prepare(Settings.Model);
+        if (Settings.Online && Settings.AutoAi && Settings.Provider == "claude") claude.Prepare(Settings.ForModel(LookupModel.Primary(Settings)));
         else claude.ReleasePrepared();
         var second = LookupModel.Secondary(Settings);
-        if (Settings.Online && Settings.AutoAi && Settings.ParallelLookup && second.Provider == "claude" && second != LookupModel.Primary(Settings)) secondaryClaude.Prepare(second.Model);
+        if (Settings.Online && Settings.AutoAi && Settings.ParallelLookup && second.Provider == "claude" && second != LookupModel.Primary(Settings)) secondaryClaude.Prepare(Settings.ForModel(second));
         else secondaryClaude.ReleasePrepared();
     }
 

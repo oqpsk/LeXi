@@ -149,9 +149,34 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
                 return new { removed = entry != null && session.RemoveHistory(entry), history = History() };
             }
             case "text.models":
+            {
                 if (!session.Settings.Online) throw new HostException("offline", "请先开启在线补充，再读取模型列表。");
-                return new { models = (await text.ModelsAsync(Text(p, "baseUrl"), TextCredentials(p), token))
-                    .Select(id => new ModelChoice("自定义 · " + id, id, CompatibleText.Provider)).ToArray() };
+                var endpoint = Text(p, "baseUrl");
+                var models = await text.ModelChoicesAsync(endpoint, TextCredentials(p), token);
+                await InferenceOptions.Remember(session.Paths.UserRoot, CompatibleText.Provider, endpoint, models, token);
+                return new { models };
+            }
+            case "inference.models":
+            {
+                if (!session.Settings.Online) throw new HostException("offline", "请先开启在线补充，再读取模型列表。");
+                try
+                {
+                    var models = await InferenceOptions.ReadSubscriptions(session.Settings.CodexPath, token);
+                    await InferenceOptions.RememberSubscriptions(session.Paths.UserRoot, models, token);
+                    return Settings();
+                }
+                catch (Exception e) when (e is InvalidOperationException or TimeoutException or System.ComponentModel.Win32Exception or IOException)
+                { throw new HostException("model_discovery_failed", "无法读取订阅模型，请检查官方客户端版本、登录状态和网络。"); }
+            }
+            case "inference.configure":
+            {
+                var model = InferenceOptions.Available(session.Paths.UserRoot, session.Settings).FirstOrDefault(m => m.Provider == Text(p, "provider") && m.Id == Text(p, "model"))
+                    ?? throw new HostException("invalid_settings", "请先读取模型列表并选择模型。");
+                var previous = session.QuerySettingsIdentity();
+                try { InferenceOptions.Configure(session.Settings, model, Text(p, "effort", ""), Text(p, "speed", "")); }
+                catch (InvalidOperationException e) { throw new HostException("invalid_settings", e.Message); }
+                session.SettingsSaved(previous); return Settings();
+            }
             case "text.credentials":
                 // Process memory only; the front end owns Keychain storage. No secret is echoed.
                 session.SetTextCredentials(Text(p, "baseUrl"), TextCredentials(p));
@@ -219,7 +244,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
     private object Settings()
     {
         var settings = session.Settings;
-        var models = ModelCatalog.Choices(settings);
+        var models = InferenceOptions.Available(session.Paths.UserRoot, settings);
         return new
         {
             settings, models, judgeModels = ModelCatalog.JudgeChoices(models),
@@ -261,7 +286,6 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
         var previous = session.QuerySettingsIdentity();
         foreach (var property in typeof(AppSettings).GetProperties().Where(x => x.CanRead && x.CanWrite))
             property.SetValue(session.Settings, property.GetValue(candidate));
-        ModelCatalog.ApplyFixedOptions(session.Settings);
         session.SettingsSaved(previous);
         return Settings();
     }

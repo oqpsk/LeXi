@@ -82,6 +82,8 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
     private async Task<string> RunAsync(string prompt, string schemaFile, AppSettings settings, CancellationToken token,
         string instructionsFile = "dictionary.instructions.txt", int timeoutSeconds = 70)
     {
+        InferenceOptions.ValidateRequest(settings, userRoot);
+        var selected = InferenceOptions.Selected(settings, LookupModel.Primary(settings));
         var tool = ToolLocator.Codex(settings.CodexPath) ?? throw new ModelAccessException(ModelAccessFailure.ClientMissing);
         var dir = Path.Combine(userRoot, "codex-work");
         Directory.CreateDirectory(dir);
@@ -91,12 +93,13 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
         info.StandardOutputEncoding = Encoding.UTF8; info.StandardErrorEncoding = Encoding.UTF8; info.WorkingDirectory = dir;
         foreach (var arg in new[] { "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "--json",
             "--color", "never", "--output-schema", Path.Combine(assetFolder, schemaFile) }) info.ArgumentList.Add(arg);
-        foreach (var config in new[] { "approval_policy=\"never\"", "web_search=\"disabled\"", "project_doc_max_bytes=0", "model_reasoning_effort=" + JsonSerializer.Serialize(settings.ReasoningEffort),
-            "service_tier=" + JsonSerializer.Serialize(settings.ServiceTier), "features.fast_mode=true",
+        foreach (var config in new[] { "approval_policy=\"never\"", "web_search=\"disabled\"", "project_doc_max_bytes=0", "features.fast_mode=" + (selected.Speed is "fast" or "priority" or "ultrafast" ? "true" : "false"),
             "features.shell_tool=false", "features.apps=false", "features.plugins=false", "features.memories=false", "features.multi_agent=false",
             "features.computer_use=false", "features.browser_use=false", "features.skip_host_skill_discovery=true",
             "model_instructions_file=" + JsonSerializer.Serialize(Path.Combine(assetFolder, instructionsFile)) })
         { info.ArgumentList.Add("-c"); info.ArgumentList.Add(config); }
+        if (selected.Effort != "") { info.ArgumentList.Add("-c"); info.ArgumentList.Add("model_reasoning_effort=" + JsonSerializer.Serialize(selected.Effort)); }
+        if (selected.Speed != "") { info.ArgumentList.Add("-c"); info.ArgumentList.Add("service_tier=" + JsonSerializer.Serialize(selected.Speed == "priority" ? "fast" : selected.Speed)); }
         if (!string.IsNullOrWhiteSpace(settings.Model)) { info.ArgumentList.Add("--model"); info.ArgumentList.Add(settings.Model.Trim()); }
         info.ArgumentList.Add("-");
         // The CLI manages OAuth itself. No access token, refresh token, or auth file is read by Lexi.

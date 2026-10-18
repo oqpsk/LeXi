@@ -74,6 +74,7 @@ public sealed class AppSettings
     public string Provider { get; set; } = "codex";
     public string ServiceTier { get; set; } = "fast";
     public string ReasoningEffort { get; set; } = "low";
+    public InferenceProfile[] InferenceProfiles { get; set; } = [];
     public bool ParallelLookup { get; set; } = true;
     public string SecondaryProvider { get; set; } = "";
     public string SecondaryModel { get; set; } = "";
@@ -91,6 +92,7 @@ public sealed class AppSettings
         var copy = (AppSettings)MemberwiseClone();
         copy.Provider = model.Provider; copy.Model = model.Model;
         copy.DisabledDictionaries = [.. DisabledDictionaries ?? []];
+        copy.InferenceProfiles = [.. InferenceProfiles ?? []];
         return copy;
     }
     public static AppSettings Load(string root)
