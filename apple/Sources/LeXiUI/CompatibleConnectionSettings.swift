@@ -90,7 +90,11 @@ struct CompatibleConnectionSettings: View {
     private func remove() {
         do {
             try keys.remove(baseUrl); invalidate(); clientId = ""; clientSecret = ""; apiKey = ""; saved = false
-            message = "已清除此地址的凭据。"
+            let endpoint = baseUrl
+            Task { @MainActor in
+                await store.forgetTextCredentials(endpoint)
+                message = "已清除此地址的凭据。"
+            }
         } catch { message = error.localizedDescription }
     }
 }

@@ -176,6 +176,9 @@ public final class LexiStore {
     public func keepTextModels(_ models: [ModelChoice], baseUrl: String) {
         compatibleModels = models; compatibleModelsEndpoint = (try? TextCredentials.endpoint(baseUrl)) ?? ""
     }
+    public func forgetTextCredentials(_ baseUrl: String) async {
+        _ = try? await client?.call("text.credentials", TextRequest(baseUrl: baseUrl, credentials: TextCredentials())) as TextConfigured?
+    }
     private func provideTextCredentials() async {
         guard let settings = settings?.settings, settings.online,
               settings.provider == "compatible" || settings.parallelLookup && settings.secondaryProvider == "compatible" || settings.mergeSenses && settings.judgeProvider == "compatible",

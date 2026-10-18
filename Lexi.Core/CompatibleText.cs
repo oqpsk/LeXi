@@ -11,9 +11,9 @@ namespace Lexi.Core;
 // front end's protected store and never serialized as settings, provenance or diagnostic data.
 public sealed class CompatibleCredentials(string clientId = "", string clientSecret = "", string apiKey = "")
 {
-    [JsonIgnore] public string ClientId { get; } = clientId.Trim();
-    [JsonIgnore] public string ClientSecret { get; } = clientSecret.Trim();
-    [JsonIgnore] public string ApiKey { get; } = apiKey.Trim();
+    [JsonIgnore] public string ClientId { get; } = (clientId ?? "").Trim();
+    [JsonIgnore] public string ClientSecret { get; } = (clientSecret ?? "").Trim();
+    [JsonIgnore] public string ApiKey { get; } = (apiKey ?? "").Trim();
     public override string ToString() => "[protected text credentials]";
 }
 
@@ -25,7 +25,7 @@ public static class CompatibleText
     public const string Provider = "compatible";
     public const string DefaultBaseUrl = "https://ai.rwby.io/v1";
     public const string MissingCredentials = "请在设置 → 自定义文本服务中填写 CF Access Client ID 和 Client Secret。";
-    public const string AuthenticationFailed = "自定义文本服务鉴权失败（401/403），请检查 CF Access Client ID、Client Secret 及可选 API Key。";
+    public const string AuthenticationFailed = "自定义文本服务鉴权失败，请检查 CF Access Client ID、Client Secret 及可选 API Key。";
     public const string StorageFailure = "自定义文本服务凭据无法读取或保存，请在设置中重新填写。";
     public static string UserAgent => "LeXi/" + (typeof(CompatibleText).Assembly.GetName().Version?.ToString(3) ?? "0.0.0");
     public static string NormalizeBase(string value)
@@ -80,7 +80,7 @@ public sealed class CompatibleTextClient : IDisposable
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancel);
         CheckStatus(response);
         using var json = JsonDocument.Parse(await ReadJsonAsync(response, cancel));
-        if (!json.RootElement.TryGetProperty("data", out var models) || models.ValueKind != JsonValueKind.Array)
+        if (json.RootElement.ValueKind != JsonValueKind.Object || !json.RootElement.TryGetProperty("data", out var models) || models.ValueKind != JsonValueKind.Array)
             throw Protocol();
         var ids = models.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString()! : "").ToArray();
         if (ids.Length > 10000 || ids.Any(id => !CompatibleText.ValidModel(id))) throw Protocol();
@@ -119,7 +119,7 @@ public sealed class CompatibleTextClient : IDisposable
     {
         // Never reflect a provider body, redirect location, reason phrase or exception message.
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden || (int)response.StatusCode is >= 300 and <= 399)
-            throw new CompatibleException("authentication_failed", CompatibleText.AuthenticationFailed);
+            throw new CompatibleException("authentication_failed", $"HTTP {(int)response.StatusCode} · " + CompatibleText.AuthenticationFailed);
         if (response.StatusCode == HttpStatusCode.TooManyRequests)
             throw new CompatibleException("rate_limited", "自定义文本服务请求过多或额度不足，请稍后重试。");
         if (!response.IsSuccessStatusCode)
@@ -160,13 +160,17 @@ public sealed class CompatibleTextClient : IDisposable
     private static async IAsyncEnumerable<string> LinesAsync(Stream stream, [EnumeratorCancellation] CancellationToken token)
     {
         using var reader = new StreamReader(stream, new UTF8Encoding(false, true), true, 4096, true);
-        var line = new StringBuilder(); var buffer = new char[2048]; int total = 0, read;
+        var line = new StringBuilder(); var buffer = new char[2048]; int total = 0, read; bool skipLf = false;
         while ((read = await reader.ReadAsync(buffer.AsMemory(), token)) > 0)
         {
             total += read; if (total > 8000000) throw Protocol();
             for (int i = 0; i < read; i++)
-                if (buffer[i] == '\n') { yield return line.ToString().TrimEnd('\r'); line.Clear(); }
-                else { line.Append(buffer[i]); if (line.Length > 300000) throw Protocol(); }
+            {
+                var ch = buffer[i];
+                if (skipLf) { skipLf = false; if (ch == '\n') continue; }
+                if (ch is '\r' or '\n') { yield return line.ToString(); line.Clear(); skipLf = ch == '\r'; }
+                else { line.Append(ch); if (line.Length > 300000) throw Protocol(); }
+            }
         }
         if (line.Length > 0) yield return line.ToString().TrimEnd('\r');
     }

@@ -76,6 +76,14 @@ internal static class CompatibleChecks
             Check(await generating.WaitAsync(TimeSpan.FromSeconds(5)) == "您好" && previews.SequenceEqual(new[] { "您", "您好" }) && gated.Disposed,
                 "SSE handles split UTF-8 bytes, CRLF, comments, multiline data, usage-only chunks and DONE, then closes the stream");
         }
+        using (var client = new CompatibleTextClient(new Handler((_, _) => Task.FromResult(Events(new MemoryStream(Encoding.UTF8.GetBytes((Event("CR") + end).Replace('\n', '\r'))))))))
+            Check(await client.CompleteAsync(endpoint, "model-a", true, credentials, "system", "text", default) == "CR", "SSE also accepts carriage-return-only event line endings");
+        foreach (var malformed in new[] { "[]", "null", "{\"data\":[null]}" })
+        {
+            using var client = new CompatibleTextClient(new Handler((_, _) => Task.FromResult(Json(malformed))));
+            try { await client.ModelsAsync(endpoint, credentials, default); Check(false, "malformed model list"); }
+            catch (CompatibleException e) { Check(e.Code == "invalid_response", "malformed model lists return a safe protocol failure rather than a UI exception"); }
+        }
         var cancellationStream = new GatedStream(Event("first"), end);
         using (var cancel = new CancellationTokenSource())
         using (var client = new CompatibleTextClient(new Handler((_, _) => Task.FromResult(Events(cancellationStream)))))
