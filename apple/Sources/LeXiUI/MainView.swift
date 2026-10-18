@@ -21,6 +21,7 @@ public struct MainView: View {
     @State private var offset: CGFloat = 0
     @FocusState private var searchFocused: Bool
     @Environment(\.appearsActive) private var appearsActive
+    @Environment(\.openWindow) private var openWindow
 
     public init(store: LexiStore) { self.store = store }
 
@@ -48,6 +49,8 @@ public struct MainView: View {
         }
         .safeAreaBar(edge: .bottom) { bottomBar }
         .glassWindow()
+        // The global ⌘2 brings this window back, reopening it if it was closed.
+        .background(ShortcutWindow { openWindow(id: "main") })
         .toolbar { toolbar }
         .navigationTitle("LeXi")
         .frame(minWidth: 540, minHeight: 420)
