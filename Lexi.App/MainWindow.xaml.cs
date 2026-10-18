@@ -63,6 +63,7 @@ public partial class MainWindow : Window
         if (e.Key == Key.Escape)
         {
             if (EtymologyPopup.IsOpen) DismissEtymology();
+            else if (keyboardSenses.Any(s => s.Row.IsKeyboardFocused)) FocusSearch();
             else if (Suggestions.Visibility == Visibility.Visible || InputPreviewCard.Visibility == Visibility.Visible) DismissSuggestions(restoreDraft: true);
             else WindowState = WindowState.Minimized;
             e.Handled = true;
