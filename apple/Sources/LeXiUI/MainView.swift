@@ -49,7 +49,7 @@ public struct MainView: View {
                     .padding(.horizontal, 20).padding(.top, 2)
                 if searchFocused, let preview = store.inputPreview {
                     Button { submit(preview.query) } label: { InputPreviewCard(preview: preview) }
-                        .buttonStyle(.plain).padding(.horizontal, 24)
+                        .buttonStyle(.plain).padding(.horizontal, 20)
                 }
             }.padding(.bottom, 10)
         }
