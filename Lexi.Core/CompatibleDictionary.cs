@@ -26,6 +26,13 @@ public sealed class CompatibleDictionary(string assets, CompatibleTextClient cli
         catch (Exception e) when (e is System.Text.Json.JsonException or InvalidDataException)
         { throw new CompatibleException("invalid_result", "自定义文本模型未返回完整、匹配的翻译，请重试。"); }
     }
+    public async Task<ContextPick> ContextAsync(ContextRequest request, AppSettings settings, CancellationToken token)
+    {
+        var result = await Run(request.Prompt, "context.schema.json", "context.instructions.txt", settings, token);
+        try { return LookupContext.Parse(StreamingEntry.Unwrap(result), request); }
+        catch (Exception e) when (e is System.Text.Json.JsonException or InvalidDataException)
+        { throw new CompatibleException("invalid_result", "自定义文本模型未返回有效的语境判断，已保留一般释义。"); }
+    }
     public async Task<SenseMergePlan> JudgeAsync(SenseMergeRequest request, AppSettings settings, CancellationToken token)
     {
         var result = await Run(request.Prompt, "sense-merge.schema.json", "sense-merge.instructions.txt", settings, token);

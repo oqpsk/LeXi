@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Testing
+@testable import LeXiKit
 @testable import LeXiUI
 
 // The text ⌘2 picks up from a copy in another app. A private pasteboard stands in for the reader's.
@@ -19,7 +20,7 @@ import Testing
         copy("serendipity", to: board)
         clock.date += 2
         lookup.capture()
-        #expect(lookup.take() == "serendipity")
+        #expect(lookup.take() == CapturedText(text: "serendipity"))
         #expect(lookup.take() == nil, "the window takes it once")
         lookup.capture()
         #expect(lookup.take() == nil, "the same copy is not looked up again on the next ⌘2")

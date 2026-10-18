@@ -43,12 +43,16 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 
 `progress.restored` 为可选布尔字段，明确标记本轮是否直接恢复完整缓存；为 `true` 时成功终态不播放退场动画，即使前端曾短暂显示等待。缺省为 `false`，不影响旧客户端。
 
+### 本句语境
+
+`query.submit` 带 `context` 时，释义定稿后 Core 用义项判断模型做一次轻量判断（`context.instructions.txt`、`context.schema.json`）：从已显示的义项中选出查询词在这句话里的意思，并给出一句简短中文。结果按查询、句子与义项内容缓存于 `context-picks-v1`。TL;DR 改为这句话里的意思（`caption` 为 `TL;DR · 本句语境`，提示中含原句与一般释义），对应义项的 `heading.inContext` 为 `true`；其余义项不变。判断进行中 TL;DR 显示“本句语境判断中”；离线、关闭自动补充、无法判断或判断失败时保持一般 TL;DR。词条本身的生成与缓存不受句子影响；“重新生成”沿用本页句子。
+
 ## 方法
 
 | 方法 | 参数 | 结果 |
 |---|---|---|
 | `initialize` | — | `protocol`、`version`、`platform`、`paths`、当前 `view`、`settings`（同 `settings.get`）。等待离线词库加载 |
-| `query.submit` | `text`，可选 `force`、`scroll` | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送 |
+| `query.submit` | `text`，可选 `force`、`scroll`、`context`（查询词所在的句子，见 `query.candidate`） | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送 |
 | `query.regenerate` | — | 跳过已保存结果重新查询当前页面 |
 | `query.navigate` | `direction`（-1 或 1），可选 `scroll` | `{page, view}`；`page` 为 `null` 表示已到边界 |
 | `query.home` | 可选 `scroll` | 返回查询历史页面 |
@@ -56,7 +60,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `query.view` | — | 当前 `QueryView` |
 | `suggest` | `text` | `{suggestions}` |
 | `query.preview` | `text` | `{query, headword, text, source}` 或 `null`。只读已保存的 TL;DR 和启用的本地词库；保持大小写缓存身份，显示实际匹配词；不联网、不记录历史、不发布或改变当前视图；支持 `cancel` |
-| `query.candidate` | `text` | `{text, submit}` 或 `null`。用户在其他应用中按全局快捷键呼出 LeXi 时，前端把选中的文字或刚复制的文字交给 Core 判断：去掉随词带来的引号和标点；单行且不超过 64 个字符时 `submit` 为 `true`，直接查询；更长或多行的文字只填入输入框；链接、路径、邮箱和无效输入返回 `null`。不发起查询、不记录历史 |
+| `query.candidate` | `text`，可选 `surrounding`、`start` | `{text, submit, context}` 或 `null`。用户在其他应用中按全局快捷键呼出 LeXi 时，前端把选中的文字或刚复制的文字交给 Core 判断：去掉随词带来的引号和标点；单行且不超过 64 个字符时 `submit` 为 `true`，直接查询；更长或多行的文字只填入输入框；链接、路径、邮箱和无效输入返回 `null`。前端能读到选区前后的文字时传 `surrounding` 与选区在其中的起点 `start`（UTF-16），Core 截出所在句子作为 `context`，前端随 `query.submit` 交回。不发起查询、不记录历史 |
 | `history.list` | — | `{entries: [{query, translation, queriedAt, preview, kind}], error}` |
 | `history.remove` | `query`、`translation` | `{removed, history}` |
 | `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |

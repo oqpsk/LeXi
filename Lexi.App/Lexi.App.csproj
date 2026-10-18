@@ -21,5 +21,7 @@
     <None Include="Assets/Lexi.ico" Link="assets/shell/Lexi.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../Lexi.Core/sense-merge.schema.json" Link="assets/sense-merge.schema.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../Lexi.Core/sense-merge.instructions.txt" Link="assets/sense-merge.instructions.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../Lexi.Core/context.schema.json" Link="assets/context.schema.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../Lexi.Core/context.instructions.txt" Link="assets/context.instructions.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
