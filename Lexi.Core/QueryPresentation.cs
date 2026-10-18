@@ -106,7 +106,7 @@ public sealed class QueryPresentation
     public void ResetLexical()
     {
         SourceEtymologies = []; modelEtymologies.Clear(); etymologyIdentity = ""; Etymology = [];
-        overviewLocal = []; overviewFromModel = false; overviewCore = false; QuickRead = QuickReadView.Hidden;
+        overviewLocal = []; overviewFromModel = false; overviewCore = false; overviewLead = null; QuickRead = QuickReadView.Hidden;
         baseQuickRead = QuickReadView.Hidden; context = null;
     }
     public void ApplySourceEtymology(EtymologyExcerpt[] excerpts) { SourceEtymologies = excerpts; RefreshEtymology(); }
@@ -185,8 +185,15 @@ public sealed class QueryPresentation
                 ? Mark(s) with { Alternatives = s.Alternatives.Select(a => a.Key == key ? Mark(a) : a).ToArray() } : s).ToArray()
         };
     }
-    private QuickMeaning[] QuickReadSelection(LookupSnapshot snapshot, SpecialistReference[] uncovered) =>
-        Lexi.Core.QuickRead.Create(snapshot.Groups, uncovered, overviewLocal);
+    // The first model to complete leads the overview until the merge ranks every answer; it stays the
+    // lead while its answer stands, so the TL;DR does not change when the other model finishes.
+    private LookupModel? overviewLead;
+    private QuickMeaning[] QuickReadSelection(LookupSnapshot snapshot, SpecialistReference[] uncovered)
+    {
+        var answered = snapshot.Answers.Where(a => a.Phase != ModelPhase.Streaming && a.Entry is { Found: true, Senses.Length: > 0 }).Select(a => a.Model).ToArray();
+        if (overviewLead == null || !answered.Contains(overviewLead)) overviewLead = answered.FirstOrDefault();
+        return Lexi.Core.QuickRead.Create(snapshot.Groups, uncovered, overviewLocal, overviewLead);
+    }
     private QuickReadView Caption(QuickReadView view, string state) => view with
     {
         State = state, Caption = "TL;DR · " + state, ShowState = state is "预览" or "缓存预览" or "部分结果",
