@@ -6,6 +6,7 @@ $fixture = Join-Path $root ('.cache/package-check-' + [Guid]::NewGuid().ToString
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 try {
     foreach ($name in @('Lexi.exe','Lexi.dll','Lexi.Core.dll','Lexi.runtimeconfig.json','README.md','LICENSE','coreclr.dll')) { [IO.File]::WriteAllText((Join-Path $fixture $name),'synthetic public file') }
+    [IO.File]::WriteAllText((Join-Path $fixture 'README.md'),'Public service documentation: https://docs.x.ai https://api.example.org/v1')
     & (Join-Path $PSScriptRoot 'Check-Package.ps1') -Directory $fixture -SelfContained
     foreach ($name in @('userdata','data','text-provider-keys')) {
         $path = Join-Path $fixture $name; New-Item -ItemType Directory -Path $path | Out-Null
@@ -14,7 +15,7 @@ try {
         if (!$rejected) { throw 'Private directory escaped package checks' }
         Remove-Item -LiteralPath $path
     }
-    foreach ($value in @(('sk-' + ('a' * 30)), ('C:' + [char]92 + 'Users' + [char]92 + 'Synthetic' + [char]92 + 'private'))) {
+    foreach ($value in @(('sk-' + ('a' * 30)), ('C:' + [char]92 + 'Users' + [char]92 + 'Synthetic' + [char]92 + 'private'), ('https://ai.' + 'rwby.io/v1'))) {
         [IO.File]::WriteAllText((Join-Path $fixture 'Lexi.dll'),$value,[Text.Encoding]::Unicode)
         $rejected = $false
         try { & (Join-Path $PSScriptRoot 'Check-Package.ps1') -Directory $fixture } catch { $rejected = $true }

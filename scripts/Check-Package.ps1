@@ -15,7 +15,7 @@ foreach ($node in $nodes) {
 $patterns = @(
     '(?i)[A-Z]:[\\/]Users[\\/][^\\/\s<>]+', '(?:/Users/|/home/)[A-Za-z0-9_.-]+/',
     '\b(?:sk-(?:ant-)?[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b',
-    '-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----', 'ai\.' + 'rwby\.io'
+    '-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----', ('ai\.' + 'rwby\.io')
 )
 foreach ($file in $files) {
     $relative = [IO.Path]::GetRelativePath($packageRoot, $file.FullName).Replace('\','/')

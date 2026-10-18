@@ -86,6 +86,38 @@ internal static class MajorWorkflowChecks
                 "session retry after restart preserves successful work and ignores unrelated speech settings");
         }
 
+        using (var failedNetwork = new FailingSource())
+        using (var sourceSession = new QuerySession(new("assets", Path.GetFullPath(fixture), Path.Combine(work,"source-retry")), providers: providers, network: failedNetwork))
+        {
+            sourceSession.Settings.ParallelLookup = false; sourceSession.Settings.MergeSenses = false;
+            await sourceSession.SubmitAsync("sourcefixture");
+            Check(sourceSession.View.CanRetry && sourceSession.Saved.Dictionary("sourcefixture")?.FailedSources == SourceFailures.Online, "failed source is recorded separately from successful model generation");
+            var calls = failedNetwork.Calls; failedNetwork.Fail = false;
+            await sourceSession.RetryFailedAsync();
+            Check(!sourceSession.View.CanRetry && failedNetwork.Calls == calls + 1, "source-only retry performs exactly the failed dictionary request");
+            sourceSession.ShowHome(); Check(!sourceSession.View.CanRetry, "home never retains an actionable retry from a previous query");
+        }
+
+        int mergeDefinitions = 0, mergeAttempts = 0;
+        var retryMerging = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var mergeProviders = new QueryProviders((model, query, evidence, options, token, report) =>
+        { mergeDefinitions++; return Task.FromResult(Entry(query) with { Senses = [Entry(query).Senses[0] with { English = "Environment variant " + model.Provider }] }); },
+            async (request, options, token) =>
+            {
+                mergeAttempts++;
+                if (mergeAttempts == 1) throw new InvalidDataException("synthetic judge response");
+                if (mergeAttempts == 2) { retryMerging.TrySetResult(); await Task.Delay(Timeout.Infinite, token); }
+                return new(request.InputHash, [], Overview: [], ComparedPairs: request.Pairs.Length);
+            }, (_,_,_,_,_) => throw new Exception("No translation"));
+        using (var mergeSession = new QuerySession(new("assets", Path.GetFullPath(fixture), Path.Combine(work,"cancelled-merge")), providers: mergeProviders, network: new SlowSource(Task.CompletedTask)))
+        {
+            await mergeSession.SubmitAsync("mergefixture"); Check(mergeSession.View.CanRetry, "failed merge can be retried from its completed model checkpoint");
+            var run = mergeSession.RetryFailedAsync(); await retryMerging.Task.WaitAsync(TimeSpan.FromSeconds(3)); mergeSession.Cancel(); await run;
+            Check(mergeSession.View.CanRetry && mergeDefinitions == 2, "cancelled merge retry remains retryable without discarding successful definitions");
+            await mergeSession.RetryFailedAsync();
+            Check(!mergeSession.View.CanRetry && mergeDefinitions == 2 && mergeAttempts == 3, "third merge attempt reuses both successful model answers after cancellation");
+        }
+
         var historyRoot = Path.Combine(work, "data"); var history = new QueryHistory(historyRoot);
         for (int i = 0; i < 75; i++) history.Record("history-" + i, false);
         history.Record("ABS", false); history.Record("ABS", false); history.Record("abs", false); history.Record("A long sentence.", true);
@@ -131,6 +163,16 @@ internal static class MajorWorkflowChecks
             Interlocked.Increment(ref Calls);
             if (request.RequestUri!.Host.Contains("wiktionary")) await release.WaitAsync(token);
             return new(HttpStatusCode.NotFound) { Content = new StringContent("") };
+        }
+    }
+    private sealed class FailingSource : HttpMessageHandler
+    {
+        public bool Fail = true;
+        public int Calls;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
+        {
+            if (request.RequestUri!.Host.Contains("wiktionary")) { Calls++; if (Fail) throw new HttpRequestException("synthetic source failure"); }
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("") });
         }
     }
     private sealed class ModelsHandler : HttpMessageHandler

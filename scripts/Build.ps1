@@ -24,7 +24,7 @@ try {
     # Explicit public files, plus only tracked documentation. Never copy an installation.
     Copy-Item README.md, THIRD_PARTY_NOTICES.md, LICENSE -Destination $output -Force
     Copy-Item scripts/Refresh-TaskbarIcon.ps1 -Destination $output -Force
-    $documents = @(& git -c core.quotepath=false ls-files -- docs)
+    $documents = @(& git -c core.quotepath=false ls-files -- docs licenses)
     if ($LASTEXITCODE) { throw 'Cannot enumerate public documentation' }
     foreach ($document in $documents) {
         $target = Join-Path $output $document

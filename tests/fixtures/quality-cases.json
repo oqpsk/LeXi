@@ -7,7 +7,10 @@
     ],
     "coreTerm": "赛博朋克",
     "excludedCoreTags": [
-      "信息安全"
+      "信息安全",
+      "网络安全",
+      "infosec",
+      "cybersecurity"
     ]
   },
   {
@@ -37,7 +40,9 @@
     "coreTerm": "JavaScript对象表示法",
     "excludedCoreTags": [
       "区块链",
-      "加密资产"
+      "加密资产",
+      "blockchain",
+      "cryptoasset"
     ]
   },
   {
@@ -48,7 +53,9 @@
     ],
     "coreTerm": "幂等性",
     "excludedCoreTags": [
-      "区块链"
+      "区块链",
+      "blockchain",
+      "cryptoasset"
     ]
   },
   {
@@ -161,7 +168,9 @@
     ],
     "coreTerm": "远程过程调用",
     "excludedCoreTags": [
-      "区块链"
+      "区块链",
+      "blockchain",
+      "cryptoasset"
     ]
   },
   {
