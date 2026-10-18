@@ -2,6 +2,7 @@
 
 ## Unreleased — major-version preparation
 
+- Give the macOS app an Icon Composer icon (`apple/Resources/AppIcon.icon`): a black fill with the ξ from `docs/brandmark.svg` as a glass layer. macOS now draws the rounded shape, glass and shadow itself, so the corners match every other app instead of the brandmark's own rounded plate. Windows, the tray and the README keep the brandmark with its pink outline.
 - Look up without typing on macOS: ⌘2 in another app takes the text copied there in the last few seconds, or, once allowed in 设置 → 通用, the selection itself (Accessibility permission). Core's new `query.candidate` decides: words and short phrases are looked up at once with stray quotes and punctuation removed, longer text only fills the query field, and links or paths are ignored. Only the pasteboard's change count is polled; its contents are read once, at ⌘2, and LeXi's own copies never count.
 - Use results from the keyboard on macOS: ↓ or Tab in the query field moves into the senses, ↑ ↓ move between them, Space reads the focused sense, Return opens its examples, ⌘C copies it and Escape returns to the query. ⌘D reads the headword and ⇧⌘C copies the TL;DR or translation. The query window no longer sets a default focus, which had pulled focus back to the query field.
 
