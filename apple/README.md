@@ -15,7 +15,7 @@ apple/scripts/build-app.sh
 - `Contents/MacOS/LeXi`：SwiftUI 应用
 - `Contents/Helpers/lexi-host`：自包含单文件 Host
 - `Contents/Resources/assets`：官方客户端读取的模型说明与结构
-- `Contents/Resources`：图标（由 `docs/brandmark.svg` 生成）、许可与第三方声明
+- `Contents/Resources`：图标（`apple/Resources/AppIcon.icon`，Icon Composer 格式：黑色底由 `icon.json` 定义，ξ 图层在构建时取自 `docs/brandmark.svg`；外形、玻璃质感与阴影由 macOS 绘制，与其他应用的圆角一致）、许可与第三方声明
 
 仓库的 `NuGet.Config` 不含包源；脚本从 nuget.org 获取 .NET 运行时包，不引入第三方依赖。生成的应用使用临时签名，只适合在本机运行。分发版本需要 Developer ID 签名、hardened runtime（Host 需要 .NET 运行时所需的 JIT 权限）和公证，目前尚未提供。
 

@@ -65,6 +65,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 全局呼出 | 固定到任务栏第 2 位后，Win+2 呼出或最小化 | ⌘2 在任何应用中呼出 LeXi、再按隐藏，优先于其他应用自己的 ⌘2（系统级热键，无需辅助功能权限）；“设置 → 通用”可关闭，并可设为登录时打开 |
 | 单实例 | 互斥量与命名管道激活已有窗口 | macOS 应用默认单实例，单一查询窗口 |
 | 设计语言 | Windows 11 Acrylic 深色浮窗，粉色点缀 | Apple 设计语言：Liquid Glass 查询胶囊、工具栏与底部控件，结果在其下滚动；窗口本身是一整块 Liquid Glass（如控制中心），透出桌面并随深浅色变为浅色或深色玻璃，开启“减少透明度”时更不透明；系统颜色与强调色，跟随深浅色；粉色用于 TL;DR 与深色界面的词头播放声纹，词性用与 Windows 相同的淡金色（浅色下加深） |
+| 应用图标 | `docs/brandmark.svg`：黑底、粉色描边圆角方块与 ξ | Icon Composer 图标：黑色底与玻璃质感的粉色 ξ；外形、高光与阴影由 macOS 绘制，圆角与其他应用一致 |
 | 快捷键 | Ctrl+L、Ctrl+,、Ctrl+Q；Esc 收起建议或最小化 | ⌘2（全局）、⌘L、⌘R、⌘D、⇧⌘C、⌘[、⌘]、⌘Y、⌘,、⌘Q；Esc 收起建议；结果中 ↑ ↓、空格、Return、⌘C、Esc |
 | 查询逻辑接入 | 直接引用 `Lexi.Core` | 内置 `Lexi.Host`（JSON lines） |
 | 构建与分发 | `scripts/Build.ps1`，可生成自包含版本 | `apple/scripts/build-app.sh`，按构建机器架构生成本机签名的应用；Developer ID 签名与公证计划中 |
