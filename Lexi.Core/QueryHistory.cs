@@ -42,8 +42,9 @@ public sealed class QueryHistory
         if (Queries.Validate(query) != null) return false;
         var key = Canonical(query, translation);
         var previous = entries.FirstOrDefault(e => e.Query == key && e.Translation == translation);
-        var entry = new HistoryEntry(key, translation, when ?? DateTimeOffset.UtcNow, Math.Min(1_000_000, Math.Max(0, previous?.Visits ?? 0) + 1));
-        return Save(new[] { entry }.Concat(entries.Where(e => e.Query != entry.Query || e.Translation != translation)).Take(Capacity).ToArray());
+        var instant = when ?? DateTimeOffset.UtcNow;
+        var entry = new HistoryEntry(key, translation, previous != null && previous.QueriedAt > instant ? previous.QueriedAt : instant, Math.Min(1_000_000, Math.Max(0, previous?.Visits ?? 0) + 1));
+        return Save(new[] { entry }.Concat(entries.Where(e => e.Query != entry.Query || e.Translation != translation)).OrderByDescending(e => e.QueriedAt).Take(Capacity).ToArray());
     }
     public HistoryEntry[] Search(string text, int offset = 0, int count = HomePageSize) => entries
         .Where(e => e.Query.Contains(text.Trim(), StringComparison.OrdinalIgnoreCase))

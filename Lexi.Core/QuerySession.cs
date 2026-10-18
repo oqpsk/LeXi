@@ -227,7 +227,8 @@ public sealed partial class QuerySession : IDisposable
         if (!navigating)
         {
             lock (gate) { Navigation.RememberScroll(scroll); Navigation.Visit(raw.Trim(), translating); historyPending++; }
-            historyWrite = Task.Run(() => { lock (historyGate) History.Record(raw, translating); });
+            var submittedAt = clock.GetUtcNow();
+            historyWrite = Task.Run(() => { lock (historyGate) History.Record(raw, translating, submittedAt); });
         }
         try
         {

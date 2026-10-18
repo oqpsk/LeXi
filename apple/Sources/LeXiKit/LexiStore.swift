@@ -148,13 +148,18 @@ public final class LexiStore {
 
     // ---- History ----
     public private(set) var historyFilter = ""
+    private var historyRequest = 0
+    private var historyPaging = false
     public func refreshHistory() async {
-        if let list = try? await client?.call("history.list", ["text": historyFilter]) as HistoryList? { history = list }
+        historyRequest += 1; let request = historyRequest; let text = historyFilter
+        if let list = try? await client?.call("history.list", ["text": text]) as HistoryList?, request == historyRequest { history = list }
     }
     public func searchHistory(_ text: String) async { historyFilter = text; await refreshHistory() }
     public func moreHistory() async {
-        let parameters: [String: SettingValue] = ["text": .string(historyFilter), "offset": .integer(history.entries.count)]
-        if let next = try? await client?.call("history.list", parameters) as HistoryList? {
+        guard !historyPaging else { return }; historyPaging = true; defer { historyPaging = false }
+        let request = historyRequest; let text = historyFilter; let offset = history.entries.count
+        let parameters: [String: SettingValue] = ["text": .string(text), "offset": .integer(offset)]
+        if let next = try? await client?.call("history.list", parameters) as HistoryList?, request == historyRequest, text == historyFilter, offset == history.entries.count {
             var list = HistoryList(entries: history.entries + next.entries, error: next.error); list.total = next.total; history = list
         }
     }
@@ -167,7 +172,7 @@ public final class LexiStore {
     }
     public func clearCache(_ category: String) async throws { let _: EmptyResponse = try await requireClient().call("data.clear", ["category": category]) }
     public func refreshSpeechModels(key: String) async throws { let _: EmptyResponse = try await requireClient().call("speech.elevenModels", ["key": key]) }
-    private struct EmptyResponse: Decodable {}
+    private struct EmptyResponse: Decodable, Sendable {}
     private func requireClient() throws -> HostClient { guard let client else { throw CocoaError(.fileNoSuchFile) }; return client }
     private func refreshHistoryIfHome() async { if view.kind == .home { await refreshHistory() } }
     public func remove(_ entry: HistoryEntry) async {
