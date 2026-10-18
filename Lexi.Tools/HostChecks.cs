@@ -78,6 +78,9 @@ internal static class HostChecks
                 (await client.Call("query.candidate", new { text = "https://example.org" })).GetProperty("result").ValueKind == JsonValueKind.Null &&
                 ReferenceEquals(beforePreview, session.View) && session.History.Entries.Count == 0,
                 "summoning with copied or selected text uses Core's lookup rule without starting a query");
+            var selected = (await client.Call("query.candidate", new { text = "bank", surrounding = "Prices rose. We sat on the bank of the river.", start = 27 })).GetProperty("result");
+            Check(selected.GetProperty("context").GetString() == "We sat on the bank of the river." && selected.GetProperty("submit").GetBoolean(),
+                "a selection read with its surrounding text carries the sentence it came from");
 
             var submitted = (await client.Call("query.submit", new { text = "serendipity" })).GetProperty("result");
             var request = submitted.GetProperty("request").GetInt64();

@@ -5,7 +5,9 @@ namespace Lexi.Core;
 public sealed record QueryProviders(
     Func<LookupModel, string, OnlineEntry?, AppSettings, CancellationToken, IProgress<AiEntry>, Task<AiEntry>> Define,
     Func<SenseMergeRequest, AppSettings, CancellationToken, Task<SenseMergePlan>> Judge,
-    Func<string, string, AppSettings, CancellationToken, IProgress<TranslationEntry>, Task<TranslationEntry>> Translate);
+    Func<string, string, AppSettings, CancellationToken, IProgress<TranslationEntry>, Task<TranslationEntry>> Translate,
+    // Which sense a word has in the sentence it was selected in; absent in checks that do not need it.
+    Func<ContextRequest, AppSettings, CancellationToken, Task<ContextPick>>? Context = null);
 
 // The query lifecycle shared by every front end: routing, sources, caches, models, saved views,
 // history and navigation. Each step publishes a complete QueryView; front ends only render it.
@@ -33,6 +35,8 @@ public sealed partial class QuerySession : IDisposable
     private readonly object historyGate = new();
     private int historyPending;
     private readonly List<OfflineLibrary> retiredLibraries = [];
+    // The sentence of the current dictionary page's query, kept for regeneration.
+    private string pageContext = "";
 
     public QuerySession(LexiPaths paths, Task<OfflineLibrary>? library = null, QueryProviders? providers = null,
         HttpMessageHandler? network = null, TimeProvider? clock = null,
@@ -57,7 +61,8 @@ public sealed partial class QuerySession : IDisposable
             (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.JudgeAsync(request, options, token) : codex.JudgeSensesAsync(request, options, token),
             (text, target, options, token, preview) => options.Provider == CompatibleText.Provider
                 ? compatible.TranslateAsync(text, target, options, token, preview) : options.Provider == "claude"
-                ? claude.TranslateAsync(text, target, options, token, preview) : codex.TranslateAsync(text, target, options, token));
+                ? claude.TranslateAsync(text, target, options, token, preview) : codex.TranslateAsync(text, target, options, token),
+            (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.ContextAsync(request, options, token) : codex.ContextAsync(request, options, token));
         this.clock = clock ?? TimeProvider.System;
         View = Build();
     }
@@ -210,11 +215,16 @@ public sealed partial class QuerySession : IDisposable
     public bool RemoveHistory(HistoryEntry entry) { lock (gate) if (maintaining) return false; bool removed; lock (historyGate) removed = History.Remove(entry); lock (gate) Publish(); return removed; }
 
     // ---- Queries ----
-    public Task RegenerateAsync() { var query = Current; return query.Length > 0 ? SubmitAsync(query, true) : Task.CompletedTask; }
-
-    public async Task SubmitAsync(string raw, bool force = false, bool navigating = false, double scroll = 0)
+    public Task RegenerateAsync()
     {
-        lock (gate) { if (maintaining) return; }
+        string query, context; lock (gate) { query = current; context = pageContext; }
+        return query.Length > 0 ? SubmitAsync(query, true, context: context) : Task.CompletedTask;
+    }
+
+    // context: the sentence the query was selected in (LookupContext), when the front end has one.
+    public async Task SubmitAsync(string raw, bool force = false, bool navigating = false, double scroll = 0, string? context = null)
+    {
+        lock (gate) { if (maintaining) return; pageContext = navigating || string.IsNullOrWhiteSpace(context) ? "" : context.Trim(); }
         var validation = Queries.Validate(raw);
         if (validation != null) { SetStatus(validation); return; }
         var timing = new LookupTiming(clock);
@@ -233,7 +243,7 @@ public sealed partial class QuerySession : IDisposable
         try
         {
             if (translating) await TranslateAsync(raw.Trim(), force, timing);
-            else await LookupAsync(raw, force, timing);
+            else await LookupAsync(raw, force, timing, navigating || string.IsNullOrWhiteSpace(context) ? null : context.Trim());
         }
         finally { try { await historyWrite; } finally { if (!navigating) lock (gate) historyPending--; } }
 
@@ -247,7 +257,7 @@ public sealed partial class QuerySession : IDisposable
         return (request, lookup.Token);
     }
 
-    private async Task LookupAsync(string raw, bool force, LookupTiming timing)
+    private async Task LookupAsync(string raw, bool force, LookupTiming timing, string? context = null)
     {
         var query = Queries.LookupKey(raw);
         var modelsEnabled = Settings.Online && (Settings.AutoAi || force);
@@ -273,7 +283,8 @@ public sealed partial class QuerySession : IDisposable
 
         try
         {
-            if (Saved.Dictionary(query, force) is { } saved) { Step(id, () => RestoreSavedCore(saved, timing, progressId)); return; }
+            if (Saved.Dictionary(query, force) is { } saved)
+            { Step(id, () => RestoreSavedCore(saved, timing, progressId)); await ApplyContextAsync(id, query, context, token); return; }
             try
             {
                 if (Settings.OfflineEnabled)
@@ -310,6 +321,7 @@ public sealed partial class QuerySession : IDisposable
                     progress.Update(progressId, QueryProgressState.Finished(shown, Settings.MergeSenses, sourceIncomplete).WithWork(Settings, shown, false) with { Restored = true, Detail = "已恢复已有缓存 · 点击重新生成可更新" });
                     status = timing.Finish("已显示缓存 · 重新生成可更新");
                 });
+                await ApplyContextAsync(id, query, context, token);
                 return;
             }
             if (!Settings.Online)
@@ -412,6 +424,7 @@ public sealed partial class QuerySession : IDisposable
                 });
             }
             finally { lock (gate) finished = true; }
+            await ApplyContextAsync(id, query, context, token);
         }
         catch (OperationCanceledException)
         { Step(id, () => progress.Update(progressId, (progress.Current ?? initialProgress).Interrupted("查询已中断", "本次查询已结束，可重新查询"))); }
@@ -625,6 +638,36 @@ public sealed partial class QuerySession : IDisposable
         try { await Saved.SaveTranslationAsync(text, target, new(entry, model, clock.GetUtcNow()), token); }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    // The selection's sentence picks one of the shown senses, through the sense-judge model, once the
+    // entry is final. It changes only the TL;DR and the matching sense's label; a failure keeps both.
+    private async Task ApplyContextAsync(long id, string query, string? sentence, CancellationToken token)
+    {
+        if (sentence == null || providers.Context == null || !Settings.Online || !Settings.AutoAi || token.IsCancellationRequested) return;
+        ContextRequest? contextRequest;
+        lock (gate) { if (id != request) return; contextRequest = LookupContext.Request(query, sentence, Presentation.Answers); }
+        if (contextRequest == null) return;
+        var judge = new LookupModel(Settings.JudgeProvider, Settings.JudgeModel);
+        var options = Settings.ForModel(judge);
+        var key = contextRequest.InputHash + ":" + judge.CacheKey("", options);
+        if (Cache.Read<ContextPick>(LookupContext.CacheKind, key) is { } saved)
+        {
+            try { var valid = LookupContext.Parse(JsonSerializer.Serialize(saved, Json.Options), contextRequest); Step(id, () => Presentation.ApplyContext(sentence, valid)); return; }
+            catch (Exception e) when (e is InvalidDataException or JsonException) { }
+        }
+        Step(id, () => Presentation.BeginContext(sentence));
+        try
+        {
+            var pick = await Task.Run(() => providers.Context(contextRequest, options, token), token);
+            pick = LookupContext.Parse(JsonSerializer.Serialize(pick, Json.Options), contextRequest);
+            token.ThrowIfCancellationRequested();
+            await TryCacheAsync(LookupContext.CacheKind, key, pick);
+            Step(id, () => Presentation.ApplyContext(sentence, pick));
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception e) when (DictionaryCoordinator.ExpectedFailure(e) || e is OperationCanceledException)
+        { Step(id, () => Presentation.ContextFailed()); }
     }
 
     private async Task TryCacheAsync<T>(string kindName, string key, T value)

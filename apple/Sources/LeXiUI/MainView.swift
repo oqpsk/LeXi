@@ -187,7 +187,7 @@ public struct MainView: View {
         Task {
             guard let candidate = await store.candidate(raw) else { return }
             setText(candidate.text)
-            if candidate.submit { submit(candidate.text) }
+            if candidate.submit { speech.stop(); await store.submit(candidate.text, scroll: offset, context: candidate.context) }
             focusSearch()
         }
     }

@@ -13,8 +13,9 @@ public sealed record OnlineSenseView(string Label, string Definition, OnlineExam
 public sealed record OnlineExampleView(string Text, bool Chinese);
 public sealed record OnlineSourceView(string Header, OnlineSenseView[] Senses, string Url, string Footer, bool Cached);
 
+// InContext marks the sense the query has in the sentence it was selected in (LookupContext).
 public sealed record SenseHeadingView(string Prefix, string PartOfSpeech, string Form, string Usage, bool Abbreviation,
-    bool Provisional, string Tooltip);
+    bool Provisional, string Tooltip, bool InContext = false);
 public sealed record CitationView(int Number, string Label, string Definition, string Url);
 public sealed record BriefView(string Caption, string Chinese, string English);
 // Key is a content identity that survives streaming, reordering and merging. Front ends key

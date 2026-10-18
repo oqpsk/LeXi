@@ -98,10 +98,10 @@ public final class LexiStore {
     }
 
     // ---- Queries ----
-    public func submit(_ text: String, force: Bool = false, scroll: Double = 0) async {
+    public func submit(_ text: String, force: Bool = false, scroll: Double = 0, context: String? = nil) async {
         clearSuggestions()
         await provideTextCredentials()
-        _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll)) as SubmitResult?
+        _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll, context: context)) as SubmitResult?
         await refreshHistoryIfHome()
     }
     public func retryFailed() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.retry") as SubmitResult? }
@@ -143,9 +143,11 @@ public final class LexiStore {
         }
     }
     // Core's rule for text taken from another app when LeXi is summoned (query.candidate).
-    public func candidate(_ text: String) async -> LookupCandidate? {
-        try? await client?.callOptional("query.candidate", ["text": text], as: LookupCandidate.self)
+    public func candidate(_ captured: CapturedText) async -> LookupCandidate? {
+        try? await client?.callOptional("query.candidate", Candidate(text: captured.text, surrounding: captured.surrounding, start: captured.start),
+                                         as: LookupCandidate.self)
     }
+    private struct Candidate: Encodable, Sendable { let text: String; let surrounding: String?; let start: Int }
     public func clearInputPreview() {
         previewRequest += 1; previewWork?.cancel(); previewWork = nil; inputPreview = nil
     }
@@ -302,7 +304,7 @@ public final class LexiStore {
         return try await client.call("speech.synthesize", SpeechRequest(text: text, selection, key: key), as: SpeechFile.self).path
     }
 
-    private struct Submit: Encodable, Sendable { let text: String; let force: Bool; let scroll: Double }
+    private struct Submit: Encodable, Sendable { let text: String; let force: Bool; let scroll: Double; let context: String? }
     private struct Navigate: Encodable, Sendable { let direction: Int; let scroll: Double }
     private struct Scroll: Encodable, Sendable { let scroll: Double }
     private struct RemoveHistory: Encodable, Sendable { let query: String; let translation: Bool }

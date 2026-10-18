@@ -15,6 +15,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 离线词典联合查询、简繁检索、词形匹配 | `OfflineLibrary`、`ChineseVariants`（内置 OpenCC 字表，各平台相同） | 已实现 | 已实现：词库位于 `~/Library/Application Support/LeXi/data` |
 | 输入停顿 TL;DR | `InputPreview` / `QuerySession.PreviewAsync`：先读已保存结果，再读启用的本地词库；显示实际匹配词；不联网，不写历史，不改变导航和当前结果 | 已实现：停顿 300 ms 显示紧凑 TL;DR，跟随建议选择；组字时等待，Esc/查询时取消；点击或 Enter 打开完整查询 | 已实现：通过 Host 的 `query.preview` 读取同一内容；相同停顿、组字与取消规则，原生卡片位于输入框下方 |
 | 选中或刚复制的文字直接查 | `LookupCandidates`（Host `query.candidate`）：去掉随词带来的引号和标点；单词、短语直接查，长文字只填入输入框；链接、路径不查 | 未实现 | 已实现：⌘2 呼出时读取其他应用中选中的文字（可选，需辅助功能权限）或几秒内刚复制的文字；只轮询剪贴板变化计数，⌘2 时才读取内容；LeXi 自己复制的内容不算 |
+| 本句语境 | `LookupContext`：从选区前后文字截出所在句子；释义定稿后由义项判断模型选出这句话里的义项并写一句简短中文，按句子缓存；TL;DR 改为本句意思，对应义项标记 `inContext`，其余义项与词条缓存不变 | 未实现：Core 已就绪，待读取选区所在文字 | 已实现：选中文字查询（辅助功能权限）时读取选区前后约 300 个字符；TL;DR 显示“本句语境”，对应义项带粉色“本句”标签 |
 | 键盘浏览结果 | 不适用：前端按键 | 未实现 | 已实现：输入框中 ↓ 或 Tab 进入释义，↑ ↓ 切换，空格朗读，Return 展开例句，⌘C 复制释义，Esc 回到输入框；⌘D 朗读词头，⇧⌘C 复制 TL;DR 或译文 |
 | 输入建议 | `QuerySession.Suggest`：历史精确大小写、重复次数、近期查询优先，再接离线词库 | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原 | 已实现：列表悬于输入框下方；↑↓ 预览，Tab 或点击接受，Esc 还原；输入法组字时按键留给输入法 |
 | Wiktionary 在线来源与原文 | `OnlineDictionary`、`QueryView.Online` | 已实现：可展开原文与来源链接 | 已实现：可展开原文与来源链接 |

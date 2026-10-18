@@ -10,6 +10,7 @@ internal static class SessionChecks
         await MajorWorkflowChecks.Run(fixture,root);
         await InputPreviewChecks.Run(fixture,root);
         CandidateChecks.Run();
+        await ContextChecks.Run(fixture, root);
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
         var work = Path.Combine(Path.GetFullPath(root), Guid.NewGuid().ToString("N"));

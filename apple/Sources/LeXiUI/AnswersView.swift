@@ -66,7 +66,17 @@ struct SenseHeadingText: View {
         if !heading.usage.isEmpty { text = Text("\(text)\(Text("  " + heading.usage))") }
         if heading.abbreviation { text = Text("\(text)\(Text("  缩写"))") }
         if heading.provisional { text = Text("\(text)\(Text(" · 生成中"))") }
-        return text.font(.subheadline).foregroundStyle(.secondary).help(heading.tooltip)
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            text.font(.subheadline).foregroundStyle(.secondary)
+            // The sense the query has in the sentence it was selected in, tagged like the TL;DR it feeds.
+            if heading.inContext == true {
+                Text("本句").font(.caption2.weight(.semibold)).foregroundStyle(.black)
+                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .background(LexiTheme.pink, in: .capsule)
+                    .accessibilityLabel("本句语境中的义项")
+            }
+        }
+        .help(heading.tooltip)
     }
 }
 
