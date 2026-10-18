@@ -18,7 +18,7 @@ internal static class CandidateChecks
         var paragraph = string.Join(" ", Enumerable.Repeat("The ship is ready to leave the harbour.", 4));
         Check(LookupCandidates.From(paragraph) is { Submit: false } && LookupCandidates.From("first line\nsecond line") is { Submit: false },
             "longer or multi-line text only fills the query field");
-        Check(new[] { "https://example.org/a", "www.example.org", "someone@example.org", "/Users/someone/file.txt", "~/notes", "C:\\Temp\\a.txt", "", "   ", "a\u0001b", new string('x', 5001) }
+        Check(new[] { "https://example.org/a", "www.example.org", "someone@example.org", "/tmp/notes.txt", "~/notes", "C:\\Temp\\a.txt", "", "   ", "a\u0001b", new string('x', 5001) }
             .All(t => LookupCandidates.From(t) == null), "links, paths, addresses, blanks, control characters and oversized text are not lookups");
     }
 }
