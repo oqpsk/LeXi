@@ -3,7 +3,7 @@ import SwiftUI
 
 // LeXi for macOS follows Apple's design language rather than the Windows look: system colors that
 // adapt to light, dark and the user's accent, continuous corners, Liquid Glass for the floating
-// controls, and content on quiet grouped surfaces. Pink appears only as the brand TL;DR mark;
+// controls, and content on quiet grouped surfaces. Pink marks TL;DR and active speech on dark glass;
 // parts of speech are pale gold, as on Windows.
 public enum LexiTheme {
     // The one brand pink (#FFADD2). Solid pink fills always carry dark text.
@@ -15,6 +15,11 @@ public enum LexiTheme {
             ? NSColor(srgbRed: 0xDD / 255.0, green: 0xBD / 255.0, blue: 0x82 / 255.0, alpha: 1)
             : NSColor(srgbRed: 0x7D / 255.0, green: 0x5A / 255.0, blue: 0x1A / 255.0, alpha: 1)
     }
+    public static let speechAccent = Color(nsColor: NSColor(name: "LexiSpeech") { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 1, green: 0xAD / 255.0, blue: 0xD2 / 255.0, alpha: 1)
+            : .labelColor
+    })
     public static let gold = Color(nsColor: goldColor)
     public static func lexical(_ size: CGFloat, weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight, design: .serif) }
     public static func chineseExample(_ size: CGFloat) -> Font { .custom("Songti SC", size: size) }

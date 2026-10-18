@@ -9,7 +9,7 @@ internal sealed class SpeechPlayback(string root) : IDisposable
     private CancellationTokenSource? active;
     private SpeechOutput? output;
     public void Stop() { active?.Cancel(); output?.Dispose(); output = null; }
-    public async Task PlayAsync(string text, SpeechOptions options, bool online, Action<string> status, string? suppliedKey = null)
+    public async Task PlayAsync(string text, SpeechOptions options, bool online, Action<string> status, string? suppliedKey = null, Action? started = null)
     {
         Stop(); active?.Dispose(); var request = active = new CancellationTokenSource(); var token = request.Token;
         var path = options.Provider == "windows"
@@ -21,7 +21,7 @@ internal sealed class SpeechPlayback(string root) : IDisposable
         try
         {
             status("正在准备音频输出…");
-            await playback.PlayAsync(path, silence, () => status("正在播放合成发音…"), token);
+            await playback.PlayAsync(path, silence, () => { status("正在播放合成发音…"); started?.Invoke(); }, token);
         }
         finally { if (ReferenceEquals(output, playback)) output = null; }
     }

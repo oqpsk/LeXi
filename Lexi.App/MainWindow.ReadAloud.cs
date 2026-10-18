@@ -7,7 +7,7 @@ using System.Windows.Media;
 namespace Lexi;
 
 // Definitions and examples can be read aloud, the same way as on macOS. A speaker appears in the
-// card's left margin while the pointer is over a block and stays, as a stop button, while it plays;
+// card's left margin while the pointer is over a block and stays as a waveform while it plays (clicking still stops);
 // the block is tinted gold while it plays. Its context menu starts with 朗读 (朗读所选文字 for a
 // selection, 停止朗读 while it plays).
 public partial class MainWindow
@@ -25,12 +25,18 @@ public partial class MainWindow
     {
         public string Key { get; } = key;
         public bool Hovering { get; set; }
-        public void Show(bool playing)
+        public void Show(bool playing, bool audioPlaying = false)
         {
             surface.Background = playing ? ReadingTint : Brushes.Transparent;
-            var icon = Theme.Icon(playing ? "StopIcon" : "SpeakerIcon"); icon.Width = 14; icon.Height = 14;
-            if (playing) icon.Stroke = Theme.Brush("Warning");
-            speaker.Content = icon;
+            if (playing)
+            {
+                if (speaker.Content is not SpeechWaveform) speaker.Content = new SpeechWaveform("Warning", 14);
+                ((SpeechWaveform)speaker.Content).IsAnimating = audioPlaying;
+            }
+            else if (speaker.Content is not System.Windows.Shapes.Path)
+            {
+                var icon = Theme.Icon("SpeakerIcon"); icon.Width = icon.Height = 14; speaker.Content = icon;
+            }
             speaker.Visibility = Hovering || playing ? Visibility.Visible : Visibility.Hidden;
             speaker.ToolTip = playing ? "停止朗读" : "朗读";
             AutomationProperties.SetName(speaker, playing ? "停止朗读" : "朗读");
@@ -58,12 +64,12 @@ public partial class MainWindow
         Grid.SetColumn(surface, 1);
         container.Children.Add(surface); container.Children.Add(speaker);
         AlignReadAloud(text, container, speakerOffset, speaker.Height);
-        container.MouseEnter += (_, _) => { block.Hovering = true; block.Show(speakingKey == key); };
-        container.MouseLeave += (_, _) => { block.Hovering = false; block.Show(speakingKey == key); };
+        container.MouseEnter += (_, _) => { block.Hovering = true; block.Show(speakingKey == key, audioPlaying); };
+        container.MouseLeave += (_, _) => { block.Hovering = false; block.Show(speakingKey == key, audioPlaying); };
         speaker.Click += async (_, _) => await ReadAloudAsync(key, text.Text, "");
         text.ContextMenu = ReadAloudMenu(text, key);
         readAloudBlocks.Add(block);
-        block.Show(speakingKey == key);
+        block.Show(speakingKey == key, audioPlaying);
         return container;
     }
 
@@ -119,6 +125,6 @@ public partial class MainWindow
 
     private void ShowReadAloud()
     {
-        foreach (var block in readAloudBlocks) block.Show(speakingKey == block.Key);
+        foreach (var block in readAloudBlocks) block.Show(speakingKey == block.Key, audioPlaying);
     }
 }

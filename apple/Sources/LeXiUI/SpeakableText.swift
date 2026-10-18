@@ -9,7 +9,7 @@ extension EnvironmentValues {
 }
 
 // A definition or example that can be read aloud, the same way as on Windows. A speaker appears in
-// the margin while the pointer is over the block and stays, as a stop button, while it plays; the
+// the margin while the pointer is over the block and stays as a waveform while it plays (clicking still stops); the
 // block is tinted gold while it plays. Its context menu starts with 朗读 (朗读所选文字 for a
 // selection), above the system's Look Up, Translate and Copy, and VoiceOver offers the same action.
 struct Speakable: View {
@@ -45,10 +45,16 @@ struct Speakable: View {
         if speech != nil {
             let shown = hovering || playing
             Button { read("") } label: {
-                Image(systemName: playing ? "stop.fill" : "speaker.wave.2.fill")
-                    .font(.system(size: 11, weight: .medium))
-                    .frame(width: 18, height: 18)
-                    .contentShape(.rect)
+                Group {
+                    if playing {
+                        SpeechWaveform(animate: speech?.audioPlaying == true, size: 14)
+                    } else {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                }
+                .frame(width: 18, height: 18)
+                .contentShape(.rect)
             }
             .buttonStyle(.borderless)
             .foregroundStyle(playing ? AnyShapeStyle(LexiTheme.gold) : AnyShapeStyle(.secondary))
