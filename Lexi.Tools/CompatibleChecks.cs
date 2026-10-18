@@ -127,6 +127,7 @@ internal static class CompatibleChecks
         Check(ModelCatalog.Validate(settings) == null && ModelCatalog.Choices(settings, ["new-model", "model-a"]).Any(m => m.Provider == "compatible" && m.Id == "new-model") &&
             ModelCatalog.JudgeChoices(ModelCatalog.Choices(settings)).Any(m => m.Provider == "compatible"), "discovered text models can be selected for lookup, translation and explicit sense judging");
         await InferenceChecks.Run(root, Check);
+        await SparseMergeChecks.Transport(assets, root, Check);
         await CheckDictionary(assets, root, settings, credentials, Check);
         Console.WriteLine($"{count} custom text provider checks passed");
     }

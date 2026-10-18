@@ -15,6 +15,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 离线词典联合查询、简繁检索、词形匹配 | `OfflineLibrary`、`ChineseVariants`（内置 OpenCC 字表，各平台相同） | 已实现 | 已实现：词库位于 `~/Library/Application Support/LeXi/data` |
 | 输入建议 | `QuerySession.Suggest` | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原 | 已实现：列表悬于输入框下方；↑↓ 预览，Tab 或点击接受，Esc 还原；输入法组字时按键留给输入法 |
 | Wiktionary 在线来源与原文 | `OnlineDictionary`、`QueryView.Online` | 已实现：可展开原文与来源链接 | 已实现：可展开原文与来源链接 |
+| 同义项判断返回精简 | `SenseMerging`：仍逐对判断，仅返回高置信度合并关系；省略项按不确定处理，保留原文及 TL;DR 选择 | 已实现：同一 Core | 已实现：同一 Host/Core |
 | 双模型查词、流式预览、失败隔离 | `DictionaryCoordinator`、`QuerySession`；后台生成与预览采样、重复内容去重，最终结果完整校验 | 已实现：仅排队最新预览，输入/滚动/取消优先 | 已实现：Host 使用同一预览采样 |
 | OAuth 动态模型列表 | 官方客户端模型发现及能力缓存；隐藏模型单独标注；保留已选模型，移除固定四项列表 | 已实现：打开 OAuth 连接即读取完整列表及各模型 effort/速度 | 已实现：打开 OAuth 连接读取同一 Host 列表与能力 |
 | 义项合并与其他表述 | `SenseMerging`、`AnswersView` | 已实现：折叠的“其他表述 / 用法细分” | 已实现：可展开的“其他表述 / 用法细分” |

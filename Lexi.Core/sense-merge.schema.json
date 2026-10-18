@@ -23,13 +23,13 @@
               "equivalent",
               "same_usage",
               "a_covers_b",
-              "b_covers_a",
-              "different",
-              "uncertain"
+              "b_covers_a"
             ]
           },
           "confidence": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0.95,
+            "maximum": 1
           },
           "preferred": {
             "type": "string"
@@ -42,7 +42,8 @@
           "confidence",
           "preferred"
         ]
-      }
+      },
+      "description": "Only confident positive grouping relations. Omitted pairs remain separate."
     },
     "overview": {
       "type": "array",
@@ -51,11 +52,17 @@
       },
       "maxItems": 2,
       "description": "Select 1 or 2 supplied sense IDs for the central everyday meaning of the query, in importance order. Use [] if uncertain. Do not select two paraphrases of one usage."
+    },
+    "comparedPairs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Must equal the supplied pairCount after all requested pairs have been reviewed."
     }
   },
   "required": [
     "inputHash",
     "pairs",
-    "overview"
+    "overview",
+    "comparedPairs"
   ]
 }

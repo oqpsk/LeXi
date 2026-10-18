@@ -25,6 +25,10 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.24 (Windows / macOS)
+
+- Reduce sense-judge output without changing the selected models, effort/speed preferences or the conservative grouping rules. Judges still review every requested pair and select the overview, but return only positive links at confidence >= 0.95 plus the reviewed pair count. Core validates identities/counts and expands omitted pairs to uncertain, so missing links cannot merge senses or create a transitive bridge. Fully enumerated plans remain readable; new judgments use versioned comparison caches. Windows and macOS use the same prompt, schema and decoder through Core/Host; completed saved query views remain unchanged.
+
 ## 0.9.23 (Windows / macOS)
 
 - Keep generation and model-preview processing off the desktop UI synchronization context. Sample Claude and compatible-API JSON previews at most once per 80 ms and skip unchanged content; final responses still receive complete validation. Windows coalesces pending views at background dispatcher priority so input, scrolling and cancellation can run during token bursts, and stale revisions cannot overwrite the latest result. The same preview sampling applies to macOS through Core/Host.

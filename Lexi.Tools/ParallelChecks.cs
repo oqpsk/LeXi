@@ -66,7 +66,7 @@ internal static class ParallelChecks
         Check(facetGroups.Sum(g => g.Variants.Length) == facets.Sum(a => a.Entry!.Senses.Length), "usage grouping retains every original variant and its provenance");
         var singleFacets = facets.Take(1).ToArray();
         Check(SenseMerging.Request("fixture", singleFacets).Pairs.Length == 3, "single-model queries still receive sense comparison");
-        Check(SenseMerging.CacheKind == "sense-merges-v5", "revised grouping never reuses legacy comparison caches");
+        Check(SenseMerging.CacheKind == "sense-merges-v6", "revised grouping never reuses legacy comparison caches");
         foreach (var bad in new[]
         {
             plan with { InputHash = "different query" }, plan with { Pairs = [] },
@@ -171,6 +171,7 @@ internal static class ParallelChecks
         await late.LookupAsync("chad", null, single, false, CancellationToken.None, new CallbackProgress<LookupSnapshot>(_ => lateReports++));
         var before = lateReports; delayed!.Report(Entry(country));
         Check(lateReports == before, "late streaming callback cannot overwrite a completed answer");
+        await SparseMergeChecks.Run(work, Check);
         Console.WriteLine($"{count} parallel lookup and sense-merging checks passed");
     }
 }
