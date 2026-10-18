@@ -4,8 +4,10 @@ import SwiftUI
 
 // Menu commands act on the focused window's query page.
 public struct LexiActions {
-    public let back, forward, home, regenerate, focusSearch: () -> Void
-    public let canBack, canForward, canRegenerate: Bool
+    public let back, forward, home, regenerate, focusSearch, speak, copySummary: () -> Void
+    public let canBack, canForward, canRegenerate, canSpeak, canCopySummary: Bool
+    // "复制 TL;DR" on a dictionary page, "复制译文" on a translation.
+    public let copyTitle: String
 }
 extension FocusedValues { @Entry public var lexiActions: LexiActions? }
 
@@ -20,6 +22,9 @@ public struct MainView: View {
     @State private var position = ScrollPosition(edge: .top)
     @State private var offset: CGFloat = 0
     @FocusState private var searchFocused: Bool
+    @FocusState private var senseFocus: String?
+    // A short confirmation in the status line, such as after copying.
+    @State private var notice = ""
     @Environment(\.appearsActive) private var appearsActive
     @Environment(\.openWindow) private var openWindow
 
@@ -45,7 +50,8 @@ public struct MainView: View {
         }
         .safeAreaBar(edge: .top) {
             VStack(spacing: 8) {
-                SearchBar(store: store, text: $text, programmatic: $programmatic, cursor: $cursor, focused: $searchFocused, submit: submit)
+                SearchBar(store: store, text: $text, programmatic: $programmatic, cursor: $cursor, focused: $searchFocused, submit: submit,
+                          enterResults: enterResults)
                     .padding(.horizontal, 20).padding(.top, 2)
                 if searchFocused, let preview = store.inputPreview {
                     Button { submit(preview.query) } label: { InputPreviewCard(preview: preview) }
@@ -63,10 +69,16 @@ public struct MainView: View {
         .onChange(of: store.view.request) { _, _ in pageChanged() }
         .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
         .focusedSceneValue(\.lexiActions, LexiActions(back: { navigate(-1) }, forward: { navigate(1) }, home: goHome,
-            regenerate: regenerate, focusSearch: focusSearch,
-            canBack: store.view.navigation.canBack, canForward: store.view.navigation.canForward, canRegenerate: canRegenerate))
-        .defaultFocus($searchFocused, true)
-        .onChange(of: appearsActive, initial: true) { _, active in if active { focusSearch() } }
+            regenerate: regenerate, focusSearch: focusSearch, speak: speakHeadword, copySummary: copySummary,
+            canBack: store.view.navigation.canBack, canForward: store.view.navigation.canForward, canRegenerate: canRegenerate,
+            canSpeak: store.view.kind != .home && !store.view.speechText.isEmpty, canCopySummary: !summary.isEmpty,
+            copyTitle: store.view.kind == .translation ? "复制译文" : "复制 TL;DR"))
+        // No defaultFocus: it pulls focus back to the query field and would keep the senses from taking
+        // the keyboard. Activation focuses the query instead.
+        .onChange(of: appearsActive, initial: true) { _, active in if active { focusSearch(); lookUpSummoned() } }
+        .onChange(of: senseFocus) { _, key in
+            if let key { withAnimation(.easeOut(duration: 0.15)) { position.scrollTo(id: key, anchor: .center) } }
+        }
     }
 
     @ViewBuilder private var content: some View {
@@ -79,7 +91,7 @@ public struct MainView: View {
             if store.view.kind == .home {
                 HistoryView(store: store) { entry in setText(entry.query); submit(entry.query) }
             } else {
-                EntryView(store: store, speech: speech).environment(speech)
+                EntryView(store: store, speech: speech, keyboard: SenseKeyboard(focus: $senseFocus, leave: focusSearch)).environment(speech)
             }
         }
     }
@@ -88,7 +100,7 @@ public struct MainView: View {
     private var canRegenerate: Bool { store.view.kind != .home && store.view.canRegenerate && online }
 
     // Speech messages share the status line with the query, as in the Windows status bar; the newer one shows.
-    private var status: String { speech.status.isEmpty ? store.view.status : speech.status }
+    private var status: String { !notice.isEmpty ? notice : speech.status.isEmpty ? store.view.status : speech.status }
 
     // Status on the leading side; regeneration and the online mode as grouped glass controls.
     private var bottomBar: some View {
@@ -147,6 +159,7 @@ public struct MainView: View {
     // As on Windows, the query is ready whenever the window comes forward or ⌘L is pressed: the
     // cursor is in it with the last query selected, so the next word simply replaces it.
     private func focusSearch() {
+        senseFocus = nil
         searchFocused = true
         DispatchQueue.main.async { (NSApp.keyWindow?.firstResponder as? NSTextView)?.selectAll(nil) }
     }
@@ -158,6 +171,46 @@ public struct MainView: View {
         store.clearSuggestions()
         store.previewInput(text)
         searchFocused = true
+    }
+
+    // ↓ or Tab in the query field with no suggestions: the first sense takes the keyboard.
+    private func enterResults() -> Bool {
+        guard store.view.kind == .dictionary, let first = store.view.answers?.senses.first?.key else { return false }
+        senseFocus = first
+        return true
+    }
+
+    // Text selected or copied in another app before ⌘2 (InstantLookup), handled as Core decides:
+    // looked up at once, or left in the query field, selected, to edit or confirm with Return.
+    private func lookUpSummoned() {
+        guard let raw = InstantLookup.shared.take() else { return }
+        Task {
+            guard let candidate = await store.candidate(raw) else { return }
+            setText(candidate.text)
+            if candidate.submit { submit(candidate.text) }
+            focusSearch()
+        }
+    }
+
+    // ⌘D reads the headword, or stops it.
+    private func speakHeadword() {
+        guard store.view.kind != .home, !store.view.speechText.isEmpty else { return }
+        speech.toggle(store.view.speechText, using: store)
+    }
+
+    // ⌘⇧C copies what the page says in brief: the TL;DR, or the whole translation.
+    private var summary: String {
+        switch store.view.kind {
+        case .dictionary: store.view.quickRead.visible ? store.view.quickRead.text : ""
+        case .translation: store.view.translation?.paragraphs.joined(separator: "\n\n") ?? ""
+        case .home: ""
+        }
+    }
+    private func copySummary() {
+        guard !summary.isEmpty else { return }
+        copyToPasteboard(summary)
+        notice = store.view.kind == .translation ? "已复制译文" : "已复制 TL;DR"
+        Task { try? await Task.sleep(for: .seconds(2)); notice = "" }
     }
 
     private func submit(_ value: String) {
@@ -188,6 +241,7 @@ public struct MainView: View {
 
     private func pageChanged() {
         speech.stop()
+        senseFocus = nil
         position.scrollTo(edge: .top)
         if store.view.kind != .home { setText(store.view.input) }
     }

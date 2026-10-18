@@ -6,18 +6,22 @@ import SwiftUI
 struct AnswersCard: View {
     let answers: Answers
     @Bindable var store: LexiStore
+    var keyboard: SenseKeyboard? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(answers.references.enumerated()), id: \.element.key) { index, reference in
                 Row(first: index == 0) { ReferenceRow(reference: reference, store: store) }
             }
+            let keys = answers.senses.map(\.key)
             ForEach(Array(answers.senses.enumerated()), id: \.element.key) { index, sense in
                 Row(first: index + answers.references.count == 0) {
                     VStack(alignment: .leading, spacing: 4) {
                         SenseHeadingText(heading: sense.heading)
                         SenseContent(sense: sense, store: store)
                     }
+                    .keyboardSense(sense, keys: keys, keyboard: keyboard, store: store)
+                    .id(sense.key)
                 }
             }
             ForEach(Array(answers.notices.enumerated()), id: \.offset) { _, notice in

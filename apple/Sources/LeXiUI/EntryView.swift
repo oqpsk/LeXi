@@ -5,8 +5,13 @@ import SwiftUI
 public struct EntryView: View {
     @Bindable var store: LexiStore
     var speech: SpeechController
+    // The query window passes its keyboard focus for the senses (KeyboardSense).
+    var keyboard: SenseKeyboard?
 
     public init(store: LexiStore, speech: SpeechController) { self.store = store; self.speech = speech }
+    init(store: LexiStore, speech: SpeechController, keyboard: SenseKeyboard) {
+        self.store = store; self.speech = speech; self.keyboard = keyboard
+    }
 
     public var body: some View {
         let view = store.view
@@ -34,7 +39,7 @@ public struct EntryView: View {
                 if let translation = view.translation { TranslationCard(translation: translation) }
             } else {
                 VStack(alignment: .leading, spacing: 18) {
-                    if let answers = view.answers, !answers.empty { AnswersCard(answers: answers, store: store) }
+                    if let answers = view.answers, !answers.empty { AnswersCard(answers: answers, store: store, keyboard: keyboard) }
                     LocalSourcesView(view: view, store: store)
                     OnlineSourceView(view: view, store: store)
                 }

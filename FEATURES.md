@@ -14,6 +14,8 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 窗口来到前台即可输入 | 不适用：窗口行为 | 已实现：窗口激活时聚焦输入框并全选，Ctrl+L 同 | 已实现：窗口来到前台时聚焦输入框并全选上次的查询，⌘L 同 |
 | 离线词典联合查询、简繁检索、词形匹配 | `OfflineLibrary`、`ChineseVariants`（内置 OpenCC 字表，各平台相同） | 已实现 | 已实现：词库位于 `~/Library/Application Support/LeXi/data` |
 | 输入停顿 TL;DR | `InputPreview` / `QuerySession.PreviewAsync`：先读已保存结果，再读启用的本地词库；显示实际匹配词；不联网，不写历史，不改变导航和当前结果 | 已实现：停顿 300 ms 显示紧凑 TL;DR，跟随建议选择；组字时等待，Esc/查询时取消；点击或 Enter 打开完整查询 | 已实现：通过 Host 的 `query.preview` 读取同一内容；相同停顿、组字与取消规则，原生卡片位于输入框下方 |
+| 选中或刚复制的文字直接查 | `LookupCandidates`（Host `query.candidate`）：去掉随词带来的引号和标点；单词、短语直接查，长文字只填入输入框；链接、路径不查 | 未实现 | 已实现：⌘2 呼出时读取其他应用中选中的文字（可选，需辅助功能权限）或几秒内刚复制的文字；只轮询剪贴板变化计数，⌘2 时才读取内容；LeXi 自己复制的内容不算 |
+| 键盘浏览结果 | 不适用：前端按键 | 未实现 | 已实现：输入框中 ↓ 或 Tab 进入释义，↑ ↓ 切换，空格朗读，Return 展开例句，⌘C 复制释义，Esc 回到输入框；⌘D 朗读词头，⇧⌘C 复制 TL;DR 或译文 |
 | 输入建议 | `QuerySession.Suggest`：历史精确大小写、重复次数、近期查询优先，再接离线词库 | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原 | 已实现：列表悬于输入框下方；↑↓ 预览，Tab 或点击接受，Esc 还原；输入法组字时按键留给输入法 |
 | Wiktionary 在线来源与原文 | `OnlineDictionary`、`QueryView.Online` | 已实现：可展开原文与来源链接 | 已实现：可展开原文与来源链接 |
 | 同义项判断返回精简 | `SenseMerging`：仍逐对判断，仅返回高置信度合并关系；省略项按不确定处理，保留原文及 TL;DR 选择 | 已实现：同一 Core | 已实现：同一 Host/Core |
@@ -63,7 +65,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 全局呼出 | 固定到任务栏第 2 位后，Win+2 呼出或最小化 | ⌘2 在任何应用中呼出 LeXi、再按隐藏，优先于其他应用自己的 ⌘2（系统级热键，无需辅助功能权限）；“设置 → 通用”可关闭，并可设为登录时打开 |
 | 单实例 | 互斥量与命名管道激活已有窗口 | macOS 应用默认单实例，单一查询窗口 |
 | 设计语言 | Windows 11 Acrylic 深色浮窗，粉色点缀 | Apple 设计语言：Liquid Glass 查询胶囊、工具栏与底部控件，结果在其下滚动；窗口本身是一整块 Liquid Glass（如控制中心），透出桌面并随深浅色变为浅色或深色玻璃，开启“减少透明度”时更不透明；系统颜色与强调色，跟随深浅色；粉色用于 TL;DR 与深色界面的词头播放声纹，词性用与 Windows 相同的淡金色（浅色下加深） |
-| 快捷键 | Ctrl+L、Ctrl+,、Ctrl+Q；Esc 收起建议或最小化 | ⌘2（全局）、⌘L、⌘R、⌘[、⌘]、⌘Y、⌘,、⌘Q；Esc 收起建议 |
+| 快捷键 | Ctrl+L、Ctrl+,、Ctrl+Q；Esc 收起建议或最小化 | ⌘2（全局）、⌘L、⌘R、⌘D、⇧⌘C、⌘[、⌘]、⌘Y、⌘,、⌘Q；Esc 收起建议；结果中 ↑ ↓、空格、Return、⌘C、Esc |
 | 查询逻辑接入 | 直接引用 `Lexi.Core` | 内置 `Lexi.Host`（JSON lines） |
 | 构建与分发 | `scripts/Build.ps1`，可生成自包含版本 | `apple/scripts/build-app.sh`，按构建机器架构生成本机签名的应用；Developer ID 签名与公证计划中 |
 | 发音状态 | 底栏显示生成、播放与错误状态 | 底栏显示生成、播放与错误状态；扬声器按钮显示播放或停止 |

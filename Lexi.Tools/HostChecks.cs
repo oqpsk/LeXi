@@ -73,6 +73,11 @@ internal static class HostChecks
                 inputPreview.GetProperty("text").GetString()=="你好" && ReferenceEquals(beforePreview,session.View) && session.History.Entries.Count==0 &&
                 (await client.Call("query.preview",new {text="hel"})).GetProperty("result").ValueKind==JsonValueKind.Null,
                 "the native preview endpoint exposes shared local glosses without publishing a query or recording history");
+            var candidate = (await client.Call("query.candidate", new { text = "“serendipity,”" })).GetProperty("result");
+            Check(candidate.GetProperty("text").GetString() == "serendipity" && candidate.GetProperty("submit").GetBoolean() &&
+                (await client.Call("query.candidate", new { text = "https://example.org" })).GetProperty("result").ValueKind == JsonValueKind.Null &&
+                ReferenceEquals(beforePreview, session.View) && session.History.Entries.Count == 0,
+                "summoning with copied or selected text uses Core's lookup rule without starting a query");
 
             var submitted = (await client.Call("query.submit", new { text = "serendipity" })).GetProperty("result");
             var request = submitted.GetProperty("request").GetInt64();

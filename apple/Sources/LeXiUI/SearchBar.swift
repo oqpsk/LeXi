@@ -20,11 +20,14 @@ public struct SearchBar: View {
     @Binding var cursor: SuggestionCursor
     var focused: FocusState<Bool>.Binding
     let submit: (String) -> Void
+    // Moves the keyboard into the results when there are no suggestions to step through.
+    let enterResults: () -> Bool
     @State private var editing = false
 
     public init(store: LexiStore, text: Binding<String>, programmatic: Binding<Bool>, cursor: Binding<SuggestionCursor>,
-                focused: FocusState<Bool>.Binding, submit: @escaping (String) -> Void) {
-        self.store = store; self._text = text; self._programmatic = programmatic; self._cursor = cursor; self.focused = focused; self.submit = submit
+                focused: FocusState<Bool>.Binding, submit: @escaping (String) -> Void, enterResults: @escaping () -> Bool = { false }) {
+        self.store = store; self._text = text; self._programmatic = programmatic; self._cursor = cursor; self.focused = focused
+        self.submit = submit; self.enterResults = enterResults
     }
 
     public var body: some View {
@@ -41,9 +44,9 @@ public struct SearchBar: View {
                     text.append("\n"); return .handled
                 }
                 .onSubmit { finish() }
-                .onKeyPress(.downArrow) { !Self.composing && move(1) ? .handled : .ignored }
+                .onKeyPress(.downArrow) { !Self.composing && (move(1) || !text.contains("\n") && enterResults()) ? .handled : .ignored }
                 .onKeyPress(.upArrow) { !Self.composing && move(-1) ? .handled : .ignored }
-                .onKeyPress(.tab) { !Self.composing && accept() ? .handled : .ignored }
+                .onKeyPress(.tab) { !Self.composing && (accept() || enterResults()) ? .handled : .ignored }
                 .onKeyPress(.escape) { !Self.composing && dismiss(restore: true) ? .handled : .ignored }
                 .onChange(of: text) { _, value in edited(value) }
                 .accessibilityLabel("查询")
