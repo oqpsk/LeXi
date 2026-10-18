@@ -38,10 +38,15 @@ public static class QuickRead
     }
     private static string Label(AiSense sense)
     { var label = LexicalLabels.Usage(sense.Register); return label.Length > 0 ? label : LexicalLabels.PartOfSpeech(sense.PartOfSpeech); }
-    public static QuickMeaning[] Create(SenseGroup[] groups, SpecialistReference[] uncovered, LocalHit[] local)
+    // lead: the model whose completed answer first gave the overview. Until the judge ranks meanings
+    // across models, each model marks its own core meaning, often the same meaning in other words;
+    // only the lead's are shown, so a second model finishing never lists a near-duplicate beside it.
+    public static QuickMeaning[] Create(SenseGroup[] groups, SpecialistReference[] uncovered, LocalHit[] local, LookupModel? lead = null)
     {
         var complete = groups.Where(g => g.Variants.Any(v => !v.Provisional)).ToArray();
         var assessed = complete.Any(g => g.OverviewAssessed);
+        bool Led(SenseGroup g) => g.Variants.Any(v => !v.Provisional && v.Model == lead);
+        if (!assessed && lead != null && complete.Any(Led)) complete = complete.Where(Led).ToArray();
         var selected = assessed
             ? complete.Where(g => g.OverviewRank != null).OrderBy(g => g.OverviewRank).ToArray()
             : complete.Where(g => g.Variants.Any(v => !v.Provisional && v.Sense.CoreMeaning == true)).ToArray();
@@ -51,7 +56,7 @@ public static class QuickRead
         var choices = new List<QuickMeaning>();
         foreach (var group in core ? selected : complete)
         {
-            var candidate = group.Variants.First(v => !v.Provisional);
+            var candidate = group.Variants.FirstOrDefault(v => !v.Provisional && !assessed && v.Model == lead) ?? group.Variants.First(v => !v.Provisional);
             var sense = candidate.Sense;
             var alternateTerm = group.Variants.Where(v => !v.Provisional).Select(v => ValidGloss(v.Sense.ChineseTerm)).FirstOrDefault(t => t.Length > 0) ?? "";
             choices.Add(new(SummaryText(sense, alternateTerm), Label(sense), core));
