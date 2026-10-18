@@ -39,7 +39,9 @@ struct CompatibleConnectionSettings: View {
                 saved = keys.hasSaved(baseUrl)
             }
         }
-        .onChange(of: baseUrl) { _, _ in
+        .onChange(of: baseUrl) { old, _ in
+            // Filling in the saved address on appear is not an edit: keep the opening guidance.
+            guard !old.isEmpty else { return }
             invalidate(); clientId = ""; clientSecret = ""; apiKey = ""; saved = keys.hasSaved(baseUrl)
         }
         .onChange(of: clientId) { _, _ in invalidate() }
