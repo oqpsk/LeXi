@@ -2,6 +2,7 @@
 
 ## Unreleased — major-version preparation
 
+- macOS light mode no longer turns grey over a dark desktop. Light glass now carries a near-white wash, so it reads as frosted white. The results sit on white groups instead of grey ones, and the TL;DR card is a clearer pale pink. The query capsule has a hairline edge, so it stays visible on near-white glass. Dark mode is unchanged.
 - Keep the TL;DR to one wording while senses merge. Each model marks its own core meaning, so after both answered the TL;DR used to list the same meaning twice ("末日刷屏：沉迷浏览负面消息；末日刷屏：沉迷刷…") until the judge finished. Until the merge ranks meanings, the TL;DR now follows the first model to complete and does not change when the other finishes; with merging off or failed it stays with that model.
 - Reach a useful result sooner, measured rather than guessed.
   - **TL;DR preview.** Until any model completes, a streamed sense that the model has finished and marked as the core meaning leads the TL;DR as a 预览. With Codex and Claude in parallel, the TL;DR of a new word appeared at about 5.6–5.9 s instead of 10.5–10.9 s. Local excerpts and completed answers still take precedence.

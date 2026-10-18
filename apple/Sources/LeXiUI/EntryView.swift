@@ -27,7 +27,7 @@ public struct EntryView: View {
                     }
                     .padding(.horizontal, 16).padding(.vertical, 14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(LexiTheme.pink.opacity(0.12), in: .rect(cornerRadius: 18, style: .continuous))
+                    .background(LexiTheme.quickReadFill, in: .rect(cornerRadius: 18, style: .continuous))
                     .accessibilityLabel("TL;DR 等待释义").padding(.bottom, 10)
                 }
                 ResultProgressBar(progress: view.progress, generation: view.progressGeneration) {
@@ -170,7 +170,7 @@ struct QuickReadCard: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LexiTheme.pink.opacity(0.12), in: .rect(cornerRadius: 18, style: .continuous))
+        .background(LexiTheme.quickReadFill, in: .rect(cornerRadius: 18, style: .continuous))
         .help(quickRead.caption + "\n" + quickRead.explanation)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(quickRead.caption + "。" + quickRead.text)
