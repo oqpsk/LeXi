@@ -17,6 +17,9 @@ public sealed class QuerySession : IDisposable
     private readonly CodexDictionary codex;
     private readonly ClaudeDictionary claude, secondaryClaude;
     private readonly QueryProviders providers;
+    private readonly CompatibleTextClient compatibleClient;
+    private readonly bool ownsCompatibleClient;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CompatibleCredentials> compatibleCredentials = new();
     private readonly bool warmClients;
     private readonly QueryProgressTracker progress = new();
     private readonly TimeProvider clock;
@@ -27,7 +30,8 @@ public sealed class QuerySession : IDisposable
     private bool disposed;
 
     public QuerySession(LexiPaths paths, Task<OfflineLibrary>? library = null, QueryProviders? providers = null,
-        HttpMessageHandler? network = null, TimeProvider? clock = null)
+        HttpMessageHandler? network = null, TimeProvider? clock = null,
+        Func<string, CompatibleCredentials>? textCredentials = null, CompatibleTextClient? textClient = null)
     {
         Paths = paths;
         Cache = new(paths.UserRoot);
@@ -37,12 +41,18 @@ public sealed class QuerySession : IDisposable
         web = new(network); pronunciations = new(network);
         codex = new(paths.AssetRoot, paths.UserRoot);
         claude = new(paths.AssetRoot, paths.UserRoot); secondaryClaude = new(paths.AssetRoot, paths.UserRoot);
+        compatibleClient = textClient ?? new(); ownsCompatibleClient = textClient == null;
+        var compatible = new CompatibleDictionary(paths.AssetRoot, compatibleClient, textCredentials ?? (url =>
+            compatibleCredentials.GetValueOrDefault(CompatibleText.NormalizeBase(url)) ?? new()), paths.UserRoot);
         warmClients = providers == null;
-        this.providers = providers ?? new((model, query, evidence, options, token, preview) => model.Provider == "claude"
-                ? (model == LookupModel.Primary(Settings) ? claude : secondaryClaude).LookupAsync(query, evidence, model.Model, token, preview)
-                : codex.LookupAsync(query, evidence, options, token), codex.JudgeSensesAsync,
-            (text, target, options, token, preview) => options.Provider == "claude"
-                ? claude.TranslateAsync(text, target, options.Model, token, preview) : codex.TranslateAsync(text, target, options, token));
+        this.providers = providers ?? new((model, query, evidence, options, token, preview) => model.Provider == CompatibleText.Provider
+                ? compatible.LookupAsync(query, evidence, options, token, preview) : model.Provider == "claude"
+                ? (model == LookupModel.Primary(Settings) ? claude : secondaryClaude).LookupAsync(query, evidence, options, token, preview)
+                : codex.LookupAsync(query, evidence, options, token),
+            (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.JudgeAsync(request, options, token) : codex.JudgeSensesAsync(request, options, token),
+            (text, target, options, token, preview) => options.Provider == CompatibleText.Provider
+                ? compatible.TranslateAsync(text, target, options, token, preview) : options.Provider == "claude"
+                ? claude.TranslateAsync(text, target, options, token, preview) : codex.TranslateAsync(text, target, options, token));
         this.clock = clock ?? TimeProvider.System;
         View = Build();
     }
@@ -60,7 +70,8 @@ public sealed class QuerySession : IDisposable
     // Raised in order for every published view; front ends marshal to their UI thread if needed.
     public event Action<QueryView>? Changed;
 
-    private string ProviderName => Settings.Provider == "claude" ? "Claude" : "Codex";
+    public void SetTextCredentials(string baseUrl, CompatibleCredentials credentials) => compatibleCredentials[CompatibleText.NormalizeBase(baseUrl)] = credentials;
+    private string ProviderName => Settings.Provider == CompatibleText.Provider ? "自定义文本服务" : Settings.Provider == "claude" ? "Claude" : "Codex";
 
     public async Task InitializeAsync()
     {
@@ -126,10 +137,10 @@ public sealed class QuerySession : IDisposable
     public void UpdatePreparedModel()
     {
         if (!warmClients) return;
-        if (Settings.Online && Settings.AutoAi && Settings.Provider == "claude") claude.Prepare(Settings.Model);
+        if (Settings.Online && Settings.AutoAi && Settings.Provider == "claude") claude.Prepare(Settings.ForModel(LookupModel.Primary(Settings)));
         else claude.ReleasePrepared();
         var second = LookupModel.Secondary(Settings);
-        if (Settings.Online && Settings.AutoAi && Settings.ParallelLookup && second.Provider == "claude" && second != LookupModel.Primary(Settings)) secondaryClaude.Prepare(second.Model);
+        if (Settings.Online && Settings.AutoAi && Settings.ParallelLookup && second.Provider == "claude" && second != LookupModel.Primary(Settings)) secondaryClaude.Prepare(Settings.ForModel(second));
         else secondaryClaude.ReleasePrepared();
     }
 
@@ -316,7 +327,10 @@ public sealed class QuerySession : IDisposable
                         Publish();
                     }
                 });
-                var result = await coordinator.LookupAsync(query, evidence, Settings, force, token, report);
+                var options = Settings.ForModel(LookupModel.Primary(Settings));
+                // Buffered SSE and CLI output can complete reads synchronously for a whole burst.
+                // Keep parsing, grouping and provider callbacks off the front end's UI context.
+                var result = await Task.Run(() => coordinator.LookupAsync(query, evidence, options, force, token, report), token);
                 token.ThrowIfCancellationRequested();
                 lock (gate) finished = true;
                 Step(id, () => Presentation.ApplyAnswers(result, sourceEvidence));
@@ -418,7 +432,8 @@ public sealed class QuerySession : IDisposable
                     Publish();
                 }
             });
-            var entry = await providers.Translate(text, target, Settings, token, report);
+            var options = Settings.ForModel(LookupModel.Primary(Settings));
+            var entry = await Task.Run(() => providers.Translate(text, target, options, token, report), token);
             token.ThrowIfCancellationRequested();
             lock (gate) finished = true;
             timing.MarkFirst();
@@ -538,10 +553,9 @@ public sealed class QuerySession : IDisposable
     public static string ModelStatus(LookupSnapshot snapshot) => string.Join(" · ", snapshot.Answers.Select(a => a.Model.Name + (a.Phase switch
     { ModelPhase.Pending => " 查询中", ModelPhase.Streaming => " 生成中", ModelPhase.Complete => a.Cached ? " 缓存" : " 完成", ModelPhase.Failed => " 未完成", _ => a.Cached ? " 缓存" : " 无缓存" })));
 
-    // Progress<T> keeps UI-thread delivery for desktop front ends; without a synchronization
-    // context (the host), updates are delivered inline so they cannot be reordered.
-    private static IProgress<T> Reporter<T>(Action<T> handler) =>
-        SynchronizationContext.Current != null ? new Progress<T>(handler) : new InlineProgress<T>(handler);
+    // Process ordered model snapshots on the generation worker. Front ends marshal complete
+    // views; posting every token to their synchronization context would starve input/cancel.
+    private static IProgress<T> Reporter<T>(Action<T> handler) => new InlineProgress<T>(handler);
 
     private bool Step(long id, Action action)
     {
@@ -559,7 +573,7 @@ public sealed class QuerySession : IDisposable
     public void Dispose()
     {
         lock (gate) { disposed = true; lookup?.Cancel(); }
-        claude.Dispose(); secondaryClaude.Dispose(); web.Dispose(); pronunciations.Dispose();
+        claude.Dispose(); secondaryClaude.Dispose(); compatibleCredentials.Clear(); if (ownsCompatibleClient) compatibleClient.Dispose(); web.Dispose(); pronunciations.Dispose();
         if (Library.IsCompletedSuccessfully) Library.Result.Dispose();
     }
 }

@@ -15,6 +15,9 @@ public final class LexiStore {
     public private(set) var suggestions: [String] = []
     public private(set) var dictionaries: DictionaryList?
     public private(set) var version = ""
+    public private(set) var compatibleModels: [ModelChoice] = []
+    private var compatibleModelsEndpoint = ""
+    private let textKeys: any TextCredentialStore
     // Disclosures the reader opened or closed in this lookup, keyed by Core sense keys plus
     // ":examples", ":sources" or ":alternatives". Untouched disclosures use their default.
     public var details: [String: Bool] = [:]
@@ -26,7 +29,7 @@ public final class LexiStore {
     private var client: HostClient?
     private var suggestionRequest = 0
 
-    public init() {}
+    public init(textKeys: any TextCredentialStore = KeychainTextCredentials()) { self.textKeys = textKeys }
 
     public func start(executable: URL, arguments: [String]) async {
         let client = HostClient(executable: executable, arguments: arguments) { [weak self] event in
@@ -94,11 +97,13 @@ public final class LexiStore {
     // ---- Queries ----
     public func submit(_ text: String, force: Bool = false, scroll: Double = 0) async {
         suggestions = []
+        await provideTextCredentials()
         _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll)) as SubmitResult?
         await refreshHistoryIfHome()
     }
-    public func regenerate() async { _ = try? await client?.call("query.regenerate") as SubmitResult? }
+    public func regenerate() async { await provideTextCredentials(); _ = try? await client?.call("query.regenerate") as SubmitResult? }
     public func navigate(_ direction: Int, scroll: Double = 0) async -> QueryPage? {
+        await provideTextCredentials()
         let result = try? await client?.call("query.navigate", Navigate(direction: direction, scroll: scroll)) as NavigateResult?
         return result?.page
     }
@@ -141,6 +146,20 @@ public final class LexiStore {
         catch let error as HostError { return error.message }
         catch { return error.localizedDescription }
     }
+    public func configureInference(_ model: ModelChoice, effort: String, speed: String) async -> String? {
+        guard let client else { return nil }
+        do {
+            settings = try await client.call("inference.configure", ["provider": model.provider, "model": model.id, "effort": effort, "speed": speed])
+            return nil
+        } catch let error as HostError { return error.message }
+        catch { return error.localizedDescription }
+    }
+    public func readSubscriptionModels() async -> String? {
+        guard let client else { return nil }
+        do { settings = try await client.call("inference.models"); return nil }
+        catch let error as HostError { return error.message }
+        catch { return error.localizedDescription }
+    }
     public func refreshSettings() async {
         if let payload = try? await client?.call("settings.get") as SettingsPayload? { settings = payload }
     }
@@ -154,6 +173,48 @@ public final class LexiStore {
         guard let client else { return nil }
         return try? await client.callOptional("connection.loginCommand", ["provider": provider], as: LoginCommand.self)
     }
+
+    // ---- Custom text service ----
+    public var queryModels: [ModelChoice] {
+        let saved = settings?.models ?? []
+        guard let endpoint = settings?.settings.compatibleBaseUrl,
+              (try? TextCredentials.endpoint(endpoint)) == compatibleModelsEndpoint else { return saved }
+        return saved + compatibleModels.filter { model in !saved.contains(where: { $0.key == model.key }) }
+    }
+    public var judgeChoices: [ModelChoice] { queryModels.filter { $0.provider == "codex" || $0.provider == "compatible" } }
+    public func clearCompatibleModels() { compatibleModels = []; compatibleModelsEndpoint = "" }
+    public func textModels(_ baseUrl: String, credentials: TextCredentials) async throws -> [ModelChoice] {
+        guard let client else { throw HostError.exited }
+        let models = try await client.call("text.models", TextRequest(baseUrl: baseUrl, credentials: credentials), as: TextModels.self).models
+        await refreshSettings()
+        return models
+    }
+    public func keepTextModels(_ models: [ModelChoice], baseUrl: String) {
+        compatibleModels = models; compatibleModelsEndpoint = (try? TextCredentials.endpoint(baseUrl)) ?? ""
+    }
+    public func forgetTextCredentials(_ baseUrl: String) async {
+        _ = try? await client?.call("text.credentials", TextRequest(baseUrl: baseUrl, credentials: TextCredentials())) as TextConfigured?
+    }
+    private func provideTextCredentials() async {
+        guard let settings = settings?.settings, settings.online,
+              settings.provider == "compatible" || settings.parallelLookup && settings.secondaryProvider == "compatible" || settings.mergeSenses && settings.judgeProvider == "compatible",
+              let endpoint = settings.compatibleBaseUrl else { return }
+        // Missing/denied Keychain access passes no credentials: Core can still restore a saved view,
+        // or show its explicit missing-credentials error if a network request is needed.
+        let credentials = (try? textKeys.read(endpoint)) ?? TextCredentials()
+        _ = try? await client?.call("text.credentials", TextRequest(baseUrl: endpoint, credentials: credentials)) as TextConfigured?
+    }
+    private struct TextRequest: Encodable, Sendable {
+        let baseUrl: String
+        let clientId: String
+        let clientSecret: String
+        let apiKey: String
+        init(baseUrl: String, credentials: TextCredentials) {
+            self.baseUrl = baseUrl; clientId = credentials.clientId; clientSecret = credentials.clientSecret; apiKey = credentials.apiKey
+        }
+    }
+    private struct TextModels: Decodable, Sendable { let models: [ModelChoice] }
+    private struct TextConfigured: Decodable, Sendable {}
 
     // ---- Speech ----
     public var speechSelection: SpeechSelection {

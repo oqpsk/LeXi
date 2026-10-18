@@ -1,31 +1,54 @@
 namespace Lexi.Core;
 
-public sealed record ModelChoice(string Label, string Id, string Provider = "codex")
-{ public override string ToString() => Label; }
+public sealed record ModelChoice(string Label, string Id, string Provider = "codex", InferenceCapabilities? Options = null, string Effort = "", string Speed = "", bool Hidden = false)
+{
+    public InferenceCapabilities Capabilities => Options ?? InferenceOptions.Subscription(Provider, Id);
+    public override string ToString() => Label;
+}
 
 // Model options and settings rules shared by every settings screen.
 public static class ModelCatalog
 {
-    public static ModelChoice[] Choices(AppSettings settings)
+    public static ModelChoice Choice(string provider, string id, InferenceCapabilities? capabilities = null, bool hidden = false)
     {
-        var choices = new List<ModelChoice> { new("Claude Haiku · 流式显示", "haiku", "claude"), new("GPT-6 Luna · Fast", "gpt-6-luna"),
-            new("GPT-6.1 Sol · Fast", "gpt-6.1-sol"), new("Codex 默认 · Fast", "") };
-        // Keep a previously saved model selectable even when it is no longer offered by default.
-        foreach (var selected in new[] { LookupModel.Primary(settings), LookupModel.Secondary(settings), new LookupModel("codex", settings.JudgeModel) })
-            if (!choices.Any(x => x.Id == selected.Model && x.Provider == selected.Provider)) choices.Add(new(selected.Name, selected.Model, selected.Provider));
-        return choices.ToArray();
+        var options = capabilities ?? (provider == CompatibleText.Provider ? InferenceOptions.Unknown : InferenceOptions.Subscription(provider, id));
+        const string hiddenNote = "官方客户端隐藏模型；能否调用取决于订阅权限。";
+        if (hidden && !options.Note.Contains(hiddenNote, StringComparison.Ordinal)) options = options with { Note = hiddenNote + options.Note };
+        return new((provider == CompatibleText.Provider ? "API | " : "OAuth | ") + new LookupModel(provider, id).Name + (hidden ? " · 隐藏" : ""), id, provider, options, Hidden: hidden);
     }
-    // The sense judge runs through the Codex subscription.
-    public static ModelChoice[] JudgeChoices(ModelChoice[] choices) => choices.Where(c => c.Provider == "codex").ToArray();
+    public static ModelChoice[] Choices(AppSettings settings, IEnumerable<string>? compatibleModels = null, IEnumerable<ModelChoice>? details = null)
+    {
+        var choices = new List<ModelChoice>();
+        if (details != null) foreach (var model in details)
+        {
+            choices.RemoveAll(m => m.Provider == model.Provider && m.Id == model.Id);
+            choices.Add(Choice(model.Provider, model.Id, model.Options, model.Hidden));
+        }
+        if (compatibleModels != null)
+            choices.AddRange(compatibleModels.Where(CompatibleText.ValidModel).Distinct(StringComparer.Ordinal).Select(id => Choice(CompatibleText.Provider, id)));
+        // Keep a previously saved model selectable even when it is no longer offered by default.
+        foreach (var selected in new[] { LookupModel.Primary(settings), LookupModel.Secondary(settings), new LookupModel(settings.JudgeProvider, settings.JudgeModel) })
+            if (!choices.Any(x => x.Id == selected.Model && x.Provider == selected.Provider)) choices.Add(Choice(selected.Provider, selected.Model));
+        return choices.Select(m => { var selected = InferenceOptions.Selected(settings, new(m.Provider, m.Id)); return m with { Effort = selected.Effort, Speed = selected.Speed }; }).ToArray();
+    }
+    // Codex subscription or the explicitly configured text endpoint can judge senses.
+    public static ModelChoice[] JudgeChoices(ModelChoice[] choices) => choices.Where(c => c.Provider is "codex" or CompatibleText.Provider).ToArray();
 
     public static string? Validate(AppSettings settings)
     {
-        if (settings.Provider is not ("codex" or "claude") || settings.SecondaryProvider is not ("" or "codex" or "claude"))
+        if (settings.Provider is not ("codex" or "claude" or CompatibleText.Provider) || settings.SecondaryProvider is not ("" or "codex" or "claude" or CompatibleText.Provider) || settings.JudgeProvider is not ("codex" or CompatibleText.Provider))
             return "请选择受支持的模型服务。";
+        if (LookupModel.Selected(settings).Append(new(settings.JudgeProvider, settings.JudgeModel)).Any(m => m.Provider == CompatibleText.Provider))
+        {
+            try { CompatibleText.NormalizeBase(settings.CompatibleBaseUrl); }
+            catch (CompatibleException e) { return e.Message; }
+            if (LookupModel.Selected(settings).Append(new(settings.JudgeProvider, settings.JudgeModel)).Any(m => m.Provider == CompatibleText.Provider && !CompatibleText.ValidModel(m.Model)))
+                return "请先完成 API 连接，读取模型列表并选择模型。";
+        }
         if (settings.ParallelLookup && LookupModel.Primary(settings) == LookupModel.Secondary(settings)) return "请选择两个不同的查询模型。";
+        if ((settings.InferenceProfiles ?? []).Length > 1024 || (settings.InferenceProfiles ?? []).Any(p => p == null || p.Provider is not ("codex" or "claude" or CompatibleText.Provider) || p.Model == null || p.Model.Length > 256 || p.Endpoint == null || p.Endpoint.Length > 128 || !InferenceOptions.ValidEffort(p.Effort) || !InferenceOptions.ValidSpeed(p.Speed)))
+            return "模型 effort 或速度配置无效，请在设置中重新选择。";
         return null;
     }
 
-    // Codex always runs with low reasoning on the fast tier; Claude disables extra thinking itself.
-    public static void ApplyFixedOptions(AppSettings settings) { settings.ReasoningEffort = "low"; settings.ServiceTier = "fast"; }
 }

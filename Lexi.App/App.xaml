@@ -200,6 +200,7 @@
           </Popup>
         </Grid>
       </ControlTemplate></Setter.Value></Setter>
+      <Style.Triggers><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></Style.Triggers>
     </Style>
     <Style TargetType="TabControl">
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabControl">

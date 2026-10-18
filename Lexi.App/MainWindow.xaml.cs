@@ -10,9 +10,10 @@ namespace Lexi;
 
 public partial class MainWindow : Window
 {
-    private readonly QuerySession session = new(App.Paths);
+    private readonly QuerySession session = new(App.Paths, textCredentials: url => new TextProviderKeys(App.UserRoot).Read(url));
     private AppSettings settings => session.Settings;
     private bool quit;
+    private readonly QueryViewDelivery viewDelivery;
     private readonly WindowPlacement windowPlacement;
     private bool suppressSuggestions;
     private string current => session.Current;
@@ -22,6 +23,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         shown = session.View;
+        viewDelivery = new(Dispatcher, Render);
         session.Changed += Render;
         FocusManager.SetFocusedElement(this, SearchBox);
         RenderHistory(history.Entries);
@@ -113,7 +115,8 @@ public partial class MainWindow : Window
     private long progressRequest;
     private void Render(QueryView view)
     {
-        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => Render(view)); return; }
+        if (!Dispatcher.CheckAccess()) { viewDelivery.Post(view); return; }
+        if (focusClosed) return;
         if (view.Revision <= shown.Revision) return;
         var previous = shown; shown = view;
         bool Changed<T>(Func<QueryView, T> part) => !Equals(part(previous), part(view));

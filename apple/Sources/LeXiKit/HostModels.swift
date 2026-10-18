@@ -219,15 +219,36 @@ public struct AppSettings: Decodable, Equatable, Sendable {
     public let secondaryModel: String
     public let mergeSenses: Bool
     public let judgeModel: String
+    public let judgeProvider: String?
+    public let compatibleBaseUrl: String?
+    public let compatibleStreaming: Bool?
     public let speechProvider: String
     public let speechModel: String
     public let speechVoice: String
     public let speechVoiceName: String
 }
+public struct InferenceOption: Decodable, Equatable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let label: String
+    public init(id: String, label: String) { self.id = id; self.label = label }
+}
+public struct InferenceCapabilities: Decodable, Equatable, Sendable, Hashable {
+    public let efforts: [String]
+    public let speeds: [InferenceOption]
+    public let note: String
+    public let effortChoices: [InferenceOption]
+    public let speedChoices: [InferenceOption]
+}
 public struct ModelChoice: Decodable, Equatable, Sendable, Hashable, Identifiable {
     public let label: String
     public let id: String
     public let provider: String
+    public let options: InferenceCapabilities?
+    public let effort: String?
+    public let speed: String?
+    public init(label: String, id: String, provider: String, options: InferenceCapabilities? = nil, effort: String? = nil, speed: String? = nil) {
+        self.label = label; self.id = id; self.provider = provider; self.options = options; self.effort = effort; self.speed = speed
+    }
     public var key: String { provider + ":" + id }
 }
 public struct ControlLabels: Decodable, Equatable, Sendable {

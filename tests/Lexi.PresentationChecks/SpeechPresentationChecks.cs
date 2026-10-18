@@ -23,7 +23,7 @@ internal static partial class Program
         selectors[0].SelectedItem = selectors[0].Items.OfType<SpeechModel>().Single(m => m.Id == "gpt-4o-mini-tts");
         Check(selectors[1].Items.Count == 13 && selectors[1].SelectedItem != null, "changing the speech model refreshes compatible voices");
         selectors[0].SelectedItem = selectors[0].Items.OfType<SpeechModel>().Single(m => m.Provider == "xai");
-        Check(selectors[1].Items.OfType<SpeechVoice>().Any(v => v.Id == "eve") && Contents(settings).OfType<PasswordBox>().Count() == 3,
+        Check(selectors[1].Items.OfType<SpeechVoice>().Any(v => v.Id == "eve") && Contents(settings).OfType<PasswordBox>().Count() == 6,
             "Grok voices and masked API key fields are available in settings");
         selectors[0].SelectedItem = selectors[0].Items.OfType<SpeechModel>().Single(m => m.Id == "eleven_flash_v2_5");
         Check(selectors[1].Items.OfType<SpeechVoice>().Any(v => v.Name == "George") &&

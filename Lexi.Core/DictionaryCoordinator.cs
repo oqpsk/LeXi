@@ -16,7 +16,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         legacy = saved == null;
         if (legacy) saved = cache.Read<AiEnvelope>("ai-v5", model.CacheKey(query, settings)) ?? cache.Read<AiEnvelope>("ai-v4", model.CacheKey(query, settings)) ?? cache.Read<AiEnvelope>("ai-v3", model.CacheKey(query, settings));
         if (saved == null || saved.Provider != model.Provider || saved.Model != model.Model ||
-            saved.ReasoningEffort != settings.ReasoningEffort || (saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence) && !(legacy && query == Queries.Normalize(query) && saved.EvidenceHash == CodexDictionary.LegacyEvidenceHash(evidence)))) return null;
+            saved.ReasoningEffort != InferenceOptions.EnvelopeEffort(settings, model) || (saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence) && !(legacy && query == Queries.Normalize(query) && saved.EvidenceHash == CodexDictionary.LegacyEvidenceHash(evidence)))) return null;
         try { return saved with { Entry = CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(saved.Entry, Json.Options), query, evidence) }; }
         catch (Exception e) when (ExpectedFailure(e)) { return null; }
     }
@@ -30,7 +30,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         }).ToArray();
         var request = SenseMerging.Request(query, answers);
         SenseMergePlan? plan = null;
-        if (settings.MergeSenses && cache.Read<SenseMergePlan>(SenseMerging.CacheKind, request.InputHash + ":" + settings.JudgeModel) is { } savedPlan)
+        if (settings.MergeSenses && cache.Read<SenseMergePlan>(SenseMerging.CacheKind, MergeKey(request, settings)) is { } savedPlan)
         {
             try { plan = SenseMerging.Parse(JsonSerializer.Serialize(savedPlan, Json.Options), request); }
             catch (Exception ex) when (ExpectedFailure(ex)) { }
@@ -75,7 +75,7 @@ public sealed class DictionaryCoordinator(Cache cache,
                 lock (sync) { closed[i] = true; answers[i] = new(model, ModelPhase.Complete, result); Publish(); }
                 if (result.Found)
                     await Write(CacheKind, model.CacheKey(query, settings), new AiEnvelope(result, CodexDictionary.EvidenceHash(evidence),
-                        DateTimeOffset.UtcNow, model.Model, settings.ReasoningEffort, model.Provider), token);
+                        DateTimeOffset.UtcNow, model.Model, InferenceOptions.EnvelopeEffort(settings, model), model.Provider), token);
             }
             catch (Exception ex) when (ExpectedFailure(ex) || ex is OperationCanceledException && !token.IsCancellationRequested)
             {
@@ -94,7 +94,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         var request = SenseMerging.Request(query, answers);
         if (!settings.Online || !settings.MergeSenses || request.Pairs.Length == 0) return snapshot;
         progress?.Report(snapshot with { Merging = true });
-        var mergeKey = request.InputHash + ":" + settings.JudgeModel;
+        var mergeKey = MergeKey(request, settings);
         try
         {
             SenseMergePlan? plan = null;
@@ -105,7 +105,7 @@ public sealed class DictionaryCoordinator(Cache cache,
             }
             if (plan == null)
             {
-                plan = await judge(request, settings.ForModel(new("codex", settings.JudgeModel)), token);
+                plan = await judge(request, settings.ForModel(new(settings.JudgeProvider, settings.JudgeModel)), token);
                 plan = SenseMerging.Parse(JsonSerializer.Serialize(plan, Json.Options), request);
                 token.ThrowIfCancellationRequested();
                 await Write(SenseMerging.CacheKind, mergeKey, plan, token);
@@ -120,6 +120,10 @@ public sealed class DictionaryCoordinator(Cache cache,
             return snapshot with { MergeNote = MergeFailures.Describe(failure) + "；已保留全部释义", MergeFailed = true, MergeFailure = failure };
         }
     }
+
+    private static string MergeKey(SenseMergeRequest request, AppSettings settings) => settings.JudgeProvider == CompatibleText.Provider
+        ? request.InputHash + ":compatible:" + CompatibleText.Scope(settings) + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, new(settings.JudgeProvider, settings.JudgeModel))
+        : request.InputHash + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, new(settings.JudgeProvider, settings.JudgeModel));
 
     private async Task Write<T>(string kind, string key, T value, CancellationToken token)
     {

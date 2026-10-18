@@ -26,6 +26,33 @@
 - Add `session-check` and `platform-check`, a cross-platform `Lexi.Shared.slnf`, and a macOS CI job. `scripts/Test.ps1` runs the shared checks on macOS and Linux and the WPF checks on Windows.
 - Add [FEATURES.md](FEATURES.md) for Windows/macOS parity, an affected-platforms section in the PR template, and split AGENTS.md into shared behavior and per-platform interface rules.
 
+## 0.9.24 (Windows / macOS)
+
+- Reduce sense-judge output without changing the selected models, effort/speed preferences or the conservative grouping rules. Judges still review every requested pair and select the overview, but return only positive links at confidence >= 0.95 plus the reviewed pair count. Core validates identities/counts and expands omitted pairs to uncertain, so missing links cannot merge senses or create a transitive bridge. Fully enumerated plans remain readable; new judgments use versioned comparison caches. Windows and macOS use the same prompt, schema and decoder through Core/Host; completed saved query views remain unchanged.
+
+## 0.9.23 (Windows / macOS)
+
+- Keep generation and model-preview processing off the desktop UI synchronization context. Sample Claude and compatible-API JSON previews at most once per 80 ms and skip unchanged content; final responses still receive complete validation. Windows coalesces pending views at background dispatcher priority so input, scrolling and cancellation can run during token bursts, and stale revisions cannot overwrite the latest result. The same preview sampling applies to macOS through Core/Host.
+- Replace the fixed four-entry OAuth starter catalog with official-client discovery and persisted model capabilities. Opening the OAuth connection explicitly refreshes available models and their independent effort/speed options on both platforms; Codex discovery requests all pages including hidden models, labels hidden entries and explains that invocation remains account-dependent. Keep previously selected models and cached metadata available offline or after a failed refresh. Never substitute API model IDs for OAuth models or switch the user's selections.
+
+## 0.9.22 (Windows / macOS)
+
+- Place compact OAuth and API connection actions together above the query model selectors, with direct access to each connection form. Prefix all shared model choices with `OAuth |` or `API |` while preserving their underlying provider/model identities and saved preferences.
+- Make unavailable model controls visibly disabled, including WPF dropdown content and arrows, with dimmed inference labels and explanations available on disabled controls. macOS uses the native disabled picker state.
+
+## 0.9.21 (Windows / macOS)
+
+- Separate model identity from inference preferences. Label subscription choices as OAuth and direct endpoint choices as custom API; show effort and speed beneath each model using the same shared capability rules. Save explicit preferences per provider/model and, for APIs, per endpoint. The same model selected in multiple roles shares its settings.
+- Read effort levels and service tiers from authenticated API model metadata and the official Codex model-list and Claude initialization interfaces, retaining public capability metadata locally for reopening. Offer defaults for unadvertised capabilities; offer Fast or faster tiers only when advertised. Preserve an unsupported saved choice visibly until the user changes it.
+- Send selected `reasoning_effort` and `service_tier` in JSON and SSE Chat Completions requests, apply Codex/Claude CLI options without global configuration changes, and include preferences in prepared-worker and generation-cache identities. Remove forced Low/Fast and disabled-thinking settings; keep legacy Codex preferences and complete saved results. Reject unavailable options without silently downgrading or retrying.
+
+## 0.9.20 (Windows / macOS)
+
+- Add a direct OpenAI-compatible text service for dictionary lookup, translation and optional sense judging. Configure its HTTPS Base URL, enter CF Access Client ID / Client Secret and an optional API key, fetch the authenticated server model list, then explicitly choose a model. Keep existing subscriptions and selections until the user changes them.
+- Send Access headers and a versioned LeXi User-Agent on every models/completions request. Support ordinary JSON and incremental Chat Completions SSE, cancel the active HTTP request/response on stop, and report authentication or incomplete-output failures without anonymous retries, redirects or provider fallbacks.
+- Protect endpoint-bound credentials with Windows current-user encryption or the macOS Keychain; keep them out of settings, logs, results and repository data. Scope model caches by endpoint, preserve complete saved views, and keep TTS independent.
+- Add synthetic transport, cancellation, cache, Windows secure-storage/settings, Host protocol and Swift credential checks. iOS integration remains outside this desktop update.
+
 ## 0.9.19 (Windows)
 
 - Prime the default audio output with 350 ms of played silence before starting each synthesized clip, keeping the silent stream open across the handoff. Wait for media readiness and start speech at position zero, so output startup does not consume the first syllable. Apply this to words, definitions, examples, selected text and settings previews, including cache hits.

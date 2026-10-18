@@ -156,6 +156,7 @@ internal static class SessionChecks
         Check(QueryPresentation.BuildAnswers(new(overview, SenseMerging.Group(overview)), null, []).Originals == OriginalsMode.Collapse &&
             QueryPresentation.BuildAnswers(new([overview[0] with { Phase = ModelPhase.Failed, Entry = null }], []), null, []).Originals == OriginalsMode.Expand &&
             QueryPresentation.BuildAnswers(new([], []), null, []).Empty, "original dictionary text collapses beside definitions and reopens when models fail");
+        await ResponsivenessChecks.Run(fixture, root, Check);
         Console.WriteLine($"{count} query session checks passed");
     }
 
