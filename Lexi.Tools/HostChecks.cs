@@ -86,6 +86,10 @@ internal static class HostChecks
                 done.GetProperty("title").GetString() == "已完成 · 1 个义项" && done.GetProperty("stageLabels").GetArrayLength() == 4 &&
                 views.Any(v => v.GetProperty("progress") is { ValueKind: JsonValueKind.Object } p && p.GetProperty("stage").GetString() == "supplement" && p.GetProperty("busy").GetBoolean()),
                 "views carry camelCase fields, string enums and the same lifecycle as the Windows window");
+            var activities = views.Where(v => v.GetProperty("progress").ValueKind == JsonValueKind.Object)
+                .Select(v => v.GetProperty("progress").GetProperty("activity").GetString()).ToArray();
+            Check(activities.Contains("querying") && activities.Contains("generating") && activities.Contains("merging") && activities.Last()=="idle",
+                "native clients receive Core's query, output, merge and idle animation states");
             Check(final.GetProperty("answers").GetProperty("senses")[0].GetProperty("alternativesLabel").GetString() == "其他表述 · 1" &&
                 final.GetProperty("quickRead").GetProperty("caption").GetString() == "TL;DR · 已整理",
                 "merged senses and the overview reach the front end fully worded");

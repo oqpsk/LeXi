@@ -23,8 +23,10 @@
       "mergeEnabled": true,
       "translation": false,
       "failedStage": null,
+      "outputStarted": false,
       "busy": false,
       "warning": false,
+      "activity": "idle",
       "stageLabels": [
         "词典：已结束",
         "补充：已结束",
@@ -159,8 +161,10 @@
       "mergeEnabled": false,
       "translation": true,
       "failedStage": null,
+      "outputStarted": false,
       "busy": false,
       "warning": false,
+      "activity": "idle",
       "stageLabels": [
         "词典：跳过",
         "翻译：已结束",
@@ -231,8 +235,10 @@
       "mergeEnabled": false,
       "translation": true,
       "failedStage": null,
+      "outputStarted": true,
       "busy": true,
       "warning": false,
+      "activity": "generating",
       "stageLabels": [
         "词典：跳过",
         "翻译：进行中",
@@ -302,8 +308,10 @@
       "mergeEnabled": true,
       "translation": false,
       "failedStage": null,
+      "outputStarted": false,
       "busy": true,
       "warning": false,
+      "activity": "querying",
       "stageLabels": [
         "词典：进行中",
         "补充：等待",

@@ -507,6 +507,7 @@ public sealed partial class QuerySession : IDisposable
                     if (fingerprint == lastPreview) return;
                     lastPreview = fingerprint;
                     Presentation.ShowTranslation(partial, false, true, ProviderName); timing.MarkFirst(); status = "翻译生成中…";
+                    progress.Update(progressId, QueryProgressState.Translating(partial.Paragraphs.Any(p => !string.IsNullOrWhiteSpace(p))));
                     Publish();
                 }
             });

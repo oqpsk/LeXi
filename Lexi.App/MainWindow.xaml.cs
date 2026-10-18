@@ -125,6 +125,7 @@ public partial class MainWindow : Window
         bool Changed<T>(Func<QueryView, T> part) => !Equals(part(previous), part(view));
         var fresh = view.Request != previous.Request;
         if (fresh || Changed(v => v.Status)) LookupStatus.Text = view.Status;
+        if (fresh || Changed(v => v.Progress)) FooterActivity.Activity = view.Progress?.Activity ?? QueryActivity.Idle;
         if (Changed(v => v.Navigation)) UpdateNavigation(view.Navigation);
         if (view.ProgressGeneration != previous.ProgressGeneration)
         {
