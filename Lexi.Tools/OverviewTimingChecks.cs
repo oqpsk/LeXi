@@ -33,8 +33,16 @@ internal static class OverviewTimingChecks
             "completed model core metadata works during preview, disabled merging and judge failure without another request");
         var declines = SenseMerging.Group(fresh,new("fixture",[],[]));
         check(QuickRead.Create(declines,[],[]).All(m=>!m.Core), "an explicit uncertain overview overrides model guesses and stays an excerpt");
-        check(QuickRead.Create(SenseMerging.Group([fresh[0] with { Phase=ModelPhase.Streaming }]),[],[]).Length==0,
-            "provisional core flags never enter the overview");
+        var streaming = fresh[0] with { Phase=ModelPhase.Streaming };
+        check(QuickRead.Create(SenseMerging.Group([streaming]),[],[]) is [{Text:"核心概念",Core:true,Provisional:true}],
+            "a streamed sense the model has finished and marked as core previews the overview, labeled provisional");
+        check(QuickRead.Create(SenseMerging.Group([streaming with { Entry=streaming.Entry! with { Senses=[central with {CoreMeaning=null}] } }]),[],[]).Length==0,
+            "a streamed sense without a core flag never previews the overview");
+        check(QuickRead.Create(SenseMerging.Group([streaming, answers[1]]),[],[]) is [{Text:"核心概念的另一种说法",Provisional:false}],
+            "a completed answer replaces streamed previews");
+        var excerpt = new LocalHit(new("Fixture", "en-zh", 1, 1, "", "", "", "", true), new("fixture", "", "", "a. 本地词典的释义", "", 0));
+        check(QuickRead.Create(SenseMerging.Group([streaming]),[],[excerpt]) is [{Text:"a. 本地词典的释义",Provisional:false}],
+            "a local dictionary excerpt keeps the overview while a model is still streaming");
         foreach(var invalid in new[]{new[]{"unknown"},new[]{"m0s1","m0s1"},new[]{"m0s0","m0s1","m1s0"}})
         {
             try { SenseMerging.Parse(JsonSerializer.Serialize(plan with {Overview=invalid},Json.Options),request); check(false,"bad overview accepted"); }
