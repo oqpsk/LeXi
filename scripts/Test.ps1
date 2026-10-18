@@ -26,8 +26,12 @@ try {
     if ($LASTEXITCODE) { throw 'Extended dictionary/translation checks failed' }
     & dotnet $runner parallel-check (Join-Path $root '.cache/parallel-checks')
     if ($LASTEXITCODE) { throw 'Parallel dictionary checks failed' }
+    & dotnet $runner quality-check tests/fixtures/quality-cases.json
+    if ($LASTEXITCODE) { throw 'Definition quality harness failed' }
     & dotnet $runner lexical-check
     if ($LASTEXITCODE) { throw 'Lexical coverage checks failed' }
+    & dotnet $runner compatible-check (Join-Path $root 'Lexi.Core') (Join-Path $root '.cache/compatible-checks')
+    if ($LASTEXITCODE) { throw 'Custom text provider checks failed' }
     & dotnet $runner speech-check
     if ($LASTEXITCODE) { throw 'Pronunciation and speech checks failed' }
     & dotnet $runner platform-check (Join-Path $root '.cache/platform-checks')
@@ -36,11 +40,14 @@ try {
     if ($LASTEXITCODE) { throw 'Shared query session checks failed' }
     & dotnet $runner api-check $fixture (Join-Path $root '.cache/api-checks')
     if ($LASTEXITCODE) { throw 'Model API checks failed' }
+    & dotnet $runner json-check (Join-Path $root '.cache/json-checks')
+    if ($LASTEXITCODE) { throw 'JSON shape stability checks failed' }
     & dotnet $runner host-check $fixture (Join-Path $root '.cache/host-checks') (Join-Path $root 'Lexi.Host/bin/Release/net10.0/lexi-host.dll')
     if ($LASTEXITCODE) { throw 'Host protocol checks failed' }
     if ($windows) {
         & dotnet run --project tests/Lexi.PresentationChecks -c Release
         if ($LASTEXITCODE) { throw 'WPF resource construction checks failed' }
         & ./scripts/Test-ShellIcon.ps1
+        & ./scripts/Test-PackageChecks.ps1
     }
 } finally { Pop-Location }

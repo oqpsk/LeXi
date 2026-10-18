@@ -1,0 +1,242 @@
+[
+  {
+    "id": "genre-cyber",
+    "query": "cyberpunk",
+    "requiredMeanings": [
+      "赛博朋克"
+    ],
+    "coreTerm": "赛博朋克",
+    "excludedCoreTags": [
+      "信息安全",
+      "网络安全",
+      "infosec",
+      "cybersecurity"
+    ]
+  },
+  {
+    "id": "genre-steam",
+    "query": "steampunk",
+    "requiredMeanings": [
+      "蒸汽朋克"
+    ],
+    "coreTerm": "蒸汽朋克",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "genre-diesel",
+    "query": "dieselpunk",
+    "requiredMeanings": [
+      "柴油朋克"
+    ],
+    "coreTerm": "柴油朋克",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "format-json",
+    "query": "JSON",
+    "requiredMeanings": [
+      "JavaScript Object Notation"
+    ],
+    "coreTerm": "JavaScript对象表示法",
+    "excludedCoreTags": [
+      "区块链",
+      "加密资产",
+      "blockchain",
+      "cryptoasset"
+    ]
+  },
+  {
+    "id": "term-idempotency",
+    "query": "idempotency",
+    "requiredMeanings": [
+      "幂等"
+    ],
+    "coreTerm": "幂等性",
+    "excludedCoreTags": [
+      "区块链",
+      "blockchain",
+      "cryptoasset"
+    ]
+  },
+  {
+    "id": "term-api",
+    "query": "API",
+    "requiredMeanings": [
+      "application programming interface"
+    ],
+    "coreTerm": "应用程序接口",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "abbr-tee",
+    "query": "TEE",
+    "requiredMeanings": [
+      "Trusted Execution Environment"
+    ],
+    "coreTerm": "可信执行环境",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "abbr-sss",
+    "query": "SSS",
+    "requiredMeanings": [
+      "Shamir"
+    ],
+    "coreTerm": "秘密共享",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "abbr-abs",
+    "query": "ABS",
+    "requiredMeanings": [
+      "anti-lock",
+      "acrylonitrile"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "ordinary-tee",
+    "query": "tee",
+    "requiredMeanings": [
+      "golf"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "poly-mixer",
+    "query": "mixer",
+    "requiredMeanings": [
+      "mix",
+      "cryptocurrency"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "poly-nonce",
+    "query": "nonce",
+    "requiredMeanings": [
+      "once",
+      "cryptography"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "poly-token",
+    "query": "token",
+    "requiredMeanings": [
+      "token"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "slang-nerf",
+    "query": "nerf",
+    "requiredMeanings": [
+      "weaken"
+    ],
+    "coreTerm": "削弱",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "slang-touch",
+    "query": "touch grass",
+    "requiredMeanings": [
+      "reality"
+    ],
+    "coreTerm": "接触现实",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "name-lexington",
+    "query": "Lexington",
+    "requiredMeanings": [
+      "city"
+    ],
+    "coreTerm": "列克星敦",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "general-rpc",
+    "query": "RPC",
+    "requiredMeanings": [
+      "remote procedure call"
+    ],
+    "coreTerm": "远程过程调用",
+    "excludedCoreTags": [
+      "区块链",
+      "blockchain",
+      "cryptoasset"
+    ]
+  },
+  {
+    "id": "general-merkle",
+    "query": "Merkle tree",
+    "requiredMeanings": [
+      "hash"
+    ],
+    "coreTerm": "默克尔树",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "verb-stake",
+    "query": "stake",
+    "requiredMeanings": [
+      "stake"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "inflected-went",
+    "query": "went",
+    "requiredMeanings": [
+      "go"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "chinese-traditional",
+    "query": "可信執行環境",
+    "requiredMeanings": [
+      "Trusted Execution Environment"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "math-ring",
+    "query": "ring",
+    "requiredMeanings": [
+      "algebra",
+      "circular"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "security-enclave",
+    "query": "enclave",
+    "requiredMeanings": [
+      "territory",
+      "isolated"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  },
+  {
+    "id": "ordinary-bridge",
+    "query": "bridge",
+    "requiredMeanings": [
+      "structure",
+      "blockchain"
+    ],
+    "coreTerm": "",
+    "excludedCoreTags": []
+  }
+]

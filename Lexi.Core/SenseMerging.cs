@@ -11,16 +11,16 @@ public sealed record SenseGroup(SenseCandidate[] Variants, bool IncludesUsageVar
 }
 public sealed record SensePair(string A, string B);
 public sealed record SenseVerdict(string A, string B, string Relation, double Confidence, string Preferred = "");
-public sealed record SenseMergePlan(string InputHash, SenseVerdict[] Pairs, string[]? Overview = null);
+public sealed record SenseMergePlan(string InputHash, SenseVerdict[] Pairs, string[]? Overview = null, int? ComparedPairs = null);
 public sealed record SenseMergeRequest(string Query, SenseCandidate[] Candidates, SensePair[] Pairs)
 {
     // Presentation metadata cannot influence the independent core-meaning judgment.
-    public string InputHash => Cache.Hash(JsonSerializer.Serialize(new MergeIdentity(5, Query,
+    public string InputHash => Cache.Hash(JsonSerializer.Serialize(new MergeIdentity(6, Query,
         Candidates.Select(c => new MergeCandidateIdentity(c.Id, c.Model,
             new MergeSenseIdentity(c.Sense.PartOfSpeech, c.Sense.English, c.Sense.Chinese, c.Sense.Register,
                 c.Sense.Example, c.Sense.ExampleChinese, c.Sense.Evidence, c.Sense.LexicalForm, c.Sense.Expansion),
             c.EvidenceStatus, c.Provisional)).ToArray(), Pairs), Json.Options));
-    public string Prompt => JsonSerializer.Serialize(new MergePrompt("compare_senses", InputHash, Query,
+    public string Prompt => JsonSerializer.Serialize(new MergePrompt("compare_senses", InputHash, Query, Pairs.Length,
         Candidates.Select(c => new MergePromptSense(c.Id, c.Sense.PartOfSpeech, c.Sense.English, c.Sense.Chinese, c.Sense.Register,
             c.Sense.Example, c.Sense.LexicalForm, c.Sense.Expansion)).ToArray(), Pairs), Json.Options);
 }
@@ -29,13 +29,13 @@ internal sealed record MergeIdentity(int Version, string Query, MergeCandidateId
 internal sealed record MergeCandidateIdentity(string Id, LookupModel Model, MergeSenseIdentity Sense, string EvidenceStatus, bool Provisional);
 internal sealed record MergeSenseIdentity(string PartOfSpeech, string English, string Chinese, string Register,
     string Example, string ExampleChinese, int[] Evidence, string LexicalForm, string Expansion);
-internal sealed record MergePrompt(string Task, string InputHash, string Query, MergePromptSense[] Senses, SensePair[] Pairs);
+internal sealed record MergePrompt(string Task, string InputHash, string Query, int PairCount, MergePromptSense[] Senses, SensePair[] Pairs);
 internal sealed record MergePromptSense(string Id, string PartOfSpeech, string English, string Chinese, string Register,
     string Example, string LexicalForm, string Expansion);
 
 public static class SenseMerging
 {
-    public const string CacheKind = "sense-merges-v5";
+    public const string CacheKind = "sense-merges-v6";
     public static SenseCandidate[] Candidates(ModelAnswer[] answers) => answers.SelectMany((answer, modelIndex) =>
         (answer.Entry?.Senses ?? []).Select((sense, senseIndex) => new SenseCandidate($"m{modelIndex}s{senseIndex}",
             answer.Model, sense, answer.Entry!.EvidenceStatus, answer.Phase == ModelPhase.Streaming))).ToArray();
@@ -60,7 +60,10 @@ public static class SenseMerging
     public static SenseMergePlan Parse(string json, SenseMergeRequest request)
     {
         var plan = JsonSerializer.Deserialize<SenseMergePlan>(StreamingEntry.Unwrap(json), Json.Options);
-        if (plan == null || plan.InputHash != request.InputHash || plan.Pairs == null || plan.Pairs.Length != request.Pairs.Length)
+        if (plan == null || plan.InputHash != request.InputHash || plan.Pairs == null ||
+            (plan.ComparedPairs is { } compared
+                ? compared != request.Pairs.Length || plan.Overview == null || plan.Pairs.Length > request.Pairs.Length
+                : plan.Pairs.Length != request.Pairs.Length))
             throw new InvalidDataException("义项判断结果不完整或与当前查询不匹配。");
         var expected = request.Pairs.Select(p => PairKey(p.A, p.B)).ToHashSet();
         foreach (var pair in plan.Pairs)
@@ -73,7 +76,12 @@ public static class SenseMerging
             overview.Distinct().Count() != overview.Length ||
             overview.Any(id => !request.Candidates.Any(c => c.Id == id))))
             throw new InvalidDataException("核心义项选择包含无效或重复的标识。");
-        return plan;
+        if (plan.ComparedPairs == null) return plan; // Fully enumerated legacy/cache plans remain valid.
+        // Sparse wire responses list only approved links. Missing pairs remain uncertain:
+        // they never imply equivalence, coverage or transitive permission to merge.
+        var supplied = plan.Pairs.ToDictionary(p => PairKey(p.A, p.B));
+        return plan with { Pairs = request.Pairs.Select(p => supplied.GetValueOrDefault(PairKey(p.A, p.B)) ??
+            new SenseVerdict(p.A, p.B, "uncertain", 0)).ToArray() };
     }
 
     public static SenseGroup[] Group(ModelAnswer[] answers, SenseMergePlan? plan = null)

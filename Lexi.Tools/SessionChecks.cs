@@ -7,6 +7,8 @@ internal static class SessionChecks
 {
     public static async Task Run(string fixture, string root)
     {
+        await MajorWorkflowChecks.Run(fixture,root);
+        await InputPreviewChecks.Run(fixture,root);
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
         var work = Path.Combine(Path.GetFullPath(root), Guid.NewGuid().ToString("N"));
@@ -124,6 +126,18 @@ internal static class SessionChecks
         AiEntry Entry(params string[] meanings) => new("fixture", true, meanings.Select(m => new AiSense("noun", m, m, "", "", "", [])).ToArray(), "", "unverified");
         var both = new[] { new ModelAnswer(primary, ModelPhase.Complete, Entry("a", "b")), new ModelAnswer(secondary, ModelPhase.Complete, Entry("c")) };
         var snapshot = new LookupSnapshot(both, SenseMerging.Group(both));
+        var waiting = new LookupSnapshot([new(primary,ModelPhase.Pending,Entry("cached"),true)], []);
+        Check(QueryProgressState.Dictionary(true,true).Activity == QueryActivity.Querying &&
+            QueryProgressState.Updating(waiting,true).Activity == QueryActivity.Querying &&
+            QueryProgressState.Updating(new([new(primary,ModelPhase.Streaming,Entry("new"))],[]),true).Activity == QueryActivity.Generating &&
+            QueryProgressState.Updating(snapshot with { Merging=true },true).Activity == QueryActivity.Merging,
+            "query motion distinguishes waiting and cached text from newly received output and merging");
+        Check(QueryProgressState.Translating().Activity == QueryActivity.Querying &&
+            QueryProgressState.Translating(true).Activity == QueryActivity.Generating &&
+            QueryProgressState.Translated().Activity == QueryActivity.Idle &&
+            QueryProgressState.Translating(true).Interrupted("stopped","retained").Activity == QueryActivity.Idle &&
+            QueryProgressState.Finished(snapshot with { MergeFailed=true },true).Activity == QueryActivity.Idle,
+            "translation, completion, cancellation and partial failure use the same activity lifecycle");
         var requestId = tracker.Begin(QueryProgressState.Dictionary(true, true));
         tracker.Update(requestId, QueryProgressState.Updating(snapshot with { Merging = true }, true));
         Check(!tracker.Update(requestId, QueryProgressState.Updating(snapshot, true)) && tracker.Current?.Stage == QueryStage.Merge,
@@ -156,6 +170,7 @@ internal static class SessionChecks
         Check(QueryPresentation.BuildAnswers(new(overview, SenseMerging.Group(overview)), null, []).Originals == OriginalsMode.Collapse &&
             QueryPresentation.BuildAnswers(new([overview[0] with { Phase = ModelPhase.Failed, Entry = null }], []), null, []).Originals == OriginalsMode.Expand &&
             QueryPresentation.BuildAnswers(new([], []), null, []).Empty, "original dictionary text collapses beside definitions and reopens when models fail");
+        await ResponsivenessChecks.Run(fixture, root, Check);
         Console.WriteLine($"{count} query session checks passed");
     }
 

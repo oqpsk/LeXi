@@ -1,7 +1,7 @@
 {
   "dictionary": {
     "request": 1,
-    "revision": 17,
+    "revision": 18,
     "kind": "dictionary",
     "query": "serendipity",
     "input": "serendipity",
@@ -23,8 +23,10 @@
       "mergeEnabled": true,
       "translation": false,
       "failedStage": null,
+      "outputStarted": false,
       "busy": false,
       "warning": false,
+      "activity": "idle",
       "stageLabels": [
         "词典：已结束",
         "补充：已结束",
@@ -132,11 +134,12 @@
     },
     "wordForms": [],
     "etymology": [],
-    "translation": null
+    "translation": null,
+    "canRetry": false
   },
   "translation": {
     "request": 3,
-    "revision": 33,
+    "revision": 34,
     "kind": "translation",
     "query": "The ship is ready.\nKeep 42 intact.",
     "input": "The ship is ready.\nKeep 42 intact.",
@@ -158,8 +161,10 @@
       "mergeEnabled": false,
       "translation": true,
       "failedStage": null,
+      "outputStarted": false,
       "busy": false,
       "warning": false,
+      "activity": "idle",
       "stageLabels": [
         "词典：跳过",
         "翻译：已结束",
@@ -203,11 +208,12 @@
       "note": "",
       "complete": true,
       "error": ""
-    }
+    },
+    "canRetry": false
   },
   "preview": {
     "request": 3,
-    "revision": 31,
+    "revision": 32,
     "kind": "translation",
     "query": "The ship is ready.\nKeep 42 intact.",
     "input": "The ship is ready.\nKeep 42 intact.",
@@ -229,8 +235,10 @@
       "mergeEnabled": false,
       "translation": true,
       "failedStage": null,
+      "outputStarted": true,
       "busy": true,
       "warning": false,
+      "activity": "generating",
       "stageLabels": [
         "词典：跳过",
         "翻译：进行中",
@@ -273,7 +281,8 @@
       "note": "",
       "complete": false,
       "error": ""
-    }
+    },
+    "canRetry": false
   },
   "streaming": {
     "request": 1,
@@ -299,8 +308,10 @@
       "mergeEnabled": true,
       "translation": false,
       "failedStage": null,
+      "outputStarted": false,
       "busy": true,
       "warning": false,
+      "activity": "querying",
       "stageLabels": [
         "词典：进行中",
         "补充：等待",
@@ -352,7 +363,8 @@
     },
     "wordForms": [],
     "etymology": [],
-    "translation": null
+    "translation": null,
+    "canRetry": false
   },
   "home": {
     "request": 0,
@@ -395,6 +407,7 @@
     },
     "wordForms": [],
     "etymology": [],
-    "translation": null
+    "translation": null,
+    "canRetry": false
   }
 }

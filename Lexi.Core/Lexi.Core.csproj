@@ -4,4 +4,8 @@
     <EmbeddedResource Include="ChineseVariants/opencc-st-characters.txt" LogicalName="Lexi.Core.ChineseVariants.opencc-st-characters.txt" />
     <EmbeddedResource Include="ChineseVariants/opencc-ts-characters.txt" LogicalName="Lexi.Core.ChineseVariants.opencc-ts-characters.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Lexi.Tools json-check compares Core's internal JSON shapes with the anonymous objects they replaced. -->
+    <InternalsVisibleTo Include="Lexi.Tools" />
+  </ItemGroup>
 </Project>

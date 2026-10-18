@@ -7,17 +7,27 @@ import SwiftUI
 // saved settings intact. Controls use the system accent color.
 public struct SettingsView: View {
     @Bindable var store: LexiStore
+    @State private var selection: SettingsPage? = .general
     public init(store: LexiStore) { self.store = store }
 
     public var body: some View {
-        TabView {
-            Tab("通用", systemImage: "gearshape") { GeneralSettings() }
-            Tab("查询", systemImage: "text.magnifyingglass") { QuerySettings(store: store) }
-            Tab("词典", systemImage: "books.vertical") { DictionarySettings(store: store) }
-            Tab("账号", systemImage: "person.crop.circle") { ConnectionSettings(store: store) }
-            Tab("发音", systemImage: "speaker.wave.2") { SpeechSettings(store: store) }
+        NavigationSplitView {
+            List(SettingsPage.allCases, selection: $selection) { page in
+                Label(page.rawValue, systemImage: page.symbol).tag(page)
+            }.navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 220)
+        } detail: {
+            switch selection ?? .general {
+            case .general: GeneralSettings()
+            case .query: QuerySettings(store: store) { selection = $0 }
+            case .dictionary: DictionarySettings(store: store)
+            case .oauth: ConnectionSettings(store: store, destination: .oauth)
+            case .api: Form { CompatibleConnectionSettings(store: store) }.formStyle(.grouped)
+            case .speech: SpeechSettings(store: store)
+            case .data: DataSettings(store: store)
+            }
         }
-        .frame(width: 600, height: 560)
+        .frame(minWidth: 720, idealWidth: 860, minHeight: 520, idealHeight: 660)
+        .background(SettingsWindowMemory())
         // A glass pane like the query window; the grouped rows and the tab bar sit directly on it.
         .scrollContentBackground(.hidden)
         .glassWindow()
@@ -39,8 +49,13 @@ struct SettingLabel: View {
     }
 }
 
+// Which half of the connection page a sidebar entry shows.
+enum ModelConnectionDestination { case oauth, api }
+
 struct QuerySettings: View {
     @Bindable var store: LexiStore
+    // Shows another settings page; the connection buttons lead to the sidebar's own pages.
+    let open: (SettingsPage) -> Void
     @State private var error: String?
 
     var body: some View {
@@ -52,25 +67,33 @@ struct QuerySettings: View {
                     toggle(SettingLabel("自动补充双语释义", "查词时自动请模型补充；关闭后可点“重新生成”手动获取。"), settings.autoAi, "autoAi")
                 }
                 Section {
-                    modelPicker(SettingLabel("主要模型", "用于查词与文本翻译"), payload.models, selected: settings.provider + ":" + settings.model) { choice in
+                    HStack(spacing: 10) {
+                        Button("OAuth 连接…") { open(.oauth) }
+                        Button("API 连接…") { open(.api) }
+                    }
+                    .buttonStyle(.bordered)
+                    modelPicker(SettingLabel("主要模型", "用于查词与文本翻译"), store.queryModels, selected: settings.provider + ":" + settings.model) { choice in
                         ["provider": .string(choice.provider), "model": .string(choice.id)]
                     }
+                    inferenceControls(store.queryModels, selected: settings.provider + ":" + settings.model)
                     toggle(SettingLabel("双模型同时查词", "两个模型独立查词，先返回的释义先显示"), settings.parallelLookup, "parallelLookup")
-                    modelPicker(SettingLabel("第二个查询模型", "须与主要模型不同"), payload.models, selected: secondaryKey(settings)) { choice in
+                    modelPicker(SettingLabel("第二个查询模型", "须与主要模型不同"), store.queryModels, selected: secondaryKey(settings)) { choice in
                         ["secondaryProvider": .string(choice.provider), "secondaryModel": .string(choice.id)]
                     }
                     .disabled(!settings.parallelLookup)
+                    inferenceControls(store.queryModels, selected: secondaryKey(settings)).disabled(!settings.parallelLookup)
                 } header: {
                     Text("查询模型")
                 } footer: {
-                    Note("使用本机 Codex 与 Claude Code 的订阅登录。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。Claude 关闭额外思考，Codex 使用 Low + Fast，优先速度并消耗更多订阅额度。")
+                    Note("通过 OAuth 订阅或 API 查询。查过的内容直接使用缓存；切换模型后，点“重新生成”才会更新已有结果。思考深度和速度跟着模型保存：同一模型在不同位置共用一套，OAuth 订阅与自定义 API 分开。")
                 }
                 Section {
                     toggle(SettingLabel("自动整理同类义项", "合并重复的说法，包含单个模型内部"), settings.mergeSenses, "mergeSenses")
-                    modelPicker(SettingLabel("义项判断模型", "使用 Codex 订阅"), payload.judgeModels, selected: "codex:" + settings.judgeModel) { choice in
-                        ["judgeModel": .string(choice.id)]
+                    modelPicker(SettingLabel("义项判断模型", "Codex 订阅或自定义 API"), store.judgeChoices, selected: (settings.judgeProvider ?? "codex") + ":" + settings.judgeModel) { choice in
+                        ["judgeProvider": .string(choice.provider), "judgeModel": .string(choice.id)]
                     }
                     .disabled(!settings.mergeSenses)
+                    inferenceControls(store.judgeChoices, selected: (settings.judgeProvider ?? "codex") + ":" + settings.judgeModel).disabled(!settings.mergeSenses)
                 } header: {
                     Text("义项整理")
                 } footer: {
@@ -81,6 +104,7 @@ struct QuerySettings: View {
                 }
             }
             .formStyle(.grouped)
+            .task { await store.awaitModelCatalog() }
         } else {
             ProgressView()
         }
@@ -106,6 +130,39 @@ struct QuerySettings: View {
         } label: { label }
     }
 
+    // One row under each model picker, so the effort and speed it shows belong to that model.
+    @ViewBuilder
+    private func inferenceControls(_ models: [ModelChoice], selected: String) -> some View {
+        if let model = models.first(where: { $0.key == selected }), let options = model.options {
+            LabeledContent {
+                HStack(spacing: 6) {
+                    inferencePicker("思考深度", options.effortChoices, value: model.effort ?? "",
+                                    unavailable: "此模型未提供可选思考深度，使用模型默认设置。") { value in
+                        Task { error = await store.configureInference(model, effort: value, speed: model.speed ?? "") }
+                    }
+                    inferencePicker("速度", options.speedChoices, value: model.speed ?? "",
+                                    unavailable: "此模型未提供可选速度，使用服务默认设置。") { value in
+                        Task { error = await store.configureInference(model, effort: model.effort ?? "", speed: value) }
+                    }
+                }
+            } label: {
+                SettingLabel("思考深度 · 速度", options.note)
+            }
+        }
+    }
+    private func inferencePicker(_ title: String, _ options: [InferenceOption], value: String, unavailable: String,
+                                 change: @escaping (String) -> Void) -> some View {
+        Picker(title, selection: Binding(get: { value }, set: { change($0) })) {
+            ForEach(options) { Text($0.label).tag($0.id) }
+            if !options.contains(where: { $0.id == value }) { Text(value + "（当前不可用）").tag(value) }
+        }
+        .labelsHidden()
+        .fixedSize()
+        .disabled(Self.fixed(options, value))
+        .help(Self.fixed(options, value) ? unavailable : title)
+    }
+    // Only the default is on offer, and nothing else was saved earlier.
+    private static func fixed(_ options: [InferenceOption], _ value: String) -> Bool { options.count <= 1 && value.isEmpty }
     private func apply(_ changes: [String: SettingValue]) {
         Task { error = await store.update(changes) }
     }
@@ -113,6 +170,9 @@ struct QuerySettings: View {
 
 struct GeneralSettings: View {
     @AppStorage(AppearanceChoice.key) private var appearance = AppearanceChoice.system.rawValue
+    @AppStorage(GlobalShortcut.key) private var shortcut = true
+    @State private var loginItem = LoginItem.enabled
+    @State private var message: String?
 
     var body: some View {
         Form {
@@ -121,6 +181,25 @@ struct GeneralSettings: View {
                     ForEach(AppearanceChoice.allCases) { Text($0.title).tag($0.rawValue) }
                 } label: { SettingLabel("外观", "LeXi 的窗口使用浅色、深色，或跟随系统") }
                 .pickerStyle(.segmented)
+            }
+            Section {
+                Toggle(isOn: Binding(get: { shortcut }, set: { on in
+                    shortcut = on
+                    GlobalShortcut.shared.apply()
+                    message = GlobalShortcut.shared.unavailable ? "⌘2 已被其他应用注册为全局快捷键，暂时无法使用。" : nil
+                })) { SettingLabel("用 \(GlobalShortcut.keys) 呼出 LeXi", "在任何应用中按 \(GlobalShortcut.keys) 呼出 LeXi，再按一次隐藏；优先于其他应用自己的 \(GlobalShortcut.keys)") }
+                Toggle(isOn: Binding(get: { loginItem }, set: { on in
+                    message = LoginItem.set(on)
+                    loginItem = LoginItem.enabled
+                })) { SettingLabel("登录时打开 LeXi", "登录 Mac 后即可用 \(GlobalShortcut.keys) 呼出") }
+                if let message {
+                    Label(message, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
+                }
+            }
+            .onAppear {
+                loginItem = LoginItem.enabled
+                if GlobalShortcut.shared.unavailable { message = "⌘2 已被其他应用注册为全局快捷键，暂时无法使用。" }
+                else if LoginItem.needsApproval { message = "请在“系统设置 → 通用 → 登录项”中允许 LeXi。" }
             }
             Section("键盘快捷键") {
                 ForEach(Self.shortcuts, id: \.0) { action, keys in
@@ -131,7 +210,7 @@ struct GeneralSettings: View {
         .formStyle(.grouped)
     }
 
-    private static let shortcuts = [("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
+    private static let shortcuts = [("呼出 / 隐藏 LeXi（任何应用中）", GlobalShortcut.keys), ("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
         ("重新生成", "⌘R"), ("后退 / 前进", "⌘[  ⌘]"), ("查询历史", "⌘Y"), ("设置", "⌘,")]
 }
 
@@ -196,29 +275,51 @@ struct DictionarySettings: View {
 
 struct ConnectionSettings: View {
     @Bindable var store: LexiStore
+    var destination: ModelConnectionDestination? = nil
     @State private var codexPath = ""
+    @State private var readingModels = false
+    @State private var modelStatus = ""
 
     var body: some View {
         Form {
-            Section {
-                ProviderRow(store: store, provider: "codex", title: "ChatGPT · Codex", symbol: "sparkles", install: "https://learn.chatgpt.com/docs/cli")
-                LabeledContent {
-                    HStack {
-                        TextField("自动检测", text: $codexPath)
-                            .labelsHidden()
-                            .onSubmit { Task { await store.update(["codexPath": .string(codexPath.trimmingCharacters(in: .whitespaces))]) } }
-                        Button("选择…") { choose() }
-                    }
-                } label: { SettingLabel("程序路径", "留空时自动查找命令行与 ChatGPT 应用中的 Codex") }
-            }
-            Section {
-                ProviderRow(store: store, provider: "claude", title: "Claude", symbol: "asterisk", install: "https://code.claude.com/docs/en/setup")
-            } footer: {
-                Note("在官方登录页完成授权，LeXi 使用同一台电脑上的登录状态，不读取令牌。登录会即时生效并与官方客户端共用账号；主要模型、第二模型和义项判断共用对应账号。")
+            if destination != .oauth { CompatibleConnectionSettings(store: store) }
+            if destination != .api {
+                Section {
+                    Button(readingModels ? "正在读取…" : "读取 OAuth 订阅模型") {
+                        Task { await refreshModels() }
+                    }.disabled(readingModels)
+                    if !modelStatus.isEmpty { Text(modelStatus).font(.callout).foregroundStyle(.secondary) }
+                }
+                Section {
+                    ProviderRow(store: store, provider: "codex", title: "ChatGPT · Codex", symbol: "sparkles", install: "https://learn.chatgpt.com/docs/cli")
+                    LabeledContent {
+                        HStack {
+                            TextField("自动检测", text: $codexPath)
+                                .labelsHidden()
+                                .onSubmit { Task { await store.update(["codexPath": .string(codexPath.trimmingCharacters(in: .whitespaces))]) } }
+                            Button("选择…") { choose() }
+                        }
+                    } label: { SettingLabel("程序路径", "留空时自动查找命令行与 ChatGPT 应用中的 Codex") }
+                }
+                Section {
+                    ProviderRow(store: store, provider: "claude", title: "Claude", symbol: "asterisk", install: "https://code.claude.com/docs/en/setup")
+                } footer: {
+                    Note("在官方登录页完成授权，LeXi 使用同一台电脑上的登录状态，不读取令牌。登录会即时生效并与官方客户端共用账号；主要模型、第二模型和义项判断共用对应账号。")
+                }
             }
         }
         .formStyle(.grouped)
         .onAppear { codexPath = store.settings?.settings.codexPath ?? "" }
+        // Opening the OAuth connection is the user's explicit discovery action.
+        .task { if destination == .oauth { await refreshModels() } }
+    }
+
+    private func refreshModels() async {
+        guard !readingModels else { return }
+        readingModels = true
+        modelStatus = "正在读取 OAuth 模型与可用档位…"
+        modelStatus = await store.readSubscriptionModels() ?? "已更新订阅模型与可用档位。"
+        readingModels = false
     }
 
     private func choose() {
@@ -303,6 +404,7 @@ struct SpeechSettings: View {
     @State private var keyInputs: [String: String] = [:]
     @State private var savedKeys: Set<String> = []
     @State private var voiceStatus = ""
+    @State private var loadingModels = false
     @State private var loadingVoices = false
     @State private var voiceRequest = 0
     @State private var voiceTask: Task<Void, Never>?
@@ -330,7 +432,16 @@ struct SpeechSettings: View {
                     })) {
                         ForEach(voices) { Text($0.name).tag($0.id) }
                     }
-                    if model.provider == "elevenlabs" { elevenControls(model) }
+                    if model.provider == "elevenlabs" {
+                        Button("刷新语音模型") {
+                            Task {
+                                loadingModels = true; defer { loadingModels = false }
+                                do { try await store.refreshSpeechModels(key: typedKey("elevenlabs") ?? keys.read("elevenlabs") ?? ""); await load() }
+                                catch { message = error.localizedDescription }
+                            }
+                        }.disabled(loadingModels)
+                        elevenControls(model)
+                    }
                     if !message.isEmpty { Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
                 } header: {
                     Text("声音")
@@ -342,7 +453,14 @@ struct SpeechSettings: View {
                     HStack {
                         TextField("试听文字", text: $sample).labelsHidden()
                         Button { preview(model, settings) } label: {
-                            Label(speech.speaking ? "停止" : "试听", systemImage: speech.speaking ? "stop.fill" : "play.fill")
+                            Label {
+                                Text(speech.speaking ? "停止" : "试听")
+                            } icon: {
+                                if speech.speaking {
+                                    SpeechWaveform(animate: speech.audioPlaying, size: 14)
+                                        .foregroundStyle(LexiTheme.speechAccent)
+                                } else { Image(systemName: "play.fill") }
+                            }
                         }
                     }
                     if !speech.status.isEmpty {
@@ -458,8 +576,9 @@ struct SpeechSettings: View {
             cancelVoiceLoading(); voiceStatus = ""; manualVoice = ""
         }
         speech.stop()
-        let preferred = next.provider == "elevenlabs" ? lastEleven?.id
-            : next.provider == settings.speechProvider && next.id == settings.speechModel ? settings.speechVoice : nil
+        let remembered = settings.speechProfiles?.first { $0.provider == next.provider && $0.model == next.id }
+        let preferred = remembered?.voice ?? (next.provider == "elevenlabs" ? lastEleven?.id
+            : next.provider == settings.speechProvider && next.id == settings.speechModel ? settings.speechVoice : nil)
         let available = voices(next, settings)
         guard let voice = available.first(where: { $0.id == preferred }) ?? available.first else { return }
         apply(next, voice)

@@ -76,7 +76,7 @@ internal static class ApiChecks
 
         var desktop = new AppSettings();
         var apiSettings = new AppSettings(); ModelCatalog.UseApiDefaults(apiSettings);
-        Check(ModelCatalog.Choices(apiSettings, true).All(c => c.Provider is "openai" or "anthropic") && ModelCatalog.Choices(desktop, false).All(c => c.Provider is "codex" or "claude"),
+        Check(ModelCatalog.ApiChoices(apiSettings).All(c => c.Provider is "openai" or "anthropic") && ModelCatalog.Choices(desktop).All(c => c.Provider is "codex" or "claude"),
             "API platforms offer only API models and desktop keeps the subscription clients");
         Check(apiSettings is { Provider: "openai", Model: "gpt-6-luna" } && LookupModel.Secondary(apiSettings) == new LookupModel("anthropic", "claude-haiku-5-5") &&
             ModelCatalog.Validate(apiSettings, true) == null && ModelCatalog.Validate(desktop, true) == "请选择受支持的模型服务。" &&
@@ -84,7 +84,8 @@ internal static class ApiChecks
             "API defaults pair an OpenAI model with an Anthropic second opinion, and each mode refuses the other's services");
         apiSettings.JudgeModel = "claude-haiku-5-5"; apiSettings.Model = "bad model";
         Check(ModelCatalog.Judge(apiSettings, true) == new LookupModel("anthropic", "claude-haiku-5-5") && ModelCatalog.Judge(desktop, false).Provider == "codex" &&
-            ModelCatalog.Validate(apiSettings, true) == "请填写有效的模型 ID。" && ModelCatalog.JudgeChoices(ModelCatalog.Choices(desktop, false)).All(c => c.Provider == "codex"),
+            ModelCatalog.Validate(apiSettings, true) == "请填写有效的模型 ID。" && ModelCatalog.JudgeChoices(ModelCatalog.Choices(desktop)).All(c => c.Provider == "codex") &&
+            ModelCatalog.JudgeChoices(ModelCatalog.ApiChoices(apiSettings)).Length == ModelCatalog.ApiChoices(apiSettings).Length,
             "the judge follows its model's service and model IDs are checked");
 
         // A whole lookup through the session: each model goes to its own API with its own key.

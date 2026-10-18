@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Testing
 @testable import LeXiKit
@@ -48,7 +49,7 @@ import Testing
         let (speech, host) = make()
         host.probeFailure = HostError(code: "speech_failed", message: "离线模式下没有此声线的缓存发音。")
         speech.toggle("word", using: host)
-        #expect(speech.speaking)
+        #expect(speech.speaking && !speech.audioPlaying)
         await speech.work?.value
         #expect(!speech.speaking && speech.status == "离线模式下没有此声线的缓存发音。" && host.keys.isEmpty)
     }
@@ -92,10 +93,10 @@ import Testing
         speech.toggle("word", using: host)
         while host.held == nil { await Task.yield() }
         speech.toggle("word", using: host)
-        #expect(!speech.speaking && speech.status == "发音已停止")
+        #expect(!speech.speaking && !speech.audioPlaying && speech.status == "发音已停止")
         host.held?.resume(returning: "/nonexistent/late.mp3")
         await speech.work?.value
-        #expect(!speech.speaking && speech.status == "发音已停止")
+        #expect(!speech.speaking && !speech.audioPlaying && speech.status == "发音已停止")
         speech.clearStatus()
         #expect(speech.status.isEmpty)
     }
@@ -119,6 +120,14 @@ import Testing
         host.held?.resume(returning: "/nonexistent/late.mp3")
         await speech.work?.value
         #expect(speech.speakingID == nil)
+    }
+
+    @Test func lateSystemStartDoesNotReviveStoppedWaveform() async {
+        let (speech, _) = make()
+        speech.stop()
+        speech.speechSynthesizer(AVSpeechSynthesizer(), didStart: AVSpeechUtterance(string: "synthetic"))
+        await Task.yield()
+        #expect(!speech.speaking && !speech.audioPlaying && speech.speakingID == nil)
     }
 
     @Test func elevenLabsChoicesKeepSavedVoices() {

@@ -5,7 +5,10 @@ using Microsoft.VisualBasic.FileIO;
 using Lexi.Core;
 
 if (args.Length < 1) throw new ArgumentException("build-data <csv> <folder> | check <folder> [--fixture] | stream-check | live <folder> <assets> <cache> <word> [model] | bench-claude <assets> <work-folder> <words...> | cancel-check <assets> <work-folder>");
-if (args[0] == "lexical-check") await LexicalChecks.Run();
+if (args[0] == "quality-check") QualityChecks.Check(args[1]);
+else if (args[0] == "quality-score") QualityChecks.Score(args[1], args[2]);
+else if (args[0] == "compatible-check") await CompatibleChecks.Run(args[1], args[2]);
+else if (args[0] == "lexical-check") await LexicalChecks.Run();
 else if (args[0] == "speech-check") await SpeechChecks.Run();
 else if (args[0] == "usability-check") UsabilityChecks.Run(args[1]);
 else if (args[0] == "build-data")
@@ -144,6 +147,7 @@ else if (args[0] == "extended-check") ExtendedChecks.Run(args[1]);
 else if (args[0] == "platform-check") PlatformChecks.Run(args[1]);
 else if (args[0] == "session-check") await SessionChecks.Run(args[1], args[2]);
 else if (args[0] == "api-check") await ApiChecks.Run(args[1], args[2]);
+else if (args[0] == "json-check") await JsonShapeChecks.Run(args[1]);
 else if (args[0] == "host-check") await HostChecks.Run(args[1], args[2], args[3], args.ElementAtOrDefault(4));
 else if (args[0] == "parallel-check") await ParallelChecks.Run(args[1]);
 else if (args[0] == "parallel-live") await ParallelLive.Run(args[1], args[2], args[3], args.Skip(4));

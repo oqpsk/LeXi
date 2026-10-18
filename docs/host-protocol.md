@@ -37,6 +37,8 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 
 `data` 是完整的 `QueryView`（字段见 `Lexi.Core/QueryViews.cs`），字段名为 camelCase，枚举为 camelCase 字符串。`revision` 在整个会话中递增；前端丢弃不大于已显示 `revision` 的视图。`request` 变化表示新的查询页面。`progress` 为 `null` 表示没有进行中的查询；`progressGeneration` 变化表示新的进度周期。视图中的文字、来源说明、阶段和状态都已由 Core 决定，前端不再推断。
 
+`progress.activity` 是可选的增量字段，取 `idle`、`querying`、`generating`、`merging`。Core 区分等待模型与收到新释义/译文，缓存文本不冒充新输出；终态与取消均为 `idle`。旧视图缺少字段时原生前端保留静态标志。该字段只驱动动效，不改变 `stage`、状态文字或查询生命周期。
+
 ## 方法
 
 | 方法 | 参数 | 结果 |
@@ -49,14 +51,20 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `query.cancel` | — | 停止当前查询，保留已显示内容 |
 | `query.view` | — | 当前 `QueryView` |
 | `suggest` | `text` | `{suggestions}` |
+| `query.preview` | `text` | `{query, headword, text, source}` 或 `null`。只读已保存的 TL;DR 和启用的本地词库；保持大小写缓存身份，显示实际匹配词；不联网、不记录历史、不发布或改变当前视图；支持 `cancel` |
 | `history.list` | — | `{entries: [{query, translation, queriedAt, preview, kind}], error}` |
 | `history.remove` | `query`、`translation` | `{removed, history}` |
 | `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |
 | `settings.update` | `settings`（只含要修改的字段） | 与 Windows 设置相同的校验（修改 `speech*` 字段时也校验发声模型与声线），保存后返回 `settings.get` 的内容 |
+| `inference.models` | — | 通过官方 Codex `model/list` 和 Claude 初始化接口更新订阅模型能力，返回 `settings.get`；不访问凭据文件，离线时不发请求 |
+| `inference.catalog` | — | 等本次启动的后台 OAuth 模型读取结束（在线时 Host 启动后自动读取一次官方 Codex/Claude 客户端的模型列表；离线或已结束时立即返回），然后返回 `settings.get` 的内容 |
+| `inference.configure` | `provider`、`model`、`effort`、`speed` | 按当前模型能力校验并保存两个配置项，返回 `settings.get`；空字符串使用服务默认；不自动降低档位 |
 | `settings.setOnline` | `online` | 切换在线补充并返回设置 |
 | `dictionaries.list` | — | `{dictionaries, folder}` |
 | `connection.status` | `provider`（`codex` 或 `claude`），可选 `codexPath` | `{installed, signedIn, message}`，只含经过清理的摘要 |
 | `connection.loginCommand` | `provider`，可选 `codexPath` | `{fileName, arguments, path, clearEnvironment}` 或 `null`。前端仅在用户点击后在终端中运行，并清除 `clearEnvironment` 中的变量 |
+| `text.models` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{models: [{provider, id, label, options}]}`；鉴权后读取列表，API Key 可留空；不保存凭据、不自动选择模型；离线时不发请求 |
+| `text.credentials` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{}`；按端点绑定到本次 Host 的进程内存，用于后续查词、翻译和义项整理；前端负责 Keychain 持久化，Host 不回传或记录这些值 |
 | `speech.models` | — | `{models: [{provider, id, name, local}]}`；第一项是本机系统声线（`local` 为 `true`），其余为在线模型 |
 | `speech.voices` | `provider`、`model` | `{voices: [{id, name}]}`：该模型的在线声线；本机声线由前端从系统读取，这里为空 |
 | `speech.elevenVoices` | 可选 `key` | `{voices}`：ElevenLabs 账号可用声线。离线模式下不发请求 |
@@ -66,6 +74,14 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `cancel` | `id` | 取消仍在运行的请求，`{cancelled}` |
 | `shutdown` | — | 等待其余请求结束后最后响应，然后退出 |
 
+## 自定义文本服务
+
+`provider = compatible` 可用于主要模型、第二模型，以及 `judgeProvider = compatible` 的义项判断模型。普通设置只包含 `compatibleBaseUrl`、`compatibleStreaming`、模型 ID、服务标识和非敏感的 `inferenceProfiles`；`judgeProvider` 默认 `codex`，保留旧设置的含义。模型列表先通过 `text.models` 获取，再由用户明确选择。模型选项附带 `options`（`efforts`、`speeds`、`effortChoices`、`speedChoices`、`note`），`settings.get` 的模型还附带当前 `effort`、`speed`；旧客户端可忽略新增字段。只有服务端提供的档位可选，能力元数据按端点缓存且不含凭据。`inferenceProfiles` 按服务、模型和端点哈希区分，原有 Codex 选项继续作为尚未配置模型的兼容默认值。
+
+原生前端从本机 Keychain 读取凭据，通过私有标准输入管道调用 `text.credentials`；Host 仅在进程内持有，并直接向配置的服务发出 HTTPS 请求，不经过额外服务器。不要记录请求参数或私有管道消息。错误只返回经过清理的中文提示及 `missing_credentials` / `authentication_failed` / `invalid_response` 等代码。401/403 不降级或重试；取消同时作用于 HTTP 发送及响应读取。SSE 未正常结束时不能作为完成结果缓存。
+
+Windows 直接引用 Core，通过当前用户加密存储的读取函数提供凭据，无需 Host 的内存配置方法。TTS 的服务、密钥与请求路径独立。
+
 ## 发音
 
 发音只在用户点击后请求。音频保存在用户数据目录的 `speech-cache`，每段文字、服务、模型和声线各有一个文件（`SpeechOptions.CacheKey`），写完整后才出现，与 Windows 共用同一份 `SpeechAudio`。前端播放返回的文件；本机系统声线由前端直接朗读，不经过缓存。
@@ -74,10 +90,20 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 
 ## 模型 API
 
-iOS 没有 Codex 与 Claude Code 客户端，查询模型改用用户自己的 OpenAI 或 Anthropic API Key（`ApiDictionary`）：同一份系统说明、JSON 结构与校验，OpenAI 使用 Responses API 的严格结构化输出，Anthropic 使用强制调用的工具。`initialize` 返回的 `platform` 为 `ios` 时，`settings` 中的模型选项只有这两种服务。前端在启动和修改密钥后用 `keys.set` 传入密钥；Host 只在本次运行的内存中保留，不写入设置或缓存，也不在任何响应中返回。错误提示只包含应用自己的说明，不含服务返回的原文。
+iOS 没有 Codex 与 Claude Code 客户端，查询模型改用用户自己的 OpenAI 或 Anthropic API Key（`ApiDictionary`）：同一份系统说明、JSON 结构与校验，OpenAI 使用 Responses API 的严格结构化输出，Anthropic 使用强制调用的工具。`initialize` 返回的 `platform` 为 `ios` 时，`settings` 中的模型选项只有这两种服务。义项判断模型的服务由模型 ID 决定：以 `claude` 开头的走 Anthropic，其余走 OpenAI。前端在启动和修改密钥后用 `keys.set` 传入密钥；Host 只在本次运行的内存中保留，不写入设置或缓存，也不在任何响应中返回。错误提示只包含应用自己的说明，不含服务返回的原文。
 
 ## 兼容
 
 不兼容的变化提高 `HostServer.Protocol`。前端在 `initialize` 后检查 `protocol`，不一致时提示重新安装。新增字段和方法不改变版本号；前端忽略未知字段。
 
 `host-check` 在进程内用合成模型检查流式视图、取消、错误和设置，并分别以 `dotnet` 和单文件发布形式启动 Host 检查标准输出与退出行为。
+
+### Additive major-version preparation (protocol 1)
+
+`QueryView.canRetry` is an optional boolean for compatible clients. `query.retry` retries only failed stages from the saved input/model checkpoint; explicit regeneration keeps its existing meaning. Speech/window settings do not invalidate text checkpoints.
+
+`history.list` accepts optional `text` and `offset`, returns 50 matching entries plus `total`. Existing `entries`/`error` remain. Suggestions combine case-preserved dictionary history and the offline index; text translations are excluded.
+
+`data.usage` returns cache categories (`id`, `name`, `bytes`, `files`). `data.clear {category}` clears only `intermediate`, `speech` or `results`, and refuses while a query runs. `data.export {path}` writes a credential-free private backup; `data.inspect {path}` returns version/history/results/hasSettings before any write; `data.import {path,includeSettings}` validates and merges. The native front end must obtain file paths from a user file panel and request confirmation after preview. Credentials never enter an archive or response. Error messages do not contain file paths or file content: `invalid_data` carries Core's own refusal (for example a backup over the size limit) or, for a damaged or foreign archive, a fixed sentence; `busy` means a query or another data operation is running; `file_failed` reports an unreadable or unwritable file or data folder.
+
+`speech.elevenModels {key}` explicitly refreshes the account's TTS-capable model catalog, then `speech.models` reads it. Key lifetime follows `speech.elevenVoices`; the key is never persisted by Host. Existing saved model selections are retained.

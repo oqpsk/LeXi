@@ -59,7 +59,16 @@ struct HeadingRow: View {
                 if !view.speechText.isEmpty {
                     let playing = speech.speakingID == "heading"
                     Button { speech.toggle(view.speechText, using: store) } label: {
-                        Image(systemName: playing ? "stop.fill" : "speaker.wave.2.fill")
+                        // The speaker stays in the layout while the waveform covers it: a shape has no
+                        // text baseline, so swapping it in would lift the buttons off the headword's baseline.
+                        Image(systemName: "speaker.wave.2.fill")
+                            .opacity(playing ? 0 : 1)
+                            .overlay {
+                                if playing {
+                                    SpeechWaveform(animate: speech.audioPlaying)
+                                        .foregroundStyle(LexiTheme.speechAccent)
+                                }
+                            }
                     }
                     .help(playing ? "停止播放" : "播放合成发音")
                     .accessibilityLabel(playing ? "停止合成发音" : "播放合成发音")

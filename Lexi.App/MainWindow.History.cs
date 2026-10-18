@@ -7,6 +7,9 @@ namespace Lexi;
 
 public partial class MainWindow
 {
+    private int historyLimit = QueryHistory.HomePageSize;
+    private void HistoryFilter_Changed(object sender, TextChangedEventArgs e) { if (HistoryList == null) return; historyLimit = QueryHistory.HomePageSize; RenderHistory(history.Entries); }
+    private void MoreHistory_Click(object sender, RoutedEventArgs e) { historyLimit += QueryHistory.HomePageSize; RenderHistory(history.Entries); }
     private QueryHistory history => session.History;
     private void HistoryHome_Click(object sender, RoutedEventArgs e) => ShowHistory();
     internal void ShowHistory(bool clearInput = true, bool trackVisit = true)
@@ -16,7 +19,7 @@ public partial class MainWindow
         Suggestions.Visibility = Visibility.Collapsed;
         if (clearInput) SetQuery("");
         EntryPanel.Visibility = Visibility.Collapsed; Welcome.Visibility = Visibility.Visible;
-        RefreshButton.Visibility = Visibility.Collapsed; ResultsScroll.ScrollToTop();
+        RetryButton.Visibility = Visibility.Collapsed; RefreshButton.Visibility = Visibility.Collapsed; ResultsScroll.ScrollToTop();
         RenderHistory(history.Entries);
         SearchBox.Focus();
     }
@@ -25,7 +28,10 @@ public partial class MainWindow
         HistoryList.Children.Clear();
         HistoryMessage.Text = history.Error.Length > 0 ? history.Error : "暂无查询历史。查过的词语和文本会显示在这里。";
         HistoryMessage.Visibility = entries.Count == 0 || history.Error.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var entry in entries)
+        var matched = entries.Where(e => e.Query.Contains(HistoryFilter.Text, StringComparison.OrdinalIgnoreCase)).ToArray();
+        MoreHistory.Visibility = matched.Length > historyLimit ? Visibility.Visible : Visibility.Collapsed;
+        if (entries.Count > 0 && matched.Length == 0) { HistoryMessage.Text = "没有匹配的历史。"; HistoryMessage.Visibility = Visibility.Visible; }
+        foreach (var entry in matched.Take(historyLimit))
         {
             var row = new Grid { Margin = new(0,0,0,5) };
             row.ColumnDefinitions.Add(new()); row.ColumnDefinitions.Add(new() { Width = GridLength.Auto });

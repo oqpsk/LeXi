@@ -21,6 +21,7 @@ public struct MainView: View {
     @State private var offset: CGFloat = 0
     @FocusState private var searchFocused: Bool
     @Environment(\.appearsActive) private var appearsActive
+    @Environment(\.openWindow) private var openWindow
 
     public init(store: LexiStore) { self.store = store }
 
@@ -43,11 +44,19 @@ public struct MainView: View {
             }
         }
         .safeAreaBar(edge: .top) {
-            SearchBar(store: store, text: $text, programmatic: $programmatic, cursor: $cursor, focused: $searchFocused, submit: submit)
-                .padding(.horizontal, 20).padding(.top, 2).padding(.bottom, 10)
+            VStack(spacing: 8) {
+                SearchBar(store: store, text: $text, programmatic: $programmatic, cursor: $cursor, focused: $searchFocused, submit: submit)
+                    .padding(.horizontal, 20).padding(.top, 2)
+                if searchFocused, let preview = store.inputPreview {
+                    Button { submit(preview.query) } label: { InputPreviewCard(preview: preview) }
+                        .buttonStyle(.plain).padding(.horizontal, 20)
+                }
+            }.padding(.bottom, 10)
         }
         .safeAreaBar(edge: .bottom) { bottomBar }
         .glassWindow()
+        // The global ⌘2 brings this window back, reopening it if it was closed.
+        .background(ShortcutWindow { openWindow(id: "main") })
         .toolbar { toolbar }
         .navigationTitle("LeXi")
         .frame(minWidth: 540, minHeight: 420)
@@ -84,6 +93,8 @@ public struct MainView: View {
     // Status on the leading side; regeneration and the online mode as grouped glass controls.
     private var bottomBar: some View {
         HStack(spacing: 12) {
+            QueryActivityMark(activity: store.view.progress?.activity ?? .idle)
+                .foregroundStyle(.secondary)
             Text(status)
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)
@@ -93,6 +104,9 @@ public struct MainView: View {
             GlassEffectContainer(spacing: 8) {
                 HStack(spacing: 8) {
                     if store.view.kind != .home {
+                        if store.view.canRetry == true {
+                            Button("重试未完成", systemImage: "arrow.clockwise.circle") { speech.stop(); Task { await store.retryFailed() } }
+                        }
                         Button(action: regenerate) { Label("重新生成", systemImage: "arrow.clockwise") }
                             .disabled(!canRegenerate)
                             .help(store.settings?.controls.regenerateTooltip ?? "")
@@ -142,6 +156,7 @@ public struct MainView: View {
         cursor = SuggestionCursor()
         setText(store.suggestions[index])
         store.clearSuggestions()
+        store.previewInput(text)
         searchFocused = true
     }
 

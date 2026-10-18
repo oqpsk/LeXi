@@ -7,9 +7,15 @@ public sealed record QueryProviders(
     Func<SenseMergeRequest, AppSettings, CancellationToken, Task<SenseMergePlan>> Judge,
     Func<string, string, AppSettings, CancellationToken, IProgress<TranslationEntry>, Task<TranslationEntry>> Translate);
 
+// Settings that change query results; hashed into retry checkpoints, so names and order stay fixed.
+internal sealed record QuerySettingsKey(bool Online, bool AutoAi, bool OfflineEnabled, string[]? DisabledDictionaries, string CodexPath,
+    string Provider, string Model, string SecondaryProvider, string SecondaryModel, bool ParallelLookup,
+    bool MergeSenses, string JudgeProvider, string JudgeModel, string CompatibleBaseUrl,
+    bool CompatibleStreaming, InferenceProfile[]? InferenceProfiles, string ReasoningEffort, string ServiceTier);
+
 // The query lifecycle shared by every front end: routing, sources, caches, models, saved views,
 // history and navigation. Each step publishes a complete QueryView; front ends only render it.
-public sealed class QuerySession : IDisposable
+public sealed partial class QuerySession : IDisposable
 {
     private readonly object gate = new();
     private readonly OnlineDictionary web;
@@ -18,7 +24,12 @@ public sealed class QuerySession : IDisposable
     private readonly ClaudeDictionary claude, secondaryClaude;
     private readonly ApiDictionary api;
     private readonly QueryProviders providers;
+    private readonly CompatibleTextClient compatibleClient;
+    private readonly bool ownsCompatibleClient;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CompatibleCredentials> compatibleCredentials = new();
     private readonly bool warmClients;
+    private readonly CancellationTokenSource catalogStop = new();
+    private int catalogStarted;
     private readonly QueryProgressTracker progress = new();
     private readonly TimeProvider clock;
     private CancellationTokenSource? lookup;
@@ -26,9 +37,13 @@ public sealed class QuerySession : IDisposable
     private QueryViewKind kind = QueryViewKind.Home;
     private string current = "", input = "", speechText = "", status = "正在准备词库…";
     private bool disposed;
+    private readonly object historyGate = new();
+    private int historyPending;
+    private readonly List<OfflineLibrary> retiredLibraries = [];
 
     public QuerySession(LexiPaths paths, Task<OfflineLibrary>? library = null, QueryProviders? providers = null,
-        HttpMessageHandler? network = null, TimeProvider? clock = null)
+        HttpMessageHandler? network = null, TimeProvider? clock = null,
+        Func<string, CompatibleCredentials>? textCredentials = null, CompatibleTextClient? textClient = null)
     {
         Paths = paths;
         Cache = new(paths.UserRoot);
@@ -38,20 +53,27 @@ public sealed class QuerySession : IDisposable
         web = new(network); pronunciations = new(network);
         codex = new(paths.AssetRoot, paths.UserRoot);
         claude = new(paths.AssetRoot, paths.UserRoot); secondaryClaude = new(paths.AssetRoot, paths.UserRoot);
+        compatibleClient = textClient ?? new(); ownsCompatibleClient = textClient == null;
+        var compatible = new CompatibleDictionary(paths.AssetRoot, compatibleClient, textCredentials ?? (url =>
+            compatibleCredentials.GetValueOrDefault(CompatibleText.NormalizeBase(url)) ?? new()), paths.UserRoot);
         warmClients = providers == null;
         api = new(paths.AssetRoot, network);
-        // Each model goes to its own service: the Codex or Claude Code subscription, or an API with the user's key.
+        // Each model goes to its own service: the Codex or Claude Code subscription, the configured
+        // text endpoint, or an API with the user's key.
         this.providers = providers ?? new((model, query, evidence, options, token, preview) => model.Provider switch
             {
-                "claude" => (model == LookupModel.Primary(Settings) ? claude : secondaryClaude).LookupAsync(query, evidence, model.Model, token, preview),
+                CompatibleText.Provider => compatible.LookupAsync(query, evidence, options, token, preview),
+                "claude" => (model == LookupModel.Primary(Settings) ? claude : secondaryClaude).LookupAsync(query, evidence, options, token, preview),
                 "openai" or "anthropic" => api.LookupAsync(model, query, evidence, Keys.For(model.Provider), token),
                 _ => codex.LookupAsync(query, evidence, options, token)
             },
-            (request, options, token) => ModelCatalog.IsApi(options.Provider)
-                ? api.JudgeSensesAsync(LookupModel.Primary(options), request, Keys.For(options.Provider), token) : codex.JudgeSensesAsync(request, options, token),
+            (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.JudgeAsync(request, options, token)
+                : ModelCatalog.IsApi(options.Provider) ? api.JudgeSensesAsync(LookupModel.Primary(options), request, Keys.For(options.Provider), token)
+                : codex.JudgeSensesAsync(request, options, token),
             (text, target, options, token, preview) => options.Provider switch
             {
-                "claude" => claude.TranslateAsync(text, target, options.Model, token, preview),
+                CompatibleText.Provider => compatible.TranslateAsync(text, target, options, token, preview),
+                "claude" => claude.TranslateAsync(text, target, options, token, preview),
                 "openai" or "anthropic" => api.TranslateAsync(LookupModel.Primary(options), text, target, Keys.For(options.Provider), token),
                 _ => codex.TranslateAsync(text, target, options, token)
             });
@@ -67,17 +89,23 @@ public sealed class QuerySession : IDisposable
     public SavedQueries Saved => new(Cache);
     public QueryHistory History { get; }
     public QueryNavigation Navigation { get; } = new();
-    public Task<OfflineLibrary> Library { get; }
+    public Task<OfflineLibrary> Library { get; private set; }
     public QueryPresentation Presentation { get; } = new();
     public string Current { get { lock (gate) return current; } }
     public QueryView View { get; private set; }
     // Raised in order for every published view; front ends marshal to their UI thread if needed.
     public event Action<QueryView>? Changed;
 
-    private string ProviderName => Settings.Provider switch { "claude" or "anthropic" => "Claude", "openai" => "OpenAI", _ => "Codex" };
+    public void SetTextCredentials(string baseUrl, CompatibleCredentials credentials) => compatibleCredentials[CompatibleText.NormalizeBase(baseUrl)] = credentials;
+    private string ProviderName => Settings.Provider switch
+    { CompatibleText.Provider => "自定义文本服务", "claude" or "anthropic" => "Claude", "openai" => "OpenAI", _ => "Codex" };
+
+    // Completes when this start's background read of the OAuth model catalog ends (or was skipped).
+    public Task SubscriptionCatalog { get; private set; } = Task.CompletedTask;
 
     public async Task InitializeAsync()
     {
+        RefreshSubscriptionCatalog();
         UpdatePreparedModel();
         try { await Library; UpdateReadyStatus(); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
@@ -90,7 +118,12 @@ public sealed class QuerySession : IDisposable
     public void UpdateReadyStatus() { lock (gate) { if (current.Length > 0) return; status = ReadyStatus(); Publish(); } }
     public void SetStatus(string text) { lock (gate) { status = text; Publish(); } }
 
-    public string[] Suggest(string text) => Settings.OfflineEnabled && Library.IsCompletedSuccessfully ? Library.Result.Suggest(text, Settings) : [];
+    public string[] Suggest(string text) => History.Suggest(text)
+        .Concat(Settings.OfflineEnabled && Library.IsCompletedSuccessfully ? Library.Result.Suggest(text, Settings) : [])
+        .Distinct(StringComparer.Ordinal).Take(10).ToArray();
+
+    public Task<InputPreviewView?> PreviewAsync(string text, CancellationToken token = default) =>
+        InputPreview.ReadAsync(text, Saved, Library, Settings, token);
 
     public void Cancel() { lock (gate) lookup?.Cancel(); }
 
@@ -101,11 +134,12 @@ public sealed class QuerySession : IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { SetStatus("设置暂时无法保存，请检查文件夹写入权限。"); return false; }
     }
     // Window-closing preferences do not invalidate dictionary or model results.
-    public string QuerySettingsIdentity()
-    {
-        var copy = Settings.ForModel(LookupModel.Primary(Settings)); copy.MinimizeOnClose = true;
-        return JsonSerializer.Serialize(copy, Json.Options);
-    }
+    public string QuerySettingsIdentity() => QueryIdentity(Settings);
+    private static string QueryIdentity(AppSettings settings) => JsonSerializer.Serialize(new QuerySettingsKey(
+        settings.Online, settings.AutoAi, settings.OfflineEnabled, settings.DisabledDictionaries, settings.CodexPath,
+        settings.Provider, settings.Model, settings.SecondaryProvider, settings.SecondaryModel, settings.ParallelLookup,
+        settings.MergeSenses, settings.JudgeProvider, settings.JudgeModel, settings.CompatibleBaseUrl,
+        settings.CompatibleStreaming, settings.InferenceProfiles, settings.ReasoningEffort, settings.ServiceTier), Json.Options);
     public void SettingsSaved(string previousIdentity)
     {
         SaveSettings(); UpdateReadyStatus();
@@ -116,7 +150,23 @@ public sealed class QuerySession : IDisposable
     {
         Settings.Online = online; SaveSettings();
         StopForSettings("查询模式已更改"); UpdatePreparedModel();
-        UpdateReadyStatus();
+        UpdateReadyStatus(); RefreshSubscriptionCatalog();
+    }
+
+    // OAuth models come from the official clients. Read their catalog once per start, in the
+    // background, so every subscription model is offered before the connection page is opened.
+    // A failure keeps the cached catalog and the saved choices; nothing is selected for the user.
+    private void RefreshSubscriptionCatalog()
+    {
+        // Where the subscription clients cannot run there is no OAuth catalog to read.
+        if (!warmClients || ModelCatalog.ApiOnly || !Settings.Online || Interlocked.Exchange(ref catalogStarted, 1) == 1) return;
+        var (path, root, token) = (Settings.CodexPath, Paths.UserRoot, catalogStop.Token);
+        SubscriptionCatalog = Task.Run(async () =>
+        {
+            try { await InferenceOptions.RememberSubscriptions(root, await InferenceOptions.ReadSubscriptions(path, token), token); }
+            catch (Exception e) when (e is InvalidOperationException or TimeoutException or OperationCanceledException or IOException or
+                UnauthorizedAccessException or System.ComponentModel.Win32Exception) { }
+        });
     }
     // The kept result is marked before cancellation, so a cancelled flow that resumes inline
     // (no UI synchronization context) cannot describe itself as an interrupted query.
@@ -140,10 +190,10 @@ public sealed class QuerySession : IDisposable
     public void UpdatePreparedModel()
     {
         if (!warmClients) return;
-        if (Settings.Online && Settings.AutoAi && Settings.Provider == "claude") claude.Prepare(Settings.Model);
+        if (Settings.Online && Settings.AutoAi && Settings.Provider == "claude") claude.Prepare(Settings.ForModel(LookupModel.Primary(Settings)));
         else claude.ReleasePrepared();
         var second = LookupModel.Secondary(Settings);
-        if (Settings.Online && Settings.AutoAi && Settings.ParallelLookup && second.Provider == "claude" && second != LookupModel.Primary(Settings)) secondaryClaude.Prepare(second.Model);
+        if (Settings.Online && Settings.AutoAi && Settings.ParallelLookup && second.Provider == "claude" && second != LookupModel.Primary(Settings)) secondaryClaude.Prepare(Settings.ForModel(second));
         else secondaryClaude.ReleasePrepared();
     }
 
@@ -170,7 +220,7 @@ public sealed class QuerySession : IDisposable
         lock (gate)
         {
             if (recordVisit) { Navigation.RememberScroll(scroll); Navigation.Visit(""); }
-            request++; lookup?.Cancel();
+            request++; lookup?.Cancel(); retry = null;
             kind = QueryViewKind.Home; current = ""; input = ""; speechText = "";
             Presentation.ResetLexical(); Presentation.SetQuery("");
             progress.Reset();
@@ -178,13 +228,14 @@ public sealed class QuerySession : IDisposable
             Publish();
         }
     }
-    public bool RemoveHistory(HistoryEntry entry) { var removed = History.Remove(entry); lock (gate) Publish(); return removed; }
+    public bool RemoveHistory(HistoryEntry entry) { lock (gate) if (maintaining) return false; bool removed; lock (historyGate) removed = History.Remove(entry); lock (gate) Publish(); return removed; }
 
     // ---- Queries ----
     public Task RegenerateAsync() { var query = Current; return query.Length > 0 ? SubmitAsync(query, true) : Task.CompletedTask; }
 
     public async Task SubmitAsync(string raw, bool force = false, bool navigating = false, double scroll = 0)
     {
+        lock (gate) { if (maintaining) return; }
         var validation = Queries.Validate(raw);
         if (validation != null) { SetStatus(validation); return; }
         var timing = new LookupTiming(clock);
@@ -193,15 +244,26 @@ public sealed class QuerySession : IDisposable
         var savedDictionary = Saved.Dictionary(Queries.LookupKey(raw));
         var savedTranslation = Saved.TranslationResult(raw.Trim(), Translation.Target(raw.Trim()));
         var translating = navigating ? Navigation.Current.Translation : savedTranslation != null || savedDictionary == null && Queries.IsText(raw, knownTerm);
-        if (!navigating) lock (gate) { Navigation.RememberScroll(scroll); Navigation.Visit(raw.Trim(), translating); History.Record(raw, translating); }
-        if (translating) await TranslateAsync(raw.Trim(), force, timing);
-        else await LookupAsync(raw, force, timing);
+        Task historyWrite = Task.CompletedTask;
+        if (!navigating)
+        {
+            lock (gate) { Navigation.RememberScroll(scroll); Navigation.Visit(raw.Trim(), translating); historyPending++; }
+            var submittedAt = clock.GetUtcNow();
+            historyWrite = Task.Run(() => { lock (historyGate) History.Record(raw, translating, submittedAt); });
+        }
+        try
+        {
+            if (translating) await TranslateAsync(raw.Trim(), force, timing);
+            else await LookupAsync(raw, force, timing);
+        }
+        finally { try { await historyWrite; } finally { if (!navigating) lock (gate) historyPending--; } }
+
     }
 
     private (long Id, CancellationToken Token) Begin(QueryViewKind next, string query, string text)
     {
         // Advance first: a cancelled flow resuming inline must already be stale.
-        request++; lookup?.Cancel(); lookup?.Dispose(); lookup = new();
+        request++; lookup?.Cancel(); lookup?.Dispose(); lookup = new(); retry = null; sourceFetchFailed.Clear();
         kind = next; current = query; input = text; speechText = text;
         return (request, lookup.Token);
     }
@@ -215,6 +277,7 @@ public sealed class QuerySession : IDisposable
         long id, progressId; CancellationToken token;
         lock (gate)
         {
+            if (maintaining) return;
             (id, token) = Begin(QueryViewKind.Dictionary, query, raw.Trim());
             Presentation.BeginDictionary(query, raw.Trim());
             status = "查询本地词库…";
@@ -223,8 +286,12 @@ public sealed class QuerySession : IDisposable
         }
         var notes = new List<string>();
         var sourceIncomplete = false;
+        var failedSources = SourceFailures.None;
         LocalHit[] local = [];
         Task pronunciationTask = Task.CompletedTask;
+        Task<OnlineEntry?>? earlySource = null;
+        var earlyWatch = System.Diagnostics.Stopwatch.StartNew();
+
         try
         {
             if (Saved.Dictionary(query, force) is { } saved) { Step(id, () => RestoreSavedCore(saved, timing, progressId)); return; }
@@ -239,7 +306,7 @@ public sealed class QuerySession : IDisposable
                     Step(id, () => Presentation.ApplyLocalWordForms(query, forms));
                 }
             }
-            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; failedSources |= SourceFailures.Offline; }
             token.ThrowIfCancellationRequested();
             Step(id, () => { Presentation.ShowLocal(local, query, Settings.OfflineEnabled); BeginOverviewCore(query, local); });
             if (local.Any(h => !string.IsNullOrWhiteSpace(h.Entry.Chinese + h.Entry.English + h.Entry.Original)) ||
@@ -281,14 +348,19 @@ public sealed class QuerySession : IDisposable
                 Step(id, () => status = "本地查询完成 · 正在查在线词典…");
                 try
                 {
-                    var fetched = await web.LookupAsync(query, token);
+                    earlyWatch.Restart(); earlySource ??= FetchSourceAsync(query, token);
+                    var budget = TimeSpan.FromMilliseconds(1000) - earlyWatch.Elapsed;
+                    if (!earlySource.IsCompleted && budget > TimeSpan.Zero)
+                        await Task.WhenAny(earlySource, Task.Delay(budget, token));
+                    var fetched = !modelsEnabled || earlySource.IsCompleted ? await earlySource : null;
                     token.ThrowIfCancellationRequested();
                     if (fetched != null) { online = fetched; await TryCacheAsync("online-v3", query, online); }
-                    else if (online == null) notes.Add("在线词典未收录");
+                    else if (online == null && earlySource.IsCompleted && !sourceFetchFailed.ContainsKey(id)) notes.Add("在线词典未收录");
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested) { notes.Add("在线查询超时"); sourceIncomplete = true; }
                 catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidDataException) { notes.Add("在线来源暂不可用"); sourceIncomplete = true; }
             }
+            if (sourceFetchFailed.ContainsKey(id)) { sourceIncomplete = true; failedSources |= SourceFailures.Online; }
             token.ThrowIfCancellationRequested();
             var onlineEntry = online;
             Step(id, () =>
@@ -304,6 +376,7 @@ public sealed class QuerySession : IDisposable
             if (!modelsEnabled)
             {
                 await pronunciationTask; token.ThrowIfCancellationRequested();
+                Step(id, () => retry = new(query, local, online, evidence, cachedAnswers, Settings.ForModel(LookupModel.Primary(Settings)), sourceIncomplete, failedSources));
                 await SaveDictionaryAsync(query, local, online, evidence, cachedAnswers, false, sourceIncomplete, token);
                 token.ThrowIfCancellationRequested();
                 Step(id, () =>
@@ -330,13 +403,23 @@ public sealed class QuerySession : IDisposable
                         Publish();
                     }
                 });
-                var result = await coordinator.LookupAsync(query, evidence, Settings, force, token, report);
+                var options = Settings.ForModel(LookupModel.Primary(Settings));
+                // Buffered SSE and CLI output can complete reads synchronously for a whole burst.
+                // Keep parsing, grouping and provider callbacks off the front end's UI context.
+                var result = await Task.Run(() => coordinator.LookupAsync(query, evidence, options, force, token, report), token);
                 token.ThrowIfCancellationRequested();
                 lock (gate) finished = true;
                 Step(id, () => Presentation.ApplyAnswers(result, sourceEvidence));
                 if (result.Groups.Length > 0) timing.MarkFirst();
                 await pronunciationTask;
+                if (earlySource != null)
+                {
+                    var late = await earlySource;
+                    if (late != null) { online = late; Step(id, () => Presentation.ShowOnline(late, false)); }
+                    else if (sourceFetchFailed.ContainsKey(id)) { sourceIncomplete = true; failedSources |= SourceFailures.Online; }
+                }
                 token.ThrowIfCancellationRequested();
+                Step(id, () => retry = new(query, local, online, evidence, result, options, sourceIncomplete, failedSources));
                 await SaveDictionaryAsync(query, local, online, evidence, result, mergeEnabled, sourceIncomplete, token);
                 token.ThrowIfCancellationRequested();
                 var failures = result.Answers.Count(a => a.Phase == ModelPhase.Failed);
@@ -367,6 +450,21 @@ public sealed class QuerySession : IDisposable
         }
     }
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, bool> sourceFetchFailed = new();
+    private async Task<OnlineEntry?> FetchSourceAsync(string query, CancellationToken token)
+    {
+        long id; lock (gate) id = request;
+        try
+        {
+            using var stop = CancellationTokenSource.CreateLinkedTokenSource(token); stop.CancelAfter(TimeSpan.FromSeconds(8));
+            var entry = await web.LookupAsync(query, stop.Token);
+            if (entry != null && !token.IsCancellationRequested) await TryCacheAsync("online-v3", query, entry);
+            return entry;
+        }
+        catch (Exception e) when (e is HttpRequestException or IOException or JsonException or InvalidDataException or OperationCanceledException or TimeoutException)
+        { if (!token.IsCancellationRequested) sourceFetchFailed[id] = true; return null; }
+    }
+
     private async Task TranslateAsync(string text, bool force, LookupTiming timing)
     {
         var target = Translation.Target(text);
@@ -375,6 +473,7 @@ public sealed class QuerySession : IDisposable
         long id, progressId; CancellationToken token;
         lock (gate)
         {
+            if (maintaining) return;
             (id, token) = Begin(QueryViewKind.Translation, text, text);
             Presentation.BeginTranslation(text, target);
             progressId = progress.Begin(initialProgress);
@@ -429,10 +528,12 @@ public sealed class QuerySession : IDisposable
                     if (fingerprint == lastPreview) return;
                     lastPreview = fingerprint;
                     Presentation.ShowTranslation(partial, false, true, ProviderName); timing.MarkFirst(); status = "翻译生成中…";
+                    progress.Update(progressId, QueryProgressState.Translating(partial.Paragraphs.Any(p => !string.IsNullOrWhiteSpace(p))));
                     Publish();
                 }
             });
-            var entry = await providers.Translate(text, target, Settings, token, report);
+            var options = Settings.ForModel(LookupModel.Primary(Settings));
+            var entry = await Task.Run(() => providers.Translate(text, target, options, token, report), token);
             token.ThrowIfCancellationRequested();
             lock (gate) finished = true;
             timing.MarkFirst();
@@ -489,6 +590,8 @@ public sealed class QuerySession : IDisposable
         Presentation.RestorePronunciation(saved.Pronunciation);
         if (saved.Online != null) Presentation.ShowOnline(saved.Online, true);
         Presentation.ApplyAnswers(saved.Result, saved.Evidence);
+        retry = saved.RetryIdentity == null ? null : new(query, saved.Local, saved.Online, saved.Evidence, saved.Result,
+            Settings.ForModel(LookupModel.Primary(Settings)), saved.SourceIncomplete, saved.FailedSources, saved.RetryIdentity);
         timing.MarkFirst();
         var state = (saved.Result.Answers.Length > 0 ? QueryProgressState.Finished(saved.Result, saved.MergeEnabled,
             saved.SourceIncomplete, SpecialistReferences.Uncovered(query, saved.Result.Groups, saved.Evidence).Length) :
@@ -532,8 +635,8 @@ public sealed class QuerySession : IDisposable
     {
         token.ThrowIfCancellationRequested();
         SavedDictionary saved;
-        lock (gate) saved = new(query, local, Presentation.LocalWordForms, Presentation.OnlineWordForms, Presentation.SourceEtymologies,
-            online, evidence, result, Presentation.Pronunciation, merge, incomplete, clock.GetUtcNow());
+        lock (gate) { if (current != query || kind != QueryViewKind.Dictionary || token.IsCancellationRequested) return; saved = new(query, local, Presentation.LocalWordForms, Presentation.OnlineWordForms, Presentation.SourceEtymologies,
+            online, evidence, result, Presentation.Pronunciation, merge, incomplete, clock.GetUtcNow(), RetryIdentity: retry?.Identity, FailedSources: retry?.FailedSources ?? SourceFailures.None); }
         try { await Saved.SaveDictionaryAsync(saved, token); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* Keep the displayed result if persistence is unavailable. */ }
     }
@@ -552,10 +655,9 @@ public sealed class QuerySession : IDisposable
     public static string ModelStatus(LookupSnapshot snapshot) => string.Join(" · ", snapshot.Answers.Select(a => a.Model.Name + (a.Phase switch
     { ModelPhase.Pending => " 查询中", ModelPhase.Streaming => " 生成中", ModelPhase.Complete => a.Cached ? " 缓存" : " 完成", ModelPhase.Failed => " 未完成", _ => a.Cached ? " 缓存" : " 无缓存" })));
 
-    // Progress<T> keeps UI-thread delivery for desktop front ends; without a synchronization
-    // context (the host), updates are delivered inline so they cannot be reordered.
-    private static IProgress<T> Reporter<T>(Action<T> handler) =>
-        SynchronizationContext.Current != null ? new Progress<T>(handler) : new InlineProgress<T>(handler);
+    // Process ordered model snapshots on the generation worker. Front ends marshal complete
+    // views; posting every token to their synchronization context would starve input/cancel.
+    private static IProgress<T> Reporter<T>(Action<T> handler) => new InlineProgress<T>(handler);
 
     private bool Step(long id, Action action)
     {
@@ -568,12 +670,14 @@ public sealed class QuerySession : IDisposable
         Presentation.Pronunciation, progress.Current, progress.Generation, status, kind != QueryViewKind.Home && Settings.Online,
         new(Navigation.CanBack, Navigation.CanForward, QueryNavigation.Label(Navigation.Back), QueryNavigation.Label(Navigation.Forward)),
         Presentation.Local, Presentation.LocalHint, Presentation.Online, Presentation.OnlineHint, Presentation.Answers,
-        Presentation.QuickRead, Presentation.FormRows, Presentation.Etymology, Presentation.Translation);
+        Presentation.QuickRead, Presentation.FormRows, Presentation.Etymology, Presentation.Translation, CanRetry);
 
     public void Dispose()
     {
         lock (gate) { disposed = true; lookup?.Cancel(); }
-        claude.Dispose(); secondaryClaude.Dispose(); web.Dispose(); pronunciations.Dispose();
+        catalogStop.Cancel();
+        claude.Dispose(); secondaryClaude.Dispose(); compatibleCredentials.Clear(); if (ownsCompatibleClient) compatibleClient.Dispose(); web.Dispose(); pronunciations.Dispose();
         if (Library.IsCompletedSuccessfully) Library.Result.Dispose();
+        foreach (var library in retiredLibraries) library.Dispose();
     }
 }

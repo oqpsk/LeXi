@@ -3,11 +3,17 @@ import LeXiKit
 import LeXiUI
 import SwiftUI
 
-// Applies the saved appearance before any window appears.
+// Applies the saved appearance before any window appears, holds the global ⌘2 once running, and
+// keeps LeXi running after its window closes.
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppearanceChoice.apply(UserDefaults.standard.string(forKey: AppearanceChoice.key) ?? AppearanceChoice.system.rawValue)
     }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        GlobalShortcut.shared.apply()
+    }
+    // Closing the query window keeps LeXi running, so ⌘2 and the Dock icon can bring it back.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
 @main
@@ -29,6 +35,7 @@ struct LeXiApp: App {
         Settings {
             SettingsView(store: store)
         }
+        .windowResizability(.contentMinSize)
     }
 
     private func start() async {

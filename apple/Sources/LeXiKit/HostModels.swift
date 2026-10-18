@@ -6,10 +6,12 @@ import Foundation
 public enum QueryViewKind: String, Decodable, Sendable { case home, dictionary, translation }
 public enum QueryStage: String, Decodable, Sendable { case dictionary, supplement, merge, finished }
 public enum QueryOutcome: String, Decodable, Sendable { case running, complete, partial, failed }
+public enum QueryActivity: String, Decodable, Sendable { case idle, querying, generating, merging }
 public enum OriginalsMode: String, Decodable, Sendable { case keep, collapse, expand }
 
 public struct QueryProgress: Decodable, Equatable, Sendable {
     public let stage: QueryStage
+    public let activity: QueryActivity?
     public let title: String
     public let detail: String
     public let outcome: QueryOutcome
@@ -164,6 +166,7 @@ public struct QueryView: Decodable, Equatable, Sendable {
     public let progress: QueryProgress?
     public let progressGeneration: Int64
     public let status: String
+    public var canRetry: Bool? = nil
     public let canRegenerate: Bool
     public let navigation: NavigationState
     public let local: [LocalSource]
@@ -190,6 +193,14 @@ public struct QueryView: Decodable, Equatable, Sendable {
 public struct SubmitResult: Decodable, Sendable { public let request: Int64; public let revision: Int64 }
 public struct QueryPage: Decodable, Sendable { public let query: String; public let translation: Bool; public let scrollOffset: Double }
 public struct NavigateResult: Decodable, Sendable { public let page: QueryPage? }
+public struct InputPreview: Decodable, Equatable, Sendable {
+    public let query, headword, text, source: String
+    public init(query: String, headword: String, text: String, source: String) {
+        self.query = query; self.headword = headword; self.text = text; self.source = source
+    }
+    public var label: String { query == headword ? headword : query + " → " + headword }
+}
+
 public struct Suggestions: Decodable, Sendable { public let suggestions: [String] }
 
 public struct HistoryEntry: Decodable, Equatable, Sendable, Identifiable {
@@ -200,6 +211,7 @@ public struct HistoryEntry: Decodable, Equatable, Sendable, Identifiable {
     public var id: String { (translation ? "t:" : "d:") + query }
 }
 public struct HistoryList: Decodable, Equatable, Sendable {
+    public var total: Int? = nil
     public let entries: [HistoryEntry]
     public let error: String
     public static let empty = HistoryList(entries: [], error: "")
@@ -219,15 +231,37 @@ public struct AppSettings: Decodable, Equatable, Sendable {
     public let secondaryModel: String
     public let mergeSenses: Bool
     public let judgeModel: String
+    public let judgeProvider: String?
+    public let compatibleBaseUrl: String?
+    public let compatibleStreaming: Bool?
     public let speechProvider: String
     public let speechModel: String
     public let speechVoice: String
+    public var speechProfiles: [SpeechProfile]? = nil
     public let speechVoiceName: String
+}
+public struct InferenceOption: Decodable, Equatable, Sendable, Hashable, Identifiable {
+    public let id: String
+    public let label: String
+    public init(id: String, label: String) { self.id = id; self.label = label }
+}
+public struct InferenceCapabilities: Decodable, Equatable, Sendable, Hashable {
+    public let efforts: [String]
+    public let speeds: [InferenceOption]
+    public let note: String
+    public let effortChoices: [InferenceOption]
+    public let speedChoices: [InferenceOption]
 }
 public struct ModelChoice: Decodable, Equatable, Sendable, Hashable, Identifiable {
     public let label: String
     public let id: String
     public let provider: String
+    public let options: InferenceCapabilities?
+    public let effort: String?
+    public let speed: String?
+    public init(label: String, id: String, provider: String, options: InferenceCapabilities? = nil, effort: String? = nil, speed: String? = nil) {
+        self.label = label; self.id = id; self.provider = provider; self.options = options; self.effort = effort; self.speed = speed
+    }
     public var key: String { provider + ":" + id }
 }
 public struct ControlLabels: Decodable, Equatable, Sendable {
@@ -277,13 +311,14 @@ public struct LoginCommand: Decodable, Equatable, Sendable {
 
 // Settings changes are sent as a partial JSON object; only these value shapes are needed.
 public enum SettingValue: Encodable, Equatable, Sendable {
-    case bool(Bool), string(String), strings([String])
+    case bool(Bool), string(String), strings([String]), integer(Int)
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
         case .bool(let value): try container.encode(value)
         case .string(let value): try container.encode(value)
         case .strings(let value): try container.encode(value)
+        case .integer(let value): try container.encode(value)
         }
     }
 }

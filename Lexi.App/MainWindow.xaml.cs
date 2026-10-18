@@ -10,9 +10,10 @@ namespace Lexi;
 
 public partial class MainWindow : Window
 {
-    private readonly QuerySession session = new(App.Paths);
+    private readonly QuerySession session = new(App.Paths, textCredentials: url => new TextProviderKeys(App.UserRoot).Read(url));
     private AppSettings settings => session.Settings;
     private bool quit;
+    private readonly QueryViewDelivery viewDelivery;
     private readonly WindowPlacement windowPlacement;
     private bool suppressSuggestions;
     private string current => session.Current;
@@ -21,7 +22,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        InitializeInputPreview();
         shown = session.View;
+        viewDelivery = new(Dispatcher, Render);
         session.Changed += Render;
         FocusManager.SetFocusedElement(this, SearchBox);
         RenderHistory(history.Entries);
@@ -30,7 +33,7 @@ public partial class MainWindow : Window
         UpdateOnlineButton(); UpdateNavigation(session.View.Navigation); UpdateCloseAction();
         LocationChanged += (_, _) => EtymologyPopup.IsOpen = false;
         SizeChanged += (_, _) => EtymologyPopup.IsOpen = false;
-        Deactivated += (_, _) => { CancelSearchFocus(); EtymologyPopup.IsOpen = false; };
+        Deactivated += (_, _) => { CancelSearchFocus(); CancelInputPreview(); EtymologyPopup.IsOpen = false; };
         ContentRendered += (_, _) => QueueSearchFocus();
         StateChanged += (_, _) => { if (WindowState == WindowState.Minimized) CancelSearchFocus(); else QueueSearchFocus(); };
         PreviewMouseDown += (_, _) => CancelSearchFocus();
@@ -40,7 +43,7 @@ public partial class MainWindow : Window
         {
             if (!quit && settings.MinimizeOnClose && !Dispatcher.HasShutdownStarted) { e.Cancel = true; WindowState = WindowState.Minimized; }
         };
-        Closed += (_, _) => { focusClosed = true; CancelSearchFocus(); session.Cancel(); StopSpeech(); speech.Dispose(); session.Dispose(); };
+        Closed += (_, _) => { focusClosed = true; CancelInputPreview(); CancelSearchFocus(); session.Cancel(); StopSpeech(); speech.Dispose(); session.Dispose(); };
     }
     public void Restore()
     {
@@ -51,13 +54,14 @@ public partial class MainWindow : Window
     private void Window_Activated(object? sender, EventArgs e) { FocusSearch(); QueueSearchFocus(); }
     private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
+        if (inputComposing && e.Key is Key.Enter or Key.Up or Key.Down or Key.Escape) return;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (Keyboard.Modifiers == ModifierKeys.Alt && key is Key.Left or Key.Right)
         { e.Handled = true; await NavigateAsync(key == Key.Left ? -1 : 1); return; }
         if (e.Key == Key.Escape)
         {
             if (EtymologyPopup.IsOpen) DismissEtymology();
-            else if (Suggestions.Visibility == Visibility.Visible) DismissSuggestions(restoreDraft: true);
+            else if (Suggestions.Visibility == Visibility.Visible || InputPreviewCard.Visibility == Visibility.Visible) DismissSuggestions(restoreDraft: true);
             else WindowState = WindowState.Minimized;
             e.Handled = true;
         }
@@ -90,8 +94,8 @@ public partial class MainWindow : Window
         StopSpeech();
         var previous = session.QuerySettingsIdentity();
         var library = session.Library;
-        var dialog = new SettingsWindow(settings, library.IsCompletedSuccessfully ? library.Result.Dictionaries : DictionaryCatalog.InspectAll(App.Paths.DataRoot)) { Owner = this };
-        if (dialog.ShowDialog() == true)
+        var dialog = new SettingsWindow(settings, library.IsCompletedSuccessfully ? library.Result.Dictionaries : DictionaryCatalog.InspectAll(App.Paths.DataRoot), null, session: session) { Owner = this };
+        if (dialog.ShowDialog() == true || dialog.DataImported)
         {
             session.SettingsSaved(previous);
             UpdateOnlineButton(); UpdateCloseAction();
@@ -99,6 +103,7 @@ public partial class MainWindow : Window
         }
         FocusSearch();
     }
+    private async void Retry_Click(object sender, RoutedEventArgs e) { StopSpeech(); await session.RetryFailedAsync(); }
     private async Task SearchAsync(string raw, bool force = false, bool navigating = false)
     {
         // Speech always belongs to the result being replaced; invalid input leaves it untouched.
@@ -113,12 +118,14 @@ public partial class MainWindow : Window
     private long progressRequest;
     private void Render(QueryView view)
     {
-        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => Render(view)); return; }
+        if (!Dispatcher.CheckAccess()) { viewDelivery.Post(view); return; }
+        if (focusClosed) return;
         if (view.Revision <= shown.Revision) return;
         var previous = shown; shown = view;
         bool Changed<T>(Func<QueryView, T> part) => !Equals(part(previous), part(view));
         var fresh = view.Request != previous.Request;
         if (fresh || Changed(v => v.Status)) LookupStatus.Text = view.Status;
+        if (fresh || Changed(v => v.Progress)) FooterActivity.Activity = view.Progress?.Activity ?? QueryActivity.Idle;
         if (Changed(v => v.Navigation)) UpdateNavigation(view.Navigation);
         if (view.ProgressGeneration != previous.ProgressGeneration)
         {
@@ -136,6 +143,7 @@ public partial class MainWindow : Window
             Headword.Text = view.Heading; Headword.FontSize = view.Kind == QueryViewKind.Translation ? 28 : 30;
             ResultsScroll.ScrollToTop();
         }
+        RetryButton.Visibility = view.CanRetry ? Visibility.Visible : Visibility.Collapsed;
         if (Changed(v => v.Pronunciation)) RenderPronunciation(view.Pronunciation);
         if (Changed(v => v.WordForms)) RenderFormRows(view.WordForms);
         if (Changed(v => v.Etymology)) RenderEtymology(view.Etymology);

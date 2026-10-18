@@ -30,12 +30,14 @@ Windows 与 macOS 上的轻量桌面词典。输入中英文词语查看释义�
 
 ```powershell
 pwsh ./scripts/Build.ps1
+New-Item -ItemType Directory -Force ./artifacts/Lexi | Out-Null
+Copy-Item ./artifacts/Lexi-clean/* ./artifacts/Lexi -Recurse -Force
 pwsh ./scripts/Install-Dictionary.ps1
 pwsh ./scripts/Install-ExtendedDictionaries.ps1
 ./artifacts/Lexi/Lexi.exe
 ```
 
-构建输出到 `artifacts/Lexi/`。框架依赖版本需要 .NET 10 Desktop Runtime。词库安装脚本下载固定版本的 ECDICT，验证 SHA-256，再生成本地索引；不安装词库也能使用在线查询。
+构建输出到干净的 `artifacts/Lexi-clean/`；运行副本放在 `artifacts/Lexi/`，保留其中的个人数据。不要压缩运行副本用于分发；发布前更新版本号，再运行 `scripts/Package.ps1` 生成自带运行环境的干净 ZIP。框架依赖版本需要 .NET 10 Desktop Runtime。词库安装脚本下载固定版本的 ECDICT，验证 SHA-256，再生成本地索引；不安装词库也能使用在线查询。
 
 扩展词库来自官方公开下载渠道：
 
@@ -110,7 +112,7 @@ pwsh ./scripts/Install-Dictionary.ps1 -AppDirectory "$HOME/Library/Application S
 | ⌘Y | 查询历史 |
 | ⌘, | 设置 |
 
-关闭窗口不会退出应用，点击 Dock 图标重新打开。发音默认使用系统声线并按文字语言自动选择，也可在“设置 → 发音”中指定系统声线，或选择 OpenAI、Grok 与 ElevenLabs 在线语音。ElevenLabs 账号声线需点击“读取声线列表”。在线语音的 API Key 保存在钥匙串中，不读取环境变量。
+在任何应用中按 ⌘2 呼出 LeXi，光标已在输入框里、上次的词已选中；LeXi 在前台时再按一次即隐藏，回到原来的应用。⌘2 优先于其他应用自己的 ⌘2，可在“设置 → 通用”中关闭；同一页可设为登录时打开，开机后即可呼出。关闭窗口不会退出应用，⌘2 或点击 Dock 图标都能重新打开。发音默认使用系统声线并按文字语言自动选择，也可在“设置 → 发音”中指定系统声线，或选择 OpenAI、Grok 与 ElevenLabs 在线语音。ElevenLabs 账号声线需点击“读取声线列表”。在线语音的 API Key 保存在钥匙串中，不读取环境变量。
 
 ## 音标和发音
 

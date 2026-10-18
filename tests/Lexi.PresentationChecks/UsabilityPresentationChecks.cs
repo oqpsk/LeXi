@@ -52,7 +52,7 @@ internal static partial class Program
         main.RenderWordForms("unknown", []);
         Check(forms.Children.Count == 0, "missing forms clear the previous word's inflections");
         var tabs = Contents(settings).OfType<TabControl>().Single();
-        tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(t => (string)t.Header == "账号连接");
+        tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(t => (string)t.Header == "OAuth 连接");
         Measure((FrameworkElement)settings.Content, 538, 478);
         Check(Descendants((DependencyObject)settings.Content).OfType<Button>().Count(b => AutomationProperties.GetName(b).StartsWith("登录 ")) == 2 &&
             !Contents(settings).OfType<TextBlock>().Any(t => t.Text.Contains("someone@example.org")),

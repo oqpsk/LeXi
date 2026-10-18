@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading.Channels;
 using Lexi.Core;
 using Lexi.Host;
@@ -47,18 +48,32 @@ internal static class HostChecks
                 ? new(HttpStatusCode.OK) { Content = new StringContent("{\"voices\":[{\"voice_id\":\"voice_b\",\"name\":\"Beta\"},{\"voice_id\":\"voice_a\",\"name\":\"Alpha\"}],\"has_more\":false}") }
                 : new(HttpStatusCode.OK) { Content = new ByteArrayContent(syntheticAudio) };
         }));
+        using var textClient = new CompatibleTextClient(new SpeechHandler(request =>
+        {
+            var allowed = request.Headers.GetValues("CF-Access-Client-Id").Single() == "synthetic-id" &&
+                request.Headers.GetValues("CF-Access-Client-Secret").Single() == "synthetic-secret";
+            return new HttpResponseMessage(allowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden)
+            { Content = new StringContent(JsonSerializer.Serialize(new { data = new[] { new { id = "synthetic-model", supported_reasoning_levels = new[] { new { effort = "low" }, new { effort = "high" } }, service_tiers = new[] { new { id = "priority" } } } } })) };
+        }));
         using (var session = new QuerySession(new(Path.Combine(work, "assets"), Path.GetFullPath(fixture), user), providers: providers, network: new NoNetwork()))
         {
             var client = new Client();
-            var server = new HostServer(session, client.Input, client.Output, speechClient).RunAsync();
+            var server = new HostServer(session, client.Input, client.Output, speechClient, textClient).RunAsync();
             var init = await client.Call("initialize");
             Check(init.GetProperty("result") is var ready && ready.GetProperty("protocol").GetInt32() == HostServer.Protocol &&
                 ready.GetProperty("view").GetProperty("kind").GetString() == "home" &&
-                ready.GetProperty("settings").GetProperty("models").EnumerateArray().Any(m => m.GetProperty("label").GetString() == "GPT-6 Luna · Fast") &&
+                ready.GetProperty("settings").GetProperty("models").EnumerateArray().Any(m => m.GetProperty("label").GetString() == "OAuth | GPT-6 Luna") &&
                 ready.GetProperty("settings").GetProperty("controls").GetProperty("onlineLabel").GetString() == "在线补充",
                 "initialize reports the protocol version, the home view, shared model choices and control labels");
             Check((await client.Call("suggest", new { text = "wal" })).GetProperty("result").GetProperty("suggestions").EnumerateArray().Any(s => s.GetString() == "walk"),
                 "suggestions come from the shared offline library");
+
+            var beforePreview = session.View;
+            var inputPreview = (await client.Call("query.preview",new { text="hello" })).GetProperty("result");
+            Check(inputPreview.GetProperty("query").GetString()=="hello" && inputPreview.GetProperty("headword").GetString()=="hello" &&
+                inputPreview.GetProperty("text").GetString()=="你好" && ReferenceEquals(beforePreview,session.View) && session.History.Entries.Count==0 &&
+                (await client.Call("query.preview",new {text="hel"})).GetProperty("result").ValueKind==JsonValueKind.Null,
+                "the native preview endpoint exposes shared local glosses without publishing a query or recording history");
 
             var submitted = (await client.Call("query.submit", new { text = "serendipity" })).GetProperty("result");
             var request = submitted.GetProperty("request").GetInt64();
@@ -72,6 +87,10 @@ internal static class HostChecks
                 done.GetProperty("title").GetString() == "已完成 · 1 个义项" && done.GetProperty("stageLabels").GetArrayLength() == 4 &&
                 views.Any(v => v.GetProperty("progress") is { ValueKind: JsonValueKind.Object } p && p.GetProperty("stage").GetString() == "supplement" && p.GetProperty("busy").GetBoolean()),
                 "views carry camelCase fields, string enums and the same lifecycle as the Windows window");
+            var activities = views.Where(v => v.GetProperty("progress").ValueKind == JsonValueKind.Object)
+                .Select(v => v.GetProperty("progress").GetProperty("activity").GetString()).ToArray();
+            Check(activities.Contains("querying") && activities.Contains("generating") && activities.Contains("merging") && activities.Last()=="idle",
+                "native clients receive Core's query, output, merge and idle animation states");
             Check(final.GetProperty("answers").GetProperty("senses")[0].GetProperty("alternativesLabel").GetString() == "其他表述 · 1" &&
                 final.GetProperty("quickRead").GetProperty("caption").GetString() == "TL;DR · 已整理",
                 "merged senses and the overview reach the front end fully worded");
@@ -93,11 +112,21 @@ internal static class HostChecks
                 File.WriteAllText(fixtureOutput, JsonSerializer.Serialize(new { dictionary = final, translation = translationViews.Last(),
                     preview = translationViews.First(v => v.GetProperty("translation").ValueKind == JsonValueKind.Object && !v.GetProperty("translation").GetProperty("complete").GetBoolean()),
                     streaming = views.First(v => v.GetProperty("progress") is { ValueKind: JsonValueKind.Object } p && p.GetProperty("busy").GetBoolean() && v.GetProperty("answers").ValueKind == JsonValueKind.Object),
-                    home = ready.GetProperty("view") }, new JsonSerializerOptions(HostServer.Options) { WriteIndented = true }) + "\n");
+                    home = ready.GetProperty("view") }, new JsonSerializerOptions(HostServer.Options)
+                    { WriteIndented = true, TypeInfoResolver = JsonTypeInfoResolver.Combine(HostServer.Options.TypeInfoResolver!, new DefaultJsonTypeInfoResolver()) }) + "\n");
             var history = (await client.Call("history.list")).GetProperty("result").GetProperty("entries");
             Check(history[0].GetProperty("kind").GetString() == "翻译" && history[0].GetProperty("preview").GetString() == "The ship is ready. Keep 42 intact." &&
                 (await client.Call("history.remove", new { query = history[0].GetProperty("query").GetString(), translation = true })).GetProperty("result").GetProperty("removed").GetBoolean(),
                 "history exposes previews and kinds and removes single entries");
+
+            var notBackup = Path.Combine(work, "not-a-backup.lexibackup"); File.WriteAllText(notBackup, "plain text");
+            var inspected = (await client.Call("data.inspect", new { path = notBackup })).GetProperty("error");
+            var cleared = (await client.Call("data.clear", new { category = "keys" })).GetProperty("error");
+            var unwritable = (await client.Call("data.export", new { path = Path.Combine(work, "missing", "backup.lexibackup") })).GetProperty("error");
+            Check(inspected.GetProperty("code").GetString() == "invalid_data" && inspected.GetProperty("message").GetString() == "所选文件不是有效的 LeXi 备份。" &&
+                cleared.GetProperty("code").GetString() == "invalid_data" && cleared.GetProperty("message").GetString() == "未知缓存类别。" &&
+                unwritable.GetProperty("code").GetString() == "file_failed" && !unwritable.GetProperty("message").GetString()!.Contains(work),
+                "data errors keep Core's wording, name damaged archives and unwritable files plainly, and never echo a path");
 
             var page = (await client.Call("query.navigate", new { direction = -1 })).GetProperty("result").GetProperty("page");
             Check(page.GetProperty("query").GetString() == "hello" &&
@@ -112,8 +141,8 @@ internal static class HostChecks
                 (await client.Call("settings.update", new { settings = new { online = "yes" } })).GetProperty("error").GetProperty("code").GetString() == "invalid_params",
                 "unknown settings and wrong value types are rejected without saving");
             var updated = (await client.Call("settings.update", new { settings = new { mergeSenses = false, reasoningEffort = "high" } })).GetProperty("result").GetProperty("settings");
-            Check(!updated.GetProperty("mergeSenses").GetBoolean() && updated.GetProperty("reasoningEffort").GetString() == "low" &&
-                !AppSettings.Load(user).MergeSenses, "valid settings are saved with the fixed Codex options");
+            Check(!updated.GetProperty("mergeSenses").GetBoolean() && updated.GetProperty("reasoningEffort").GetString() == "high" &&
+                !AppSettings.Load(user).MergeSenses, "valid settings preserve the selected reasoning effort instead of forcing Low");
             const string modelKey = "synthetic-host-model-key";
             var keySet = await client.Call("keys.set", new { provider = "anthropic", key = modelKey });
             Check(keySet.GetProperty("result").ValueKind == JsonValueKind.Object && !keySet.GetRawText().Contains(modelKey) &&
@@ -121,6 +150,28 @@ internal static class HostChecks
                 !Directory.EnumerateFiles(user, "*", SearchOption.AllDirectories).Any(f => File.ReadAllText(f).Contains(modelKey)),
                 "model API keys are taken for API services only and never returned or written");
             await CheckSpeech(client, user, speechKey, syntheticAudio, speechRequests, Check);
+            var textRequest = new { baseUrl = "https://example.org/v1", clientId = "synthetic-id", clientSecret = "synthetic-secret", apiKey = "" };
+            var availableText = await client.Call("text.models", textRequest);
+            Check(availableText.GetProperty("result").GetProperty("models")[0].GetProperty("provider").GetString() == "compatible" &&
+                availableText.GetProperty("result").GetProperty("models")[0].GetProperty("id").GetString() == "synthetic-model" &&
+                !availableText.GetRawText().Contains("synthetic-secret"), "the host returns authenticated model choices without echoing the Access credentials");
+            Check((await client.Call("text.models", textRequest with { clientSecret = "wrong" })).GetProperty("error").GetProperty("code").GetString() == "authentication_failed" &&
+                (await client.Call("text.models", new { textRequest.baseUrl })).GetProperty("error").GetProperty("code").GetString() == "missing_credentials",
+                "host text discovery preserves explicit authentication and missing-credential failures");
+            await client.Call("settings.update", new { settings = new { compatibleBaseUrl = textRequest.baseUrl } });
+            var preference = await client.Call("inference.configure", new { provider = "compatible", model = "synthetic-model", effort = "low", speed = "priority" });
+            var pref = preference.GetProperty("result").GetProperty("models").EnumerateArray().Single(m => m.GetProperty("id").GetString() == "synthetic-model");
+            Check(pref.GetProperty("effort").GetString() == "low" && pref.GetProperty("speed").GetString() == "priority" &&
+                AppSettings.Load(user).InferenceProfiles.Single().Effort == "low", "host inference controls return and persist the selected model-specific effort and speed");
+            var unsupported = await client.Call("inference.configure", new { provider = "compatible", model = "synthetic-model", effort = "ultra", speed = "priority" });
+            Check(unsupported.GetProperty("error").GetProperty("code").GetString() == "invalid_settings" && AppSettings.Load(user).InferenceProfiles.Single().Effort == "low",
+                "host rejects unsupported effort without changing the saved profile");
+            var catalog = await client.Call("inference.catalog");
+            Check(catalog.GetProperty("result").GetProperty("models").EnumerateArray().Any(m => m.GetProperty("id").GetString() == "synthetic-model"),
+                "host returns current settings once this start's OAuth catalog read is over (never started with injected providers)");
+            var configuredText = await client.Call("text.credentials", textRequest);
+            Check(configuredText.GetProperty("result").EnumerateObject().Count() == 0 &&
+                !File.ReadAllText(Path.Combine(user, "settings.json")).Contains("synthetic-secret"), "text credentials stay in process memory and outside host settings and responses");
             var offline = (await client.Call("settings.setOnline", new { online = false })).GetProperty("result");
             Check(offline.GetProperty("controls").GetProperty("onlineLabel").GetString() == "离线查询" && !AppSettings.Load(user).Online &&
                 client.Latest().GetProperty("status").GetString()!.StartsWith("查询模式已更改"), "the online switch saves and keeps the current result");

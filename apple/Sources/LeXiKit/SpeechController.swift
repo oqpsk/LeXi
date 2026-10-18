@@ -7,6 +7,7 @@ import Observation
 @MainActor @Observable
 public final class SpeechController: NSObject {
     public private(set) var speaking = false
+    public private(set) var audioPlaying = false
     // What is being read: "heading" for the headword, otherwise a definition or example's key.
     public private(set) var speakingID: String?
     // Generation, playback and error messages, worded as on Windows.
@@ -18,6 +19,12 @@ public final class SpeechController: NSObject {
     @ObservationIgnored private(set) var work: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var finished = ""
+    // The last passage read, for 再次播放上一段 in the read-aloud context menu (as on Windows).
+    private var lastReading: (text: String, selection: SpeechSelection, id: String?)?
+    public var canRepeat: Bool { lastReading != nil }
+    public func repeatLast(using service: any SpeechService) {
+        if let lastReading { play(lastReading.text, lastReading.selection, using: service, finished: "发音播放结束", id: lastReading.id) }
+    }
 
     public init(keys: any SpeechKeys = KeychainSpeechKeys()) {
         self.keys = keys
@@ -36,6 +43,7 @@ public final class SpeechController: NSObject {
     public func play(_ text: String, _ selection: SpeechSelection, key: String? = nil, using service: any SpeechService,
                      finished: String, id: String? = nil) {
         stop()
+        lastReading = (text, selection, id)
         let request = generation
         speaking = true
         speakingID = id
@@ -50,6 +58,7 @@ public final class SpeechController: NSObject {
         if synthesizer.isSpeaking { synthesizer.stopSpeaking(at: .immediate) }
         player?.stop(); player = nil
         speaking = false
+        audioPlaying = false
         speakingID = nil
         status = message
     }
@@ -90,13 +99,20 @@ public final class SpeechController: NSObject {
         player = audio
         status = "正在播放合成发音…"
         guard audio.play() else { player = nil; throw SpeechFailure.playback }
+        audioPlaying = true
     }
 
     private func end(_ message: String) {
         utterance = nil; player = nil
         speaking = false
+        audioPlaying = false
         speakingID = nil
         status = message
+    }
+
+    fileprivate func began(_ source: AnyObject) {
+        guard source === utterance else { return }
+        audioPlaying = true
     }
 
     // Callbacks for stopped or replaced audio arrive late; only the current one ends playback.
@@ -111,6 +127,10 @@ public final class SpeechController: NSObject {
 }
 
 extension SpeechController: AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate {
+    nonisolated public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        let source = Delivered(object: utterance)
+        Task { @MainActor in self.began(source.object) }
+    }
     nonisolated public func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         let source = Delivered(object: utterance)
         Task { @MainActor in self.ended(source.object, succeeded: true) }

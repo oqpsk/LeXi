@@ -15,6 +15,9 @@ internal static partial class Program
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
         var view = (QueryProgressView)main.FindName("QueryProgress");
         var scroll = (ScrollViewer)main.FindName("ResultsScroll");
+        var activity = Contents(view).OfType<QueryActivityMark>().Single();
+        Check(activity.Width == 24 && activity.Height == 24 && !activity.IsHitTestVisible && !Contents(activity).OfType<Border>().Any(),
+            "query-row activity reuses the soft matrix without a second logo plate or input target");
         Check(view.Visibility == Visibility.Hidden && view.Parent is StackPanel && !Contents(scroll).Contains(view) && !Theme.CanDragFrom(view),
             "compact progress reserves space beside the query controls and never starts a window drag");
         var primary = new LookupModel("codex", "gpt-6.1-sol"); var secondary = new LookupModel("claude", "haiku");
@@ -28,22 +31,22 @@ internal static partial class Program
             new("fixture", [new("m0s0", "m1s0", "equivalent", 0.99), new("m0s1", "m1s1", "equivalent", 0.99)])), MergeNote: "同义项已整理");
         string[] CardLabels() => Contents((Panel)main.FindName("AiPanel"), true).OfType<TextBlock>().Select(t => t.Text).ToArray();
         var request = view.Begin(QueryProgressState.Dictionary(true, true));
-        Check(view.Current is { Busy: true, Stage: QueryStage.Dictionary }, "dictionary reads start a visible busy lifecycle");
+        Check(view.Current is { Busy: true, Stage: QueryStage.Dictionary } && activity.Activity == QueryActivity.Querying, "dictionary reads start a visible busy lifecycle");
         main.RenderAnswers(two, null, false); view.Update(request, QueryProgressState.Updating(two, true));
-        Check(view.Current is { Busy: true, Stage: QueryStage.Supplement } && view.Current.Detail.Contains("预览 · 2 条候选"),
+        Check(view.Current is { Busy: true, Stage: QueryStage.Supplement } && activity.Activity == QueryActivity.Generating && view.Current.Detail.Contains("预览 · 2 条候选"),
             "two early senses are labeled as preview candidates");
         main.RenderAnswers(six, null, false); view.Update(request, QueryProgressState.Updating(six, true));
         Check(!six.Provisional && view.Current is { Busy: true, Stage: QueryStage.Supplement } && view.Current.Detail.Contains("预览 · 6 条候选"),
             "both models completing does not prematurely finalize six candidates");
         view.Update(request, QueryProgressState.Updating(six with { Merging = true }, true));
-        Check(view.Current is { Busy: true, Stage: QueryStage.Merge } && view.Current.Detail.Contains("可能减少"),
+        Check(view.Current is { Busy: true, Stage: QueryStage.Merge } && activity.Activity == QueryActivity.Merging && view.Current.Detail.Contains("可能减少"),
             "merge stage explicitly explains why the displayed count can shrink");
         main.RenderAnswers(four, null); view.Update(request, QueryProgressState.Finished(four, true));
         Check(view.Current is { Busy: false, Outcome: QueryOutcome.Complete } && view.Current.Title.Contains("4 个义项") &&
             !CardLabels().Contains("双语释义") && AutomationProperties.GetName(view).Contains("结果已稳定"),
             "only the final return marks four stable senses and announces completion");
         view.Update(request, QueryProgressState.Updating(two, true));
-        Check(view.Current?.Busy == false, "late streaming callbacks cannot revive a finished query");
+        Check(view.Current?.Busy == false && activity.Activity == QueryActivity.Idle, "late streaming callbacks cannot revive a finished query or its animation");
         var next = view.Begin(QueryProgressState.Translating());
         view.Update(request, QueryProgressState.Finished(four, true));
         view.Update(request, QueryProgressState.Dictionary(true, true).Interrupted("已取消", "old query"));
@@ -57,7 +60,7 @@ internal static partial class Program
         main.RenderAnswers(failedMerge, null); view.Update(next, QueryProgressState.Finished(failedMerge, true));
         Check(view.Current is { Busy: false, Warning: true } && view.Current.Detail.Contains("保留 6 条") &&
             CardLabels().Contains(failedMerge.MergeNote) && view.Current.Detail.Contains("响应超时") &&
-            view.Current.Detail.Contains("重新生成") && AutomationProperties.GetName(view).Contains("合并：未完成") &&
+            view.Current.Detail.Contains("重试未完成") && AutomationProperties.GetName(view).Contains("合并：未完成") &&
             AutomationProperties.GetName(view).Contains("完成：部分完成"), "judge failure ends loading without presenting an unmerged list as successfully merged");
         Check(QueryProgressState.Finished(failedMerge with { MergeFailure=null },true).Detail.Contains("未记录具体失败原因"),
             "legacy failed views do not invent a timeout or account diagnosis");
@@ -86,10 +89,11 @@ internal static partial class Program
             view.Begin(state); Measure((FrameworkElement)main.Content, 558, 398);
             var tooltip = (ToolTip)view.ToolTip;
             fits &= Contents(tooltip).OfType<TextBlock>().Any(t => t.Text.Contains(state.Detail)) &&
-                view.Content is FrameworkElement glyph && glyph.Width == 18 && glyph.Height == 18 &&
+                view.Content is FrameworkElement glyph && glyph.Width == 24 && glyph.Height == 24 &&
+                activity.Activity == state.Activity && activity.Visibility == (state.Busy ? Visibility.Visible : Visibility.Collapsed) &&
                 view.ActualHeight <= 32 && view.ActualWidth <= 32 && scroll.ActualHeight > 200;
         }
-        Check(fits, "status ring fits the query row and retains full stage information in its tooltip");
+        Check(fits, "phase-aware activity and terminal symbols fit the query row and retain full stage information");
         var accent = ((SolidColorBrush)app.FindResource("Accent")).Color;
         var selection = ((SolidColorBrush)app.FindResource("Selection")).Color;
         var ink = ((SolidColorBrush)app.FindResource("Canvas")).Color;

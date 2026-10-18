@@ -16,7 +16,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         legacy = saved == null;
         if (legacy) saved = cache.Read<AiEnvelope>("ai-v5", model.CacheKey(query, settings)) ?? cache.Read<AiEnvelope>("ai-v4", model.CacheKey(query, settings)) ?? cache.Read<AiEnvelope>("ai-v3", model.CacheKey(query, settings));
         if (saved == null || saved.Provider != model.Provider || saved.Model != model.Model ||
-            saved.ReasoningEffort != settings.ReasoningEffort || (saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence) && !(legacy && query == Queries.Normalize(query) && saved.EvidenceHash == CodexDictionary.LegacyEvidenceHash(evidence)))) return null;
+            saved.ReasoningEffort != InferenceOptions.EnvelopeEffort(settings, model) || (saved.EvidenceHash != CodexDictionary.EvidenceHash(evidence) && !(legacy && query == Queries.Normalize(query) && saved.EvidenceHash == CodexDictionary.LegacyEvidenceHash(evidence)))) return null;
         try { return saved with { Entry = CodexDictionary.ParseAndValidate(JsonSerializer.Serialize(saved.Entry, Json.Options), query, evidence) }; }
         catch (Exception e) when (ExpectedFailure(e)) { return null; }
     }
@@ -30,7 +30,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         }).ToArray();
         var request = SenseMerging.Request(query, answers);
         SenseMergePlan? plan = null;
-        if (settings.MergeSenses && cache.Read<SenseMergePlan>(SenseMerging.CacheKind, request.InputHash + ":" + settings.JudgeModel) is { } savedPlan)
+        if (settings.MergeSenses && cache.Read<SenseMergePlan>(SenseMerging.CacheKind, MergeKey(request, settings)) is { } savedPlan)
         {
             try { plan = SenseMerging.Parse(JsonSerializer.Serialize(savedPlan, Json.Options), request); }
             catch (Exception ex) when (ExpectedFailure(ex)) { }
@@ -39,13 +39,14 @@ public sealed class DictionaryCoordinator(Cache cache,
     }
 
     public async Task<LookupSnapshot> LookupAsync(string query, OnlineEntry? evidence, AppSettings options, bool force,
-        CancellationToken token, IProgress<LookupSnapshot>? progress = null)
+        CancellationToken token, IProgress<LookupSnapshot>? progress = null, LookupSnapshot? resume = null)
     {
         var settings = options.ForModel(LookupModel.Primary(options));
         var models = LookupModel.Selected(settings);
         var loaded = models.Select(m => { var saved = Read(query, evidence, m, settings, out var legacy); return (Saved: saved, Legacy: legacy); }).ToArray();
         var saved = loaded.Select(s => s.Saved).ToArray();
-        var answers = models.Select((m, i) => new ModelAnswer(m, ModelPhase.Pending, saved[i]?.Entry, saved[i] != null)).ToArray();
+        var answers = models.Select((m, i) => resume?.Answers.FirstOrDefault(a => a.Model == m && a.Phase is ModelPhase.Complete or ModelPhase.Offline)
+            ?? new ModelAnswer(m, ModelPhase.Pending, saved[i]?.Entry, saved[i] != null)).ToArray();
         var closed = new bool[models.Length];
         var sync = new object();
         LookupSnapshot Snapshot() => new([.. answers], SenseMerging.Group(answers));
@@ -56,6 +57,8 @@ public sealed class DictionaryCoordinator(Cache cache,
             try
             {
                 token.ThrowIfCancellationRequested();
+                if (resume != null && answers[i].Phase is ModelPhase.Complete or ModelPhase.Offline && answers[i].Entry != null)
+                { lock (sync) { closed[i] = true; Publish(); } return; }
                 if (!settings.Online || !force && saved[i] != null)
                 {
                     lock (sync) { answers[i] = answers[i] with { Phase = settings.Online ? ModelPhase.Complete : ModelPhase.Offline }; closed[i] = true; Publish(); }
@@ -75,7 +78,7 @@ public sealed class DictionaryCoordinator(Cache cache,
                 lock (sync) { closed[i] = true; answers[i] = new(model, ModelPhase.Complete, result); Publish(); }
                 if (result.Found)
                     await Write(CacheKind, model.CacheKey(query, settings), new AiEnvelope(result, CodexDictionary.EvidenceHash(evidence),
-                        DateTimeOffset.UtcNow, model.Model, settings.ReasoningEffort, model.Provider), token);
+                        DateTimeOffset.UtcNow, model.Model, InferenceOptions.EnvelopeEffort(settings, model), model.Provider), token);
             }
             catch (Exception ex) when (ExpectedFailure(ex) || ex is OperationCanceledException && !token.IsCancellationRequested)
             {
@@ -94,7 +97,7 @@ public sealed class DictionaryCoordinator(Cache cache,
         var request = SenseMerging.Request(query, answers);
         if (!settings.Online || !settings.MergeSenses || request.Pairs.Length == 0) return snapshot;
         progress?.Report(snapshot with { Merging = true });
-        var mergeKey = request.InputHash + ":" + settings.JudgeModel;
+        var mergeKey = MergeKey(request, settings);
         try
         {
             SenseMergePlan? plan = null;
@@ -119,6 +122,14 @@ public sealed class DictionaryCoordinator(Cache cache,
             var failure = MergeFailures.Classify(ex);
             return snapshot with { MergeNote = MergeFailures.Describe(failure) + "；已保留全部释义", MergeFailed = true, MergeFailure = failure };
         }
+    }
+
+    private static string MergeKey(SenseMergeRequest request, AppSettings settings)
+    {
+        var judge = ModelCatalog.Judge(settings);
+        return judge.Provider == CompatibleText.Provider
+            ? request.InputHash + ":compatible:" + CompatibleText.Scope(settings) + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, judge)
+            : request.InputHash + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, judge);
     }
 
     private async Task Write<T>(string kind, string key, T value, CancellationToken token)

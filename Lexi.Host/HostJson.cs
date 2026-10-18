@@ -17,10 +17,11 @@ internal sealed record ViewPosition(long Request, long Revision);
 internal sealed record NavigateResult(QueryPage? Page, ViewPosition View);
 internal sealed record SuggestResult(string[] Suggestions);
 internal sealed record HistoryItem(string Query, bool Translation, DateTimeOffset QueriedAt, string Preview, string Kind);
-internal sealed record HistoryResult(HistoryItem[] Entries, string Error);
+internal sealed record HistoryResult(int Total, HistoryItem[] Entries, string Error);
 internal sealed record RemoveHistoryResult(bool Removed, HistoryResult History);
 internal sealed record ControlTexts(string OnlineLabel, string OnlineTooltip, string RegenerateTooltip);
 internal sealed record SettingsResult(AppSettings Settings, ModelChoice[] Models, ModelChoice[] JudgeModels, ControlTexts Controls);
+internal sealed record ModelsResult(ModelChoice[] Models);
 internal sealed record DictionariesResult(InstalledDictionary[] Dictionaries, string Folder);
 internal sealed record LoginCommand(string FileName, string[] Arguments, string Path, string[] ClearEnvironment);
 internal sealed record SpeechModelItem(string Provider, string Id, string Name, bool Local);
@@ -42,6 +43,7 @@ internal sealed record CancelResult(bool Cancelled);
 [JsonSerializable(typeof(HistoryResult))]
 [JsonSerializable(typeof(RemoveHistoryResult))]
 [JsonSerializable(typeof(SettingsResult))]
+[JsonSerializable(typeof(ModelsResult))]
 [JsonSerializable(typeof(DictionariesResult))]
 [JsonSerializable(typeof(LoginStatus))]
 [JsonSerializable(typeof(LoginCommand))]
@@ -50,6 +52,9 @@ internal sealed record CancelResult(bool Cancelled);
 [JsonSerializable(typeof(CachedSpeechResult))]
 [JsonSerializable(typeof(SpeechFileResult))]
 [JsonSerializable(typeof(CancelResult))]
+[JsonSerializable(typeof(CacheUsage[]))]
+[JsonSerializable(typeof(BackupPreview))]
+[JsonSerializable(typeof(InputPreviewView))]
 [JsonSerializable(typeof(QueryView))]
 [JsonSerializable(typeof(AppSettings))]
 internal partial class HostJson : JsonSerializerContext;

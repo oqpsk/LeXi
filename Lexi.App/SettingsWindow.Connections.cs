@@ -13,9 +13,9 @@ public sealed partial class SettingsWindow
     private TabItem AddConnectionsTab(TabControl tabs, TextBox codexPath)
     {
         var panel = new StackPanel { Margin = new(2,4,8,10) };
-        var tab = new TabItem { Header = "账号连接", Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = panel } };
+        var tab = new TabItem { Header = "OAuth 连接", Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = panel } };
         tabs.Items.Add(tab);
-        panel.Children.Add(Text("连接你的模型订阅", 22));
+        panel.Children.Add(Text("OAuth 订阅", 22));
         panel.Children.Add(Text("在官方登录页完成 OAuth 授权，LeXi 使用同一台电脑上的登录状态。主要模型、第二模型和义项判断共用对应账号。", 14, Muted));
         panel.Children.Add(Text("登录会即时生效，并与官方客户端共用账号；取消设置不会撤销登录。", 13, Muted));
         var refreshers = new List<Func<Task>>();
