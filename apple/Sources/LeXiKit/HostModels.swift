@@ -6,10 +6,12 @@ import Foundation
 public enum QueryViewKind: String, Decodable, Sendable { case home, dictionary, translation }
 public enum QueryStage: String, Decodable, Sendable { case dictionary, supplement, merge, finished }
 public enum QueryOutcome: String, Decodable, Sendable { case running, complete, partial, failed }
+public enum QueryActivity: String, Decodable, Sendable { case idle, querying, generating, merging }
 public enum OriginalsMode: String, Decodable, Sendable { case keep, collapse, expand }
 
 public struct QueryProgress: Decodable, Equatable, Sendable {
     public let stage: QueryStage
+    public let activity: QueryActivity?
     public let title: String
     public let detail: String
     public let outcome: QueryOutcome

@@ -37,6 +37,8 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 
 `data` 是完整的 `QueryView`（字段见 `Lexi.Core/QueryViews.cs`），字段名为 camelCase，枚举为 camelCase 字符串。`revision` 在整个会话中递增；前端丢弃不大于已显示 `revision` 的视图。`request` 变化表示新的查询页面。`progress` 为 `null` 表示没有进行中的查询；`progressGeneration` 变化表示新的进度周期。视图中的文字、来源说明、阶段和状态都已由 Core 决定，前端不再推断。
 
+`progress.activity` 是可选的增量字段，取 `idle`、`querying`、`generating`、`merging`。Core 区分等待模型与收到新释义/译文，缓存文本不冒充新输出；终态与取消均为 `idle`。旧视图缺少字段时原生前端保留静态标志。该字段只驱动动效，不改变 `stage`、状态文字或查询生命周期。
+
 ## 方法
 
 | 方法 | 参数 | 结果 |

@@ -2,14 +2,22 @@ namespace Lexi.Core;
 
 public enum QueryStage { Dictionary, Supplement, Merge, Finished }
 public enum QueryOutcome { Running, Complete, Partial, Failed }
+public enum QueryActivity { Idle, Querying, Generating, Merging }
 
 // Only the caller that has awaited the whole query may publish a terminal state.
 // A snapshot with two completed models can still be waiting for the sense judge.
 public sealed record QueryProgressState(QueryStage Stage, string Title, string Detail,
-    QueryOutcome Outcome = QueryOutcome.Running, bool ModelsEnabled = true, bool MergeEnabled = true, bool Translation = false, QueryStage? FailedStage = null)
+    QueryOutcome Outcome = QueryOutcome.Running, bool ModelsEnabled = true, bool MergeEnabled = true, bool Translation = false, QueryStage? FailedStage = null, bool OutputStarted = false)
 {
     public bool Busy => Outcome == QueryOutcome.Running;
     public bool Warning => Outcome is QueryOutcome.Partial or QueryOutcome.Failed;
+    // A visual activity, separate from the stage: waiting for a model is not received output.
+    public QueryActivity Activity => !Busy ? QueryActivity.Idle : Stage switch
+    {
+        QueryStage.Merge => QueryActivity.Merging,
+        QueryStage.Supplement when OutputStarted => QueryActivity.Generating,
+        _ => QueryActivity.Querying
+    };
 
     public static QueryProgressState Dictionary(bool models, bool merge) => new(QueryStage.Dictionary, "查询词典中",
         models ? "即时结果先显示，随后补充与整理" : "正在读取词典与已有缓存", ModelsEnabled: models, MergeEnabled: merge);
@@ -21,7 +29,8 @@ public sealed record QueryProgressState(QueryStage Stage, string Title, string D
         var failed = snapshot.Answers.Count(a => a.Phase == ModelPhase.Failed);
         var detail = failed > 0 ? $"{completed}/{snapshot.Answers.Length} 个模型已返回 · {failed} 个未完成"
             : $"{completed}/{snapshot.Answers.Length} 个模型已返回 · 义项仍可能增减";
-        return new(QueryStage.Supplement, "模型补充中", $"预览 · {snapshot.Groups.Length} 条候选 · " + detail, MergeEnabled: merge);
+        return new(QueryStage.Supplement, "模型补充中", $"预览 · {snapshot.Groups.Length} 条候选 · " + detail, MergeEnabled: merge,
+            OutputStarted: snapshot.Answers.Any(a => !a.Cached && a.Phase is ModelPhase.Streaming or ModelPhase.Complete && a.Entry?.Senses.Length > 0));
     }
 
     public static QueryProgressState Finished(LookupSnapshot snapshot, bool merge, bool sourceIncomplete = false, int referenceCount = 0)
@@ -43,8 +52,8 @@ public sealed record QueryProgressState(QueryStage Stage, string Title, string D
         sourceIncomplete ? "部分来源未能读取" : offline ? "离线查询完成" : "词典查询完成",
         "本次查询已结束，内容不再自动变化", sourceIncomplete ? QueryOutcome.Partial : QueryOutcome.Complete, false, false);
 
-    public static QueryProgressState Translating() => new(QueryStage.Supplement, "正在翻译",
-        "译文逐步显示，生成中的内容尚未完整", MergeEnabled: false, Translation: true);
+    public static QueryProgressState Translating(bool outputStarted = false) => new(QueryStage.Supplement, "正在翻译",
+        "译文逐步显示，生成中的内容尚未完整", MergeEnabled: false, Translation: true, OutputStarted: outputStarted);
     public static QueryProgressState Translated(bool cached = false) => new(QueryStage.Finished, "翻译完成",
         cached ? "已使用完整缓存 · 本次翻译已结束" : "译文已完整，本次翻译已结束", QueryOutcome.Complete, MergeEnabled: false, Translation: true);
 

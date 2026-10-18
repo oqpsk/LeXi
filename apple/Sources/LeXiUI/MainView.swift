@@ -93,6 +93,8 @@ public struct MainView: View {
     // Status on the leading side; regeneration and the online mode as grouped glass controls.
     private var bottomBar: some View {
         HStack(spacing: 12) {
+            QueryActivityMark(activity: store.view.progress?.activity ?? .idle)
+                .foregroundStyle(.secondary)
             Text(status)
                 .font(.callout).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.tail)

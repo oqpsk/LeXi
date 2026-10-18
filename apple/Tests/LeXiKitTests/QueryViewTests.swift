@@ -3,6 +3,20 @@ import Testing
 @testable import LeXiKit
 
 @Suite struct QueryViewDecoding {
+    @Test func sharedActivityAndLegacyViews() throws {
+        #expect(Fixture.view("dictionary").progress?.activity == .idle)
+        #expect(Fixture.view("translation").progress?.activity == .idle)
+        #expect(Fixture.view("preview").progress?.activity == .generating)
+        var root = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: Fixture.repository
+            .appending(path: "apple/Tests/LeXiKitTests/Fixtures/views.json"))) as? [String: Any])
+        var dictionary = try #require(root["dictionary"] as? [String: Any])
+        var progress = try #require(dictionary["progress"] as? [String: Any])
+        progress.removeValue(forKey: "activity")
+        dictionary["progress"] = progress
+        root["dictionary"] = dictionary
+        let legacy = try JSONDecoder().decode(QueryView.self, from: JSONSerialization.data(withJSONObject: dictionary))
+        #expect(legacy.progress?.activity == nil && legacy.progress?.outcome == .complete)
+    }
     @Test func decodesEveryProtocolView() {
         let dictionary = Fixture.view("dictionary")
         #expect(dictionary.kind == .dictionary)

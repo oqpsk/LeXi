@@ -2,6 +2,8 @@
 
 ## Unreleased — major-version preparation
 
+- Animate the footer with the approved soft matrix on Windows and macOS: a scanning dot grid while waiting, short unfolding lines when new definitions or translation arrive, and converging dots while merging. Restore a still ξ at every terminal state and preserve Windows' history action. Use native animation, retain the current phase across token updates, and stop motion when hidden, minimized/backgrounded or Reduce Motion is enabled. macOS uses its native system color and unframed mark. No release generated.
+
 - Redesign settings with category navigation on Windows and native sidebar/grouped forms on macOS. OAuth, API, speech and data management have their own pages. Settings windows resize and remember their own size/position, independently of query windows.
 - Limit initial online-source waiting to one second before starting generation, retaining late original text without creating retrospective citations. Completed saved results still require explicit regeneration to refresh.
 - Add “重试未完成” to retry failed model/source/merge stages while preserving successful provider results and their evidence. Translation retries only its failed generation stage; settings changes require explicit regeneration.
