@@ -8,7 +8,7 @@ using Lexi.Core;
 
 namespace Lexi;
 
-// The approved soft matrix, in the history button's existing fixed icon box.
+// The approved soft matrix, shared by the history button and query-status control.
 // Only transforms and opacity move; incoming tokens never restart an unchanged phase.
 public sealed class QueryActivityMark : Viewbox
 {
@@ -25,7 +25,9 @@ public sealed class QueryActivityMark : Viewbox
         typeof(QueryActivityMark), new PropertyMetadata(QueryActivity.Idle, (owner, _) => ((QueryActivityMark)owner).Refresh()));
     public QueryActivity Activity { get => (QueryActivity)GetValue(ActivityProperty); set => SetValue(ActivityProperty, value); }
 
-    public QueryActivityMark()
+    public QueryActivityMark() : this(true) { }
+
+    internal QueryActivityMark(bool framed)
     {
         Width = Height = 24; Stretch = Stretch.Uniform; IsHitTestVisible = false; Focusable = false;
         var grid = new Grid { Width = 24, Height = 24 };
@@ -33,7 +35,8 @@ public sealed class QueryActivityMark : Viewbox
         frame.SetResourceReference(Border.BackgroundProperty, "LogoSurface");
         frame.SetResourceReference(Border.BorderBrushProperty, "Accent");
         glyph.SetResourceReference(TextBlock.ForegroundProperty, "Accent");
-        grid.Children.Add(frame); grid.Children.Add(glyph);
+        if (framed) grid.Children.Add(frame);
+        grid.Children.Add(glyph);
         grid.Children.Add(query); grid.Children.Add(output); grid.Children.Add(merge); Child = grid;
         for (int i = 0; i < 9; i++)
         {

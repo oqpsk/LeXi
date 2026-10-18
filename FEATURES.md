@@ -26,7 +26,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 词源 | `EtymologyView` | 已实现：词条旁罗塞塔石碑按钮弹出 | 已实现：词条旁罗塞塔石碑按钮弹出（与 Windows 同一图形） |
 | 专业参考摘要 | `SpecialistReferences`、`ReferenceView` | 已实现 | 已实现 |
 | 左下角查询动画 | `QueryProgressState.Activity`：区分等待、新输出与合并；缓存不冒充输出，终态均停止 | 已实现：历史按钮内 24 DIP 柔和点阵 / 短线 / 汇聚；完成后恢复 ξ；减少动态效果、隐藏、最小化及移除时停动 | 已实现：底栏同一节奏，18 pt 系统色标志；减少动态效果、后台和移除时停动；历史入口保留在工具栏 |
-| 查询阶段、结束状态与状态文字 | `QueryProgressState`、`QueryProgressTracker`、`QueryView.Status` | 已实现：输入框旁状态环，悬浮查看阶段；单行底栏 | 已实现：输入框旁状态指示，点击查看阶段；底栏状态 |
+| 查询阶段、结束状态与状态文字 | `QueryProgressState`、`QueryProgressTracker`、`QueryView.Status` | 已实现：输入框旁同款柔和点阵 / 短线 / 汇聚；结束时勾号或未完成符号，悬浮或键盘查看阶段；单行底栏 | 已实现：输入框旁同款动效，结束时勾号或未完成符号，点击查看阶段；底栏状态 |
 | 保存的结果与重新生成 | `SavedQueries`、`QuerySession.RegenerateAsync` | 已实现：底栏“重新生成” | 已实现：底栏“重新生成”，⌘R |
 | 在线补充开关 | `QuerySession.SetOnline`、`ControlText` | 已实现：底栏两态开关 | 已实现：底部玻璃按钮，以图标和文字区分在线与离线 |
 | 文本翻译与复制译文 | `Translation`、`TranslationView` | 已实现 | 已实现 |

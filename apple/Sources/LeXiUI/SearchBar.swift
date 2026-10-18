@@ -170,11 +170,11 @@ struct StatusRing: View {
         if let progress {
             Button { showDetails.toggle() } label: {
                 Group {
-                    if progress.busy { ProgressView().controlSize(.small) }
+                    if progress.busy { QueryActivityMark(activity: progress.activity ?? .querying, size: 24).foregroundStyle(.secondary) }
                     else { Image(systemName: progress.warning ? "exclamationmark.circle" : "checkmark.circle")
                         .foregroundStyle(progress.warning ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary)) }
                 }
-                .frame(width: 20, height: 20)
+                .frame(width: 24, height: 24)
             }
             .buttonStyle(.borderless)
             .help(progress.title + " · " + progress.detail)
