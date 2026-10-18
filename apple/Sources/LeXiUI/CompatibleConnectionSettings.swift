@@ -34,7 +34,7 @@ struct CompatibleConnectionSettings: View {
         footer: { Text("OpenAI 兼容接口。凭据按地址保存在本机钥匙串中，API Key 可留空。此入口只用于文本；发音独立配置。") }
         .onAppear {
             if baseUrl.isEmpty {
-                baseUrl = store.settings?.settings.compatibleBaseUrl ?? "https://ai.rwby.io/v1"
+                baseUrl = store.settings?.settings.compatibleBaseUrl ?? ""
                 streaming = store.settings?.settings.compatibleStreaming ?? true
                 saved = keys.hasSaved(baseUrl)
             }

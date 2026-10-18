@@ -44,7 +44,7 @@ public static class SpeechCatalog
         if (string.IsNullOrWhiteSpace(text)) throw new InvalidOperationException("没有可朗读的文字。");
         var max = options.Provider == "openai" ? 4096 : 5000;
         if (text.Length > max) throw new InvalidOperationException($"此发音服务每次最多朗读 {max} 个字符。");
-        if (!Models.Any(m => m.Provider == options.Provider && m.Id == options.Model)) throw new InvalidOperationException("请在设置中重新选择发声模型。");
+        if (!Models.Any(m => m.Provider == options.Provider && m.Id == options.Model) && !(options.Provider == "elevenlabs" && ValidElevenVoice(options.Model))) throw new InvalidOperationException("请在设置中重新选择发声模型。");
         if (options.Provider == "elevenlabs" && !ValidElevenVoice(options.Voice))
             throw new InvalidOperationException("请选择 ElevenLabs 声线，或填写有效的 Voice ID。");
         if (!IsLocal(options.Provider) && options.Provider != "elevenlabs" && !Voices(options.Provider, options.Model).Any(v => v.Id == options.Voice))

@@ -87,11 +87,13 @@ public sealed class AppSettings
     public string SpeechModel { get; set; } = SpeechCatalog.Local.Id;
     public string SpeechVoice { get; set; } = "auto";
     public string SpeechVoiceName { get; set; } = "";
+    public SpeechProfile[] SpeechProfiles { get; set; } = [];
     public AppSettings ForModel(LookupModel model)
     {
         var copy = (AppSettings)MemberwiseClone();
         copy.Provider = model.Provider; copy.Model = model.Model;
         copy.DisabledDictionaries = [.. DisabledDictionaries ?? []];
+        copy.SpeechProfiles = [.. SpeechProfiles ?? []];
         copy.InferenceProfiles = [.. InferenceProfiles ?? []];
         return copy;
     }

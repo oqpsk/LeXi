@@ -89,6 +89,7 @@ public sealed partial class SettingsWindow
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(url.Text) && id.Password.Length == 0 && secret.Password.Length == 0 && api.Password.Length == 0 && remove.IsChecked != true) return true;
                 var endpoint = Endpoint();
                 if (remove.IsChecked == true && id.Password.Length == 0 && secret.Password.Length == 0 && api.Password.Length == 0) keys.Remove(endpoint);
                 else if (id.Password.Length > 0 || secret.Password.Length > 0 || api.Password.Length > 0) keys.Save(endpoint, Credentials());
@@ -96,6 +97,6 @@ public sealed partial class SettingsWindow
             }
             catch (CompatibleException e) { status.Text = e.Message; tab.IsSelected = true; status.BringIntoView(); return false; }
         }
-        return new(Endpoint, () => stream.IsChecked == true, Save);
+        return new(() => string.IsNullOrWhiteSpace(url.Text) ? "" : Endpoint(), () => stream.IsChecked == true, Save);
     }
 }

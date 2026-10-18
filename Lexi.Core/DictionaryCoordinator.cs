@@ -39,13 +39,14 @@ public sealed class DictionaryCoordinator(Cache cache,
     }
 
     public async Task<LookupSnapshot> LookupAsync(string query, OnlineEntry? evidence, AppSettings options, bool force,
-        CancellationToken token, IProgress<LookupSnapshot>? progress = null)
+        CancellationToken token, IProgress<LookupSnapshot>? progress = null, LookupSnapshot? resume = null)
     {
         var settings = options.ForModel(LookupModel.Primary(options));
         var models = LookupModel.Selected(settings);
         var loaded = models.Select(m => { var saved = Read(query, evidence, m, settings, out var legacy); return (Saved: saved, Legacy: legacy); }).ToArray();
         var saved = loaded.Select(s => s.Saved).ToArray();
-        var answers = models.Select((m, i) => new ModelAnswer(m, ModelPhase.Pending, saved[i]?.Entry, saved[i] != null)).ToArray();
+        var answers = models.Select((m, i) => resume?.Answers.FirstOrDefault(a => a.Model == m && a.Phase is ModelPhase.Complete or ModelPhase.Offline)
+            ?? new ModelAnswer(m, ModelPhase.Pending, saved[i]?.Entry, saved[i] != null)).ToArray();
         var closed = new bool[models.Length];
         var sync = new object();
         LookupSnapshot Snapshot() => new([.. answers], SenseMerging.Group(answers));
@@ -56,6 +57,8 @@ public sealed class DictionaryCoordinator(Cache cache,
             try
             {
                 token.ThrowIfCancellationRequested();
+                if (resume != null && answers[i].Phase is ModelPhase.Complete or ModelPhase.Offline && answers[i].Entry != null)
+                { lock (sync) { closed[i] = true; Publish(); } return; }
                 if (!settings.Online || !force && saved[i] != null)
                 {
                     lock (sync) { answers[i] = answers[i] with { Phase = settings.Online ? ModelPhase.Complete : ModelPhase.Offline }; closed[i] = true; Publish(); }

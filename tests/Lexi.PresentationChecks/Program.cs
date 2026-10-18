@@ -11,7 +11,7 @@ using Lexi.Core;
 internal static partial class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
         // Construct and measure resources only: no visible windows, screenshots,
         // simulated input, application message loop or online provider calls.
@@ -27,6 +27,7 @@ internal static partial class Program
             Console.WriteLine("PASS: loose shell assets never shadow embedded WPF resource paths in the executable.");
         }
         var app = new App(); app.InitializeComponent();
+        if (args is ["--render-settings", var imagePath]) { RenderSettingsPreview(imagePath); return; }
         var main = new MainWindow();
         var input = (TextBox)main.FindName("SearchBox");
         if (System.Windows.Input.FocusManager.GetFocusedElement(main) != input)
@@ -83,6 +84,7 @@ internal static partial class Program
         CheckStreamingDispatch(main);
         CheckSpeechWaveform(main);
         CheckInputPreview(main);
+        CheckQueryActivity(main);
     }
     private static void CheckChrome(App app, MainWindow main, SettingsWindow settings, StackPanel panel)
     {

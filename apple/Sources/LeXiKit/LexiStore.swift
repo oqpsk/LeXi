@@ -104,6 +104,7 @@ public final class LexiStore {
         _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll)) as SubmitResult?
         await refreshHistoryIfHome()
     }
+    public func retryFailed() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.retry") as SubmitResult? }
     public func regenerate() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.regenerate") as SubmitResult? }
     public func navigate(_ direction: Int, scroll: Double = 0) async -> QueryPage? {
         clearSuggestions()
@@ -146,13 +147,42 @@ public final class LexiStore {
     }
 
     // ---- History ----
+    public private(set) var historyFilter = ""
+    private var historyRequest = 0
+    private var historyShown = 0
+    private var historyPaging = false
+    // A home view refreshes the list on its own while home() refreshes it too. A reply is dropped
+    // only when a later one is already shown, so it never waits on a request still in flight.
     public func refreshHistory() async {
-        if let list = try? await client?.call("history.list") as HistoryList? { history = list }
+        historyRequest += 1; let request = historyRequest; let text = historyFilter
+        if let list = try? await client?.call("history.list", ["text": text]) as HistoryList?,
+           request > historyShown, text == historyFilter { history = list; historyShown = request }
     }
+    public func searchHistory(_ text: String) async { historyFilter = text; await refreshHistory() }
+    public func moreHistory() async {
+        guard !historyPaging else { return }; historyPaging = true; defer { historyPaging = false }
+        let shown = historyShown; let text = historyFilter; let offset = history.entries.count
+        let parameters: [String: SettingValue] = ["text": .string(text), "offset": .integer(offset)]
+        if let next = try? await client?.call("history.list", parameters) as HistoryList?, shown == historyShown, text == historyFilter, offset == history.entries.count {
+            var list = HistoryList(entries: history.entries + next.entries, error: next.error); list.total = next.total; history = list
+        }
+    }
+    public func dataUsage() async throws -> [CacheUsage] { try await requireClient().call("data.usage") }
+    public func inspectBackup(_ path: String) async throws -> BackupPreview { try await requireClient().call("data.inspect", ["path": path]) }
+    public func exportBackup(_ path: String) async throws { let _: EmptyResponse = try await requireClient().call("data.export", ["path": path]) }
+    public func importBackup(_ path: String, includeSettings: Bool) async throws {
+        let _: BackupPreview = try await requireClient().call("data.import", ["path": SettingValue.string(path), "includeSettings": .bool(includeSettings)])
+        await refreshSettings(); await refreshHistory()
+    }
+    public func clearCache(_ category: String) async throws { let _: EmptyResponse = try await requireClient().call("data.clear", ["category": category]) }
+    public func refreshSpeechModels(key: String) async throws { let _: EmptyResponse = try await requireClient().call("speech.elevenModels", ["key": key]) }
+    private struct EmptyResponse: Decodable, Sendable {}
+    private func requireClient() throws -> HostClient { guard let client else { throw CocoaError(.fileNoSuchFile) }; return client }
     private func refreshHistoryIfHome() async { if view.kind == .home { await refreshHistory() } }
     public func remove(_ entry: HistoryEntry) async {
         if let result = try? await client?.call("history.remove", RemoveHistory(query: entry.query, translation: entry.translation)) as HistoryRemoval? {
-            history = result.history
+            history = result.history; historyShown = historyRequest
+            if !historyFilter.isEmpty { await refreshHistory() }
         }
     }
 

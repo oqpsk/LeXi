@@ -29,7 +29,6 @@ public partial class MainWindow
         DismissSuggestions();
         if (string.IsNullOrWhiteSpace(SearchBox.Text) && current.Length > 0) ShowHistory(false);
         QueueInputPreview();
-        if (!settings.OfflineEnabled || !session.Library.IsCompletedSuccessfully) return;
         var suggestions = session.Suggest(SearchBox.Text);
         Suggestions.ItemsSource = suggestions;
         Suggestions.Visibility = suggestions.Length > 0 && SearchBox.IsKeyboardFocused ? Visibility.Visible : Visibility.Collapsed;

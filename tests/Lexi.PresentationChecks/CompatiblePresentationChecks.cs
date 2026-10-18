@@ -42,11 +42,11 @@ internal static partial class Program
             return new HttpResponseMessage(rejected ? HttpStatusCode.Forbidden : HttpStatusCode.OK)
             { Content = new StringContent(rejected ? "private body" : """{"data":[{"id":"synthetic-a"},{"id":"synthetic-b","supported_reasoning_levels":[{"effort":"low"},{"effort":"high"}],"service_tiers":[{"id":"priority"}]}]}""", Encoding.UTF8, "application/json") };
         }));
-        var settings = new AppSettings { Provider = "claude", Model = "haiku" };
+        var settings = new AppSettings { Provider = "claude", Model = "haiku", CompatibleBaseUrl = "https://example.org/v1" };
         var fixture = new SettingsWindow(settings, [], null, client, Path.Combine(work, "ui"));
         var tabs = Contents(fixture).OfType<TabControl>().Single();
         var queryTab = tabs.Items.OfType<TabItem>().Single(t => (string)t.Header == "查询与模型");
-        var connections = tabs.Items.OfType<TabItem>().Single(t => (string)t.Header == "账号连接");
+        var connections = tabs.Items.OfType<TabItem>().Single(t => (string)t.Header == "API 连接");
         var selectors = Contents((DependencyObject)queryTab.Content).OfType<ComboBox>().Where(p => p.ItemsSource is System.Collections.Generic.IEnumerable<ModelChoice>).ToArray();
         var primary = selectors[0]; var initial = (ModelChoice)primary.SelectedItem;
         var oauthAction = Contents(fixture).OfType<Button>().Single(b => AutomationProperties.GetName(b) == "OAuth 连接");

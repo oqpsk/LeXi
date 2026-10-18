@@ -187,6 +187,7 @@
     </Style>
     <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}"/>
     <Style TargetType="ComboBox">
+      <Setter Property="MaxDropDownHeight" Value="320"/>
       <Setter Property="Foreground" Value="{StaticResource Ink}"/><Setter Property="Background" Value="{StaticResource Surface}"/><Setter Property="Padding" Value="11,9"/>
       <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/><Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
@@ -196,11 +197,33 @@
           </ToggleButton>
           <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="11,9,35,9" IsHitTestVisible="False" VerticalAlignment="Center"/>
           <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False">
-            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="7" Padding="4" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="280"><ScrollViewer><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer></Border>
+            <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Stroke}" BorderThickness="1" CornerRadius="7" Padding="4" Width="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="{TemplateBinding MaxDropDownHeight}"><ScrollViewer><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer></Border>
           </Popup>
         </Grid>
       </ControlTemplate></Setter.Value></Setter>
       <Style.Triggers><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></Style.Triggers>
+    </Style>
+    <Style x:Key="SettingsNavigationItem" TargetType="TabItem">
+      <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
+        <Border x:Name="Surface" CornerRadius="7" Margin="0,0,8,5" Padding="12,11" Background="Transparent">
+          <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="{StaticResource AccentSoft}"/><Setter Property="Foreground" Value="{StaticResource Ink}"/></Trigger>
+          <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{StaticResource Ink}"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="SettingsNavigation" TargetType="TabControl">
+      <Setter Property="ItemContainerStyle" Value="{StaticResource SettingsNavigationItem}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabControl">
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="142"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Border BorderBrush="{StaticResource Stroke}" BorderThickness="0,0,1,0"><TabPanel IsItemsHost="True"/></Border>
+          <ContentPresenter Grid.Column="1" ContentSource="SelectedContent" Margin="20,0,0,0"/>
+        </Grid>
+      </ControlTemplate></Setter.Value></Setter>
     </Style>
     <Style TargetType="TabControl">
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabControl">

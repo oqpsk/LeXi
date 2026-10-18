@@ -41,4 +41,4 @@ public sealed record TranslationView(string Source, string Hint, string[] Paragr
 public sealed record QueryView(long Request, long Revision, QueryViewKind Kind, string Query, string Input, string SpeechText,
     string Heading, SavedPronunciation Pronunciation, QueryProgressState? Progress, long ProgressGeneration, string Status, bool CanRegenerate,
     NavigationView Navigation, LocalSourceView[] Local, string LocalHint, OnlineSourceView? Online, string OnlineHint,
-    AnswersView? Answers, QuickReadView QuickRead, WordFormRow[] WordForms, EtymologyView[] Etymology, TranslationView? Translation);
+    AnswersView? Answers, QuickReadView QuickRead, WordFormRow[] WordForms, EtymologyView[] Etymology, TranslationView? Translation, bool CanRetry = false);

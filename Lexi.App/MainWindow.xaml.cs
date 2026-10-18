@@ -94,8 +94,8 @@ public partial class MainWindow : Window
         StopSpeech();
         var previous = session.QuerySettingsIdentity();
         var library = session.Library;
-        var dialog = new SettingsWindow(settings, library.IsCompletedSuccessfully ? library.Result.Dictionaries : DictionaryCatalog.InspectAll(App.Paths.DataRoot)) { Owner = this };
-        if (dialog.ShowDialog() == true)
+        var dialog = new SettingsWindow(settings, library.IsCompletedSuccessfully ? library.Result.Dictionaries : DictionaryCatalog.InspectAll(App.Paths.DataRoot), null, session: session) { Owner = this };
+        if (dialog.ShowDialog() == true || dialog.DataImported)
         {
             session.SettingsSaved(previous);
             UpdateOnlineButton(); UpdateCloseAction();
@@ -103,6 +103,7 @@ public partial class MainWindow : Window
         }
         FocusSearch();
     }
+    private async void Retry_Click(object sender, RoutedEventArgs e) { StopSpeech(); await session.RetryFailedAsync(); }
     private async Task SearchAsync(string raw, bool force = false, bool navigating = false)
     {
         // Speech always belongs to the result being replaced; invalid input leaves it untouched.
@@ -124,6 +125,7 @@ public partial class MainWindow : Window
         bool Changed<T>(Func<QueryView, T> part) => !Equals(part(previous), part(view));
         var fresh = view.Request != previous.Request;
         if (fresh || Changed(v => v.Status)) LookupStatus.Text = view.Status;
+        if (fresh || Changed(v => v.Progress)) FooterActivity.Activity = view.Progress?.Activity ?? QueryActivity.Idle;
         if (Changed(v => v.Navigation)) UpdateNavigation(view.Navigation);
         if (view.ProgressGeneration != previous.ProgressGeneration)
         {
@@ -141,6 +143,7 @@ public partial class MainWindow : Window
             Headword.Text = view.Heading; Headword.FontSize = view.Kind == QueryViewKind.Translation ? 28 : 30;
             ResultsScroll.ScrollToTop();
         }
+        RetryButton.Visibility = view.CanRetry ? Visibility.Visible : Visibility.Collapsed;
         if (Changed(v => v.Pronunciation)) RenderPronunciation(view.Pronunciation);
         if (Changed(v => v.WordForms)) RenderFormRows(view.WordForms);
         if (Changed(v => v.Etymology)) RenderEtymology(view.Etymology);

@@ -20,6 +20,9 @@ public final class SpeechController: NSObject {
     @ObservationIgnored private(set) var work: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var finished = ""
+    private var lastReading: (String, SpeechSelection)?
+    public var canRepeat: Bool { lastReading != nil }
+    public func repeatLast(using service: any SpeechService) { if let lastReading { play(lastReading.0, lastReading.1, using: service, finished: "发音播放结束") } }
 
     public init(keys: any SpeechKeys = KeychainSpeechKeys()) {
         self.keys = keys
@@ -38,6 +41,7 @@ public final class SpeechController: NSObject {
     public func play(_ text: String, _ selection: SpeechSelection, key: String? = nil, using service: any SpeechService,
                      finished: String, id: String? = nil) {
         stop()
+        lastReading = (text, selection)
         let request = generation
         speaking = true
         speakingID = id

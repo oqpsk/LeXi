@@ -27,7 +27,7 @@ internal static partial class Program
             Check(bitmap.PixelWidth==256 && Pixel(32,128,Colors.Black) && Pixel(8,128,pink),
                 "packaged application and tray logo have a pure-black interior and the exact shared pink outline");
         }
-        var logoSurface = (Border)((Button)main.FindName("HistoryHomeButton")).Content;
+        var logoSurface = Contents((DependencyObject)((Button)main.FindName("HistoryHomeButton")).Content).OfType<Border>().Single();
         Check(((SolidColorBrush)logoSurface.Background).Color == Colors.Black && logoSurface.BorderBrush == app.FindResource("Accent") && logoSurface.BorderThickness == new Thickness(1),
             "in-window logo shares the pure-black fill and pink rounded border");
         var actions = (Panel)main.FindName("SearchActions");

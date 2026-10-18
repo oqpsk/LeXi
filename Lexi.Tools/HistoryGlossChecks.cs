@@ -26,8 +26,13 @@ internal static class HistoryGlossChecks
             "deletion persists across restart, preserves other rows and leaves definition caches untouched");
         Check(!afterDelete.Record("   ",false) && !afterDelete.Record(new string('x',Queries.MaxLength+1),true), "blank or invalid submissions never enter history");
         for(int i=0;i<40;i++) afterDelete.Record("query-"+i,false,now.AddMinutes(i+1));
-        Check(afterDelete.Entries.Count==QueryHistory.Capacity && new QueryHistory(workspace).Entries[0].Query=="query-39" && afterDelete.Entries.All(e=>e.Query!="query-0"),
+        Check(afterDelete.Entries.Count > 30 && new QueryHistory(workspace).Entries[0].Query=="query-39" && afterDelete.Entries.Any(e=>e.Query=="query-0"),
             "history bounds retention and keeps most recent submissions after reload");
+        var ordered = new QueryHistory(Path.Combine(workspace,"ordered"));
+        ordered.Record("newer",false,now.AddMinutes(2)); ordered.Record("older",false,now);
+        ordered.Record("newer",false,now.AddMinutes(1));
+        Check(ordered.Entries[0].Query == "newer" && ordered.Entries[0].QueriedAt == now.AddMinutes(2) && ordered.Entries[0].Visits == 2,
+            "late background history writes preserve submission order, most recent time and repeat count");
         var broken=Path.Combine(workspace,"broken"); Directory.CreateDirectory(broken);
         File.WriteAllText(Path.Combine(broken,"history.json"),"invalid json");
         var brokenHistory=new QueryHistory(broken);

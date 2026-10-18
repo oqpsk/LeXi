@@ -5,7 +5,7 @@ namespace Lexi.Core;
 public sealed record SavedPronunciation(string Text, string Label, string Attribution, string LabelAttribution, bool Sourced);
 public sealed record SavedDictionary(string Query, LocalHit[] Local, WordFormSet[] LocalForms, WordFormSet[] OnlineForms,
     EtymologyExcerpt[] Etymologies, OnlineEntry? Online, OnlineEntry? Evidence, LookupSnapshot Result,
-    SavedPronunciation Pronunciation, bool MergeEnabled, bool SourceIncomplete, DateTimeOffset SavedAt, int Version = 1);
+    SavedPronunciation Pronunciation, bool MergeEnabled, bool SourceIncomplete, DateTimeOffset SavedAt, int Version = 1, AppSettings? RetryOptions = null, SourceFailures FailedSources = SourceFailures.None);
 public sealed record SavedTranslation(TranslationEntry Entry, LookupModel Model, DateTimeOffset SavedAt, int Version = 1);
 
 /// <summary>Completed query views are stable until explicitly replaced, independently of provider settings and age.</summary>
@@ -20,7 +20,7 @@ public sealed class SavedQueries(Cache cache)
         return Valid(saved, Queries.LookupKey(query)) ? saved : null;
     }
 
-    private static bool Valid(SavedDictionary? saved, string query) => saved is { Version: 1, Local: not null,
+    internal static bool Valid(SavedDictionary? saved, string query) => saved is { Version: 1, Local: not null,
         LocalForms: not null, OnlineForms: not null, Etymologies: not null, Pronunciation: not null,
         Result: { Answers: not null, Groups: not null } result } && saved.Query == query &&
         saved.Local.All(l => l is { Dictionary: not null, Entry: not null }) &&

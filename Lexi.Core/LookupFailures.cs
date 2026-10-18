@@ -16,7 +16,7 @@ public sealed class ModelAccessException(ModelAccessFailure failure) : InvalidOp
     public ModelAccessFailure Failure { get; } = failure;
 }
 
-public enum MergeFailureKind { Timeout, InvalidResponse, SignInRequired, ClientUnavailable, ServiceUnavailable, LocalAccess }
+public enum MergeFailureKind { Timeout, InvalidResponse, SignInRequired, ClientUnavailable, ServiceUnavailable, LocalAccess, Cancelled }
 
 public static class MergeFailures
 {
@@ -32,6 +32,7 @@ public static class MergeFailures
 
     public static string Describe(MergeFailureKind? failure) => failure switch
     {
+        MergeFailureKind.Cancelled => "义项整理已停止",
         MergeFailureKind.Timeout => "整理模型响应超时",
         MergeFailureKind.InvalidResponse => "整理结果格式不完整或未通过校验",
         MergeFailureKind.SignInRequired => "Codex 登录已失效，请到设置中重新登录",

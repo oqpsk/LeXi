@@ -57,7 +57,7 @@ internal static partial class Program
         main.RenderAnswers(failedMerge, null); view.Update(next, QueryProgressState.Finished(failedMerge, true));
         Check(view.Current is { Busy: false, Warning: true } && view.Current.Detail.Contains("保留 6 条") &&
             CardLabels().Contains(failedMerge.MergeNote) && view.Current.Detail.Contains("响应超时") &&
-            view.Current.Detail.Contains("重新生成") && AutomationProperties.GetName(view).Contains("合并：未完成") &&
+            view.Current.Detail.Contains("重试未完成") && AutomationProperties.GetName(view).Contains("合并：未完成") &&
             AutomationProperties.GetName(view).Contains("完成：部分完成"), "judge failure ends loading without presenting an unmerged list as successfully merged");
         Check(QueryProgressState.Finished(failedMerge with { MergeFailure=null },true).Detail.Contains("未记录具体失败原因"),
             "legacy failed views do not invent a timeout or account diagnosis");

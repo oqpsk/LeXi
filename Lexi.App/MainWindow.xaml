@@ -58,7 +58,9 @@
             <TextBlock Text="词语看释义，文本看翻译。" Foreground="{StaticResource Muted}" FontSize="16" Margin="4,0,0,30"/>
             <TextBlock Text="查询历史" Foreground="{StaticResource Muted}" FontSize="14" Margin="4,0,0,10"/>
             <TextBlock x:Name="HistoryMessage" Text="暂无查询历史。查过的词语和文本会显示在这里。" Foreground="{StaticResource Muted}" FontSize="15" Margin="4,4,0,12"/>
+              <TextBox x:Name="HistoryFilter" TextChanged="HistoryFilter_Changed" FontSize="14" Margin="4,0,4,10" ToolTip="搜索全部查询历史" AutomationProperties.Name="搜索查询历史"/>
             <StackPanel x:Name="HistoryList"/>
+              <Button x:Name="MoreHistory" Content="更多历史" Click="MoreHistory_Click" HorizontalAlignment="Left" Margin="4,8,0,0" Visibility="Collapsed"/>
           </StackPanel>
           <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
             <TextBlock x:Name="EntryHeading" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"><Run x:Name="Headword" FontSize="30" FontWeight="SemiBold"/><Run Text="&#160;&#160;"/><Run x:Name="Phonetic" Foreground="{StaticResource Muted}"/><Run x:Name="PhoneticLabel" FontSize="12" Foreground="{StaticResource Muted}"/><InlineUIContainer BaselineAlignment="TextBottom"><Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button></InlineUIContainer><InlineUIContainer BaselineAlignment="TextBottom"><ToggleButton x:Name="EtymologyButton" Style="{StaticResource LexicalIconToggle}" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="语源 · 词的来历" AutomationProperties.Name="展开或收起语源"><Path Data="{StaticResource RosettaIcon}" Style="{StaticResource IconPath}"/></ToggleButton></InlineUIContainer></TextBlock>
@@ -97,9 +99,10 @@
       <Border x:Name="StatusBar" Grid.Row="4" Background="{StaticResource PanelSurface}" BorderBrush="{StaticResource Stroke}" BorderThickness="0,1,0,0" CornerRadius="0,0,11,11" Padding="14,6">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-          <Button x:Name="HistoryHomeButton" Style="{StaticResource IconButton}" Click="HistoryHome_Click" ToolTip="查询历史" AutomationProperties.Name="返回查询历史"><Border Background="{StaticResource LogoSurface}" BorderBrush="{StaticResource Accent}" BorderThickness="1" Width="20" Height="20" CornerRadius="5"><TextBlock Text="ξ" Foreground="{StaticResource Accent}" FontFamily="Georgia" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Button>
+          <Button x:Name="HistoryHomeButton" Style="{StaticResource IconButton}" Click="HistoryHome_Click" ToolTip="查询历史" AutomationProperties.Name="返回查询历史"><local:QueryActivityMark x:Name="FooterActivity"/></Button>
           <TextBlock x:Name="LookupStatus" Grid.Column="1" Text="正在准备词库…" FontSize="13" Margin="10,0,12,0" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" AutomationProperties.LiveSetting="Polite"/>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="RetryButton" Content="重试未完成" Click="Retry_Click" Height="32" Padding="10,4" Margin="0,0,10,0" FontSize="13" Visibility="Collapsed"/>
             <Button x:Name="RefreshButton" Content="重新生成" Click="Refresh_Click" Height="32" Padding="10,4" Margin="0,0,10,0" FontSize="13" Background="{StaticResource Surface}" BorderBrush="#565861" BorderThickness="1" Visibility="Collapsed" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="重新生成当前查询"/>
             <ToggleButton x:Name="OnlineToggle" Style="{StaticResource OnlineSwitch}" Width="112" Click="Online_Click" AutomationProperties.Name="在线补充"/>
           </StackPanel>

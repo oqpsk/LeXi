@@ -103,12 +103,15 @@ public partial class MainWindow
         var read = new MenuItem { Header = "朗读" };
         var menu = new ContextMenu();
         menu.Items.Add(read);
+        var repeat = new MenuItem { Header = "再次播放上一段" }; menu.Items.Add(repeat);
+        repeat.Click += async (_, _) => { if (lastReading is { } last) await SpeakAsync(last.Text, last.Key, last.Options); };
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "复制", Command = ApplicationCommands.Copy, CommandTarget = text });
         menu.Items.Add(new MenuItem { Header = "全选", Command = ApplicationCommands.SelectAll, CommandTarget = text });
         var selection = "";
         menu.Opened += (_, _) =>
         {
+            repeat.IsEnabled = lastReading != null;
             selection = text.SelectedText;
             read.Header = selection.Length > 0 ? "朗读所选文字" : speakingKey == key ? "停止朗读" : "朗读";
         };
