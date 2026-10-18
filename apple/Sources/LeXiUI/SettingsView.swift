@@ -18,7 +18,7 @@ public struct SettingsView: View {
         } detail: {
             switch selection ?? .general {
             case .general: GeneralSettings()
-            case .query: QuerySettings(store: store)
+            case .query: QuerySettings(store: store) { selection = $0 }
             case .dictionary: DictionarySettings(store: store)
             case .oauth: ConnectionSettings(store: store, destination: .oauth)
             case .api: Form { CompatibleConnectionSettings(store: store) }.formStyle(.grouped)
@@ -49,16 +49,14 @@ struct SettingLabel: View {
     }
 }
 
-enum ModelConnectionDestination: String, Identifiable {
-    case oauth, api
-    var id: String { rawValue }
-    var title: String { self == .oauth ? "OAuth 连接" : "API 连接" }
-}
+// Which half of the connection page a sidebar entry shows.
+enum ModelConnectionDestination { case oauth, api }
 
 struct QuerySettings: View {
     @Bindable var store: LexiStore
+    // Shows another settings page; the connection buttons lead to the sidebar's own pages.
+    let open: (SettingsPage) -> Void
     @State private var error: String?
-    @State private var connection: ModelConnectionDestination?
 
     var body: some View {
         if let payload = store.settings {
@@ -70,8 +68,8 @@ struct QuerySettings: View {
                 }
                 Section {
                     HStack(spacing: 10) {
-                        Button("OAuth 连接…") { connection = .oauth }
-                        Button("API 连接…") { connection = .api }
+                        Button("OAuth 连接…") { open(.oauth) }
+                        Button("API 连接…") { open(.api) }
                     }
                     .buttonStyle(.bordered)
                     modelPicker(SettingLabel("主要模型", "用于查词与文本翻译"), store.queryModels, selected: settings.provider + ":" + settings.model) { choice in
@@ -107,17 +105,6 @@ struct QuerySettings: View {
             }
             .formStyle(.grouped)
             .task { await store.awaitModelCatalog() }
-            .sheet(item: $connection) { destination in
-                VStack(spacing: 0) {
-                    HStack {
-                        Text(destination.title).font(.headline)
-                        Spacer()
-                        Button("完成") { connection = nil }
-                    }.padding()
-                    ConnectionSettings(store: store, destination: destination)
-                }
-                .frame(width: 600, height: 520)
-            }
         } else {
             ProgressView()
         }

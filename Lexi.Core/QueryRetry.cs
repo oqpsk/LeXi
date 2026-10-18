@@ -2,15 +2,23 @@ namespace Lexi.Core;
 
 [Flags] public enum SourceFailures { None = 0, Offline = 1, Online = 2 }
 
+// Data management waits for the current query; the message is shown as is.
+public sealed class DataBusyException() : InvalidOperationException("请等待查询结束。");
+
 public sealed partial class QuerySession
 {
     private sealed record RetryState(string Query, LocalHit[] Local, OnlineEntry? Online, OnlineEntry? Evidence,
-        LookupSnapshot Result, AppSettings Options, bool SourceIncomplete, SourceFailures FailedSources = SourceFailures.None);
+        LookupSnapshot Result, AppSettings Options, bool SourceIncomplete, SourceFailures FailedSources = SourceFailures.None, string? SavedIdentity = null)
+    {
+        // A saved checkpoint keeps only this hash of the settings that shape a query, not a settings copy.
+        public string Identity => SavedIdentity ?? RetryIdentity(Options);
+    }
+    private static string RetryIdentity(AppSettings settings) => Cache.Hash(QueryIdentity(settings));
     private RetryState? retry;
     private bool maintaining;
     public async Task<T> ManageDataAsync<T>(Func<Task<T>> action)
     {
-        lock (gate) { if (maintaining || historyPending > 0 || progress.Current?.Busy == true) throw new InvalidOperationException("请等待查询结束。"); maintaining = true; }
+        lock (gate) { if (maintaining || historyPending > 0 || progress.Current?.Busy == true) throw new DataBusyException(); maintaining = true; }
         try { return await action(); }
         finally { lock (gate) maintaining = false; }
     }
@@ -24,8 +32,10 @@ public sealed partial class QuerySession
         lock (gate) { if (!CanRetry) return; saved = retry; }
         if (saved == null) { await RegenerateAsync(); return; }
         // A changed configuration requires explicit regeneration; a retry never changes providers.
-        if (QueryIdentity(saved.Options) != QueryIdentity(Settings))
+        if (saved.Identity != RetryIdentity(Settings))
         { SetStatus("模型设置已更改，请点击重新生成；已有结果已保留。"); return; }
+        // The query settings are unchanged, so the current copy serves live and restored checkpoints alike.
+        saved = saved with { Options = Settings.ForModel(LookupModel.Primary(Settings)), SavedIdentity = null };
         var timing = new LookupTiming(clock);
         long id, progressId; CancellationToken token;
         lock (gate)

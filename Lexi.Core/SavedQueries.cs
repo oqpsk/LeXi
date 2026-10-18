@@ -5,7 +5,7 @@ namespace Lexi.Core;
 public sealed record SavedPronunciation(string Text, string Label, string Attribution, string LabelAttribution, bool Sourced);
 public sealed record SavedDictionary(string Query, LocalHit[] Local, WordFormSet[] LocalForms, WordFormSet[] OnlineForms,
     EtymologyExcerpt[] Etymologies, OnlineEntry? Online, OnlineEntry? Evidence, LookupSnapshot Result,
-    SavedPronunciation Pronunciation, bool MergeEnabled, bool SourceIncomplete, DateTimeOffset SavedAt, int Version = 1, AppSettings? RetryOptions = null, SourceFailures FailedSources = SourceFailures.None);
+    SavedPronunciation Pronunciation, bool MergeEnabled, bool SourceIncomplete, DateTimeOffset SavedAt, int Version = 1, string? RetryIdentity = null, SourceFailures FailedSources = SourceFailures.None);
 public sealed record SavedTranslation(TranslationEntry Entry, LookupModel Model, DateTimeOffset SavedAt, int Version = 1);
 
 /// <summary>Completed query views are stable until explicitly replaced, independently of provider settings and age.</summary>

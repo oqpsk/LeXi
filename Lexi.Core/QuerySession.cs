@@ -568,7 +568,8 @@ public sealed partial class QuerySession : IDisposable
         Presentation.RestorePronunciation(saved.Pronunciation);
         if (saved.Online != null) Presentation.ShowOnline(saved.Online, true);
         Presentation.ApplyAnswers(saved.Result, saved.Evidence);
-        retry = saved.RetryOptions == null ? null : new(query, saved.Local, saved.Online, saved.Evidence, saved.Result, saved.RetryOptions, saved.SourceIncomplete, saved.FailedSources);
+        retry = saved.RetryIdentity == null ? null : new(query, saved.Local, saved.Online, saved.Evidence, saved.Result,
+            Settings.ForModel(LookupModel.Primary(Settings)), saved.SourceIncomplete, saved.FailedSources, saved.RetryIdentity);
         timing.MarkFirst();
         var state = (saved.Result.Answers.Length > 0 ? QueryProgressState.Finished(saved.Result, saved.MergeEnabled,
             saved.SourceIncomplete, SpecialistReferences.Uncovered(query, saved.Result.Groups, saved.Evidence).Length) :
@@ -613,7 +614,7 @@ public sealed partial class QuerySession : IDisposable
         token.ThrowIfCancellationRequested();
         SavedDictionary saved;
         lock (gate) { if (current != query || kind != QueryViewKind.Dictionary || token.IsCancellationRequested) return; saved = new(query, local, Presentation.LocalWordForms, Presentation.OnlineWordForms, Presentation.SourceEtymologies,
-            online, evidence, result, Presentation.Pronunciation, merge, incomplete, clock.GetUtcNow(), RetryOptions: retry?.Options, FailedSources: retry?.FailedSources ?? SourceFailures.None); }
+            online, evidence, result, Presentation.Pronunciation, merge, incomplete, clock.GetUtcNow(), RetryIdentity: retry?.Identity, FailedSources: retry?.FailedSources ?? SourceFailures.None); }
         try { await Saved.SaveDictionaryAsync(saved, token); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* Keep the displayed result if persistence is unavailable. */ }
     }

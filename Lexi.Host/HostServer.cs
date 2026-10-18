@@ -100,8 +100,6 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
         catch (HostException e) { Fail(id, e.Code, e.Message); }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested) { Fail(id, "cancelled", "Request cancelled."); }
         catch (JsonException) { Fail(id, "invalid_params", "数据格式无效。"); }
-        catch (InvalidDataException) { Fail(id, "invalid_data", "数据无效或备份版本不支持。"); }
-        catch (InvalidOperationException) { Fail(id, "operation_failed", "当前无法操作，请等待查询结束后重试。"); }
         // Unexpected failures report only their category; messages can contain local paths.
         catch (Exception e) { Fail(id, "internal_error", e.GetType().Name); }
         finally { running.TryRemove(key, out _); }
@@ -129,17 +127,18 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             case "query.retry":
                 using (token.Register(session.Cancel)) await session.RetryFailedAsync();
                 return Position();
-            case "data.usage": return new UserData(session.Paths.UserRoot).Usage();
-            case "data.inspect": return new UserData(session.Paths.UserRoot).Inspect(Text(p, "path"));
+            case "data.usage": return await Data(() => Task.FromResult(new UserData(session.Paths.UserRoot).Usage()));
+            case "data.inspect": return await Data(() => Task.FromResult(new UserData(session.Paths.UserRoot).Inspect(Text(p, "path"))));
             case "data.export":
-                await session.ManageDataAsync(async () => { await new UserData(session.Paths.UserRoot).ExportAsync(Text(p, "path"), session.Settings, session.History, token); return true; }); return new { };
+                await Data(() => session.ManageDataAsync(async () => { await new UserData(session.Paths.UserRoot).ExportAsync(Text(p, "path"), session.Settings, session.History, token); return true; })); return new { };
             case "data.import":
             {
-                var imported = await session.ManageDataAsync(() => Task.FromResult(new UserData(session.Paths.UserRoot).Import(Text(p, "path"), session.Settings, session.History, Flag(p, "includeSettings"))));
-                session.SettingsSaved(""); return imported;
+                var previous = session.QuerySettingsIdentity();
+                var imported = await Data(() => session.ManageDataAsync(() => Task.FromResult(new UserData(session.Paths.UserRoot).Import(Text(p, "path"), session.Settings, session.History, Flag(p, "includeSettings")))));
+                session.SettingsSaved(previous); return imported;
             }
             case "data.clear":
-                await session.ManageDataAsync(() => { new UserData(session.Paths.UserRoot).Clear(Text(p, "category")); return Task.FromResult(true); }); return new { };
+                await Data(() => session.ManageDataAsync(() => { new UserData(session.Paths.UserRoot).Clear(Text(p, "category")); return Task.FromResult(true); })); return new { };
             case "query.regenerate":
             {
                 using var stop = token.Register(session.Cancel);
@@ -281,6 +280,19 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
 
     private static CompatibleCredentials TextCredentials(JsonElement p) => new(Text(p, "clientId", ""), Text(p, "clientSecret", ""), Text(p, "apiKey", ""));
     private static SpeechOptions SpeechRequest(JsonElement p) => new(Text(p, "provider"), Text(p, "model"), Text(p, "voice"));
+    // Backups and caches: Core's refusals are already worded for the user. Archive, JSON and file
+    // system messages can be English or name local paths, so each of those gets one fixed sentence.
+    private static async Task<T> Data<T>(Func<Task<T>> run)
+    {
+        try { return await run(); }
+        catch (UserDataException e) { throw new HostException("invalid_data", e.Message); }
+        catch (DataBusyException e) { throw new HostException("busy", e.Message); }
+        catch (Exception e) when (e is InvalidDataException or JsonException or KeyNotFoundException or InvalidOperationException)
+        { throw new HostException("invalid_data", "所选文件不是有效的 LeXi 备份。"); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        { throw new HostException("file_failed", "无法读写所选文件或数据文件夹，请检查位置和权限。"); }
+    }
+
     private static async Task<T> Speech<T>(Func<Task<T>> run)
     {
         try { return await run(); }

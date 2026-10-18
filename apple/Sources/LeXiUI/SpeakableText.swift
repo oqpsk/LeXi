@@ -11,7 +11,8 @@ extension EnvironmentValues {
 // A definition or example that can be read aloud, the same way as on Windows. A speaker appears in
 // the margin while the pointer is over the block and stays as a waveform while it plays (clicking still stops); the
 // block is tinted gold while it plays. Its context menu starts with 朗读 (朗读所选文字 for a
-// selection), above the system's Look Up, Translate and Copy, and VoiceOver offers the same action.
+// selection) and 再次播放上一段, above the system's Look Up, Translate and Copy, and VoiceOver offers
+// the same reading action.
 struct Speakable: View {
     let id: String
     let text: String
@@ -26,7 +27,8 @@ struct Speakable: View {
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             speaker.frame(width: gutter, height: look.lineHeight, alignment: .leading)
-            BlockText(text: text, look: look, menuTitle: { selected in selected ? "朗读所选文字" : playing ? "停止朗读" : "朗读" }, read: read)
+            BlockText(text: text, look: look, menuTitle: { selected in selected ? "朗读所选文字" : playing ? "停止朗读" : "朗读" }, read: read,
+                      repeatLast: speech?.canRepeat == true ? { speech?.repeatLast(using: service) } : nil)
                 .background {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(LexiTheme.gold.opacity(playing ? 0.16 : 0))
@@ -111,6 +113,7 @@ struct BlockText: NSViewRepresentable {
     let look: TextLook
     let menuTitle: (_ selected: Bool) -> String
     let read: (_ selection: String) -> Void
+    var repeatLast: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> BlockTextView {
         let view = BlockTextView(usingTextLayoutManager: false)
@@ -129,6 +132,7 @@ struct BlockText: NSViewRepresentable {
         view.show(text, look)
         view.menuTitle = menuTitle
         view.read = read
+        view.repeatLast = repeatLast
     }
 
     // The size the text needs at the proposed width. SwiftUI asks with several trial widths, so this
@@ -143,6 +147,7 @@ struct BlockText: NSViewRepresentable {
 final class BlockTextView: NSTextView {
     var menuTitle: (Bool) -> String = { _ in "朗读" }
     var read: (String) -> Void = { _ in }
+    var repeatLast: (() -> Void)?
     private var shown: (String, NSFont, NSColor, CGFloat)?
 
     // The text always wraps at the width SwiftUI gives the view, including when that width is
@@ -178,10 +183,15 @@ final class BlockTextView: NSTextView {
         let item = NSMenuItem(title: menuTitle(!selection.isEmpty), action: #selector(readFromMenu(_:)), keyEquivalent: "")
         item.target = self
         item.representedObject = selection
+        // Without an action the menu shows the item disabled until something has been read.
+        let again = NSMenuItem(title: "再次播放上一段", action: repeatLast == nil ? nil : #selector(repeatFromMenu(_:)), keyEquivalent: "")
+        again.target = self
         menu.insertItem(.separator(), at: 0)
+        menu.insertItem(again, at: 0)
         menu.insertItem(item, at: 0)
         return menu
     }
 
     @objc private func readFromMenu(_ item: NSMenuItem) { read(item.representedObject as? String ?? "") }
+    @objc private func repeatFromMenu(_ item: NSMenuItem) { repeatLast?() }
 }

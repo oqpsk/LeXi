@@ -26,7 +26,7 @@ struct DataSettings: View {
                     HStack {
                         VStack(alignment: .leading) {
                             Text(item.name)
-                            Text("\(item.files) 个文件 · " + ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file)).font(.callout).foregroundStyle(.secondary)
+                            Text("\(item.files) 个文件 · " + Self.size(item.bytes)).font(.callout).foregroundStyle(.secondary)
                         }
                         Spacer()
                         Button("清理…", role: .destructive) { clearing = item }
@@ -42,6 +42,16 @@ struct DataSettings: View {
         .confirmationDialog("清理缓存？此操作无法撤销。", isPresented: Binding(get: { clearing != nil }, set: { if !$0 { clearing = nil } })) {
             if let item = clearing { Button("清理“" + item.name + "”", role: .destructive) { Task { await run { try await store.clearCache(item.id) }; clearing = nil } } }
         }
+    }
+    // The system formatter follows the Mac's language and writes "Zero KB" or "300 bytes" on this
+    // Chinese page; kilobytes and up need no translation.
+    static func size(_ bytes: Int64) -> String {
+        if bytes == 0 { return "0 KB" }
+        if bytes < 1000 { return "不到 1 KB" }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        return formatter.string(fromByteCount: bytes)
     }
     private func refresh() async { do { usage = try await store.dataUsage() } catch { message = "暂时无法读取缓存。" } }
     private func run(_ action: () async throws -> Void) async {
