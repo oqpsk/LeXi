@@ -8,16 +8,19 @@ namespace Lexi;
 
 public sealed partial class SettingsWindow : Window
 {
+    internal readonly WindowPlacement placement;
+    public bool DataImported { get; private set; }
     private static Brush Muted => Theme.Brush("Muted");
     private static Brush Accent => Theme.Brush("Accent");
     private static TextBlock Text(string text, double size = 15, Brush? color = null) => new() { Text = text, FontSize = size, Foreground = color ?? Theme.Brush("Ink"), TextWrapping = TextWrapping.Wrap, Margin = new(0,0,0,10) };
     public SettingsWindow(AppSettings settings, InstalledDictionary[] installed) : this(settings, installed, null) { }
-    internal SettingsWindow(AppSettings settings, InstalledDictionary[] installed, SpeechClient? speechMetadata, CompatibleTextClient? textMetadata = null, string? textRoot = null)
+    internal SettingsWindow(AppSettings settings, InstalledDictionary[] installed, SpeechClient? speechMetadata, CompatibleTextClient? textMetadata = null, string? textRoot = null, QuerySession? session = null)
     {
-        Title = "LeXi 设置"; Width = 620; Height = 665; MinWidth = 540; MinHeight = 480;
+        Title = "LeXi 设置"; Width = 900; Height = 760; MinWidth = 720; MinHeight = 520;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Style = (Style)Application.Current.FindResource("AppWindow");
         Theme.ApplyChrome(this);
+        placement = new(this, System.IO.Path.Combine(textRoot ?? App.UserRoot, "settings-window-placement.json"));
         var root = new DockPanel { Margin = new(22,16,22,20) };
         var frame = new Border { BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(1), CornerRadius = new(12), Child = root };
         frame.SetResourceReference(Border.BackgroundProperty, "WindowSurface"); Content = frame;
@@ -31,7 +34,7 @@ public sealed partial class SettingsWindow : Window
         var cancel = new Button { Content = "取消", Padding = new(22,10,22,10), Margin = new(0,0,8,0), IsCancel = true };
         cancel.Click += (_, _) => DialogResult = false; actions.Children.Add(cancel);
         var save = new Button { Content = "保存", Style = (Style)FindResource("PrimaryButton"), Background = Theme.Brush("Accent"), Foreground = Theme.Brush("Canvas"), Padding = new(26,10,26,10), IsDefault = true }; actions.Children.Add(save);
-        var tabs = new TabControl();
+        var tabs = new TabControl { TabStripPlacement = Dock.Left, Style = (Style)FindResource("SettingsNavigation") };
         root.Children.Add(tabs);
         var general = new StackPanel { Margin = new(2,4,8,10) };
         tabs.Items.Add(new TabItem { Header = "查询与模型", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = general } });
@@ -55,19 +58,26 @@ public sealed partial class SettingsWindow : Window
         ComboBox ModelSelector(LookupModel selected, IEnumerable<ModelChoice> available) => new()
         {
             ItemsSource = available, IsSynchronizedWithCurrentItem = false,
-            SelectedItem = choices.First(x => x.Id == selected.Model && x.Provider == selected.Provider), Margin = new(0,0,0,12)
+            SelectedItem = choices.First(x => x.Id == selected.Model && x.Provider == selected.Provider), Margin = new(0,0,0,12),
+            MaxDropDownHeight = 360, ToolTip = "列表可滚动；保留完整模型名称和服务来源。"
         };
-        var model = ModelSelector(primaryChoice, choices); general.Children.Add(model);
+        var template = new DataTemplate();
+        var modelLabel = new FrameworkElementFactory(typeof(TextBlock));
+        modelLabel.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Label"));
+        modelLabel.SetBinding(TextBlock.ToolTipProperty, new System.Windows.Data.Binding("Label"));
+        modelLabel.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        template.VisualTree = modelLabel;
+        var model = ModelSelector(primaryChoice, choices); model.ItemTemplate = template; general.Children.Add(model);
         var primaryOptions = new InferencePicker(draft, "主要模型"); general.Children.Add(primaryOptions);
         var parallel = new CheckBox { Content = "双模型同时查词", IsChecked = settings.ParallelLookup, Margin = new(0,12,0,12) }; general.Children.Add(parallel);
         var secondaryPanel = new StackPanel(); general.Children.Add(secondaryPanel);
         secondaryPanel.Children.Add(Text("第二个查询模型"));
-        var secondary = ModelSelector(secondChoice, choices); secondaryPanel.Children.Add(secondary);
+        var secondary = ModelSelector(secondChoice, choices); secondary.ItemTemplate = template; secondaryPanel.Children.Add(secondary);
         var secondaryOptions = new InferencePicker(draft, "第二个模型"); secondaryPanel.Children.Add(secondaryOptions);
         var merge = new CheckBox { Content = "自动整理同类义项（包含单模型内部）", IsChecked = settings.MergeSenses, Margin = new(0,6,0,12) }; general.Children.Add(merge);
         var judgePanel = new StackPanel(); general.Children.Add(judgePanel);
         judgePanel.Children.Add(Text("义项判断模型"));
-        var judge = ModelSelector(new(settings.JudgeProvider, settings.JudgeModel), ModelCatalog.JudgeChoices(choices)); judgePanel.Children.Add(judge);
+        var judge = ModelSelector(new(settings.JudgeProvider, settings.JudgeModel), ModelCatalog.JudgeChoices(choices)); judge.ItemTemplate = template; judgePanel.Children.Add(judge);
         var judgeOptions = new InferencePicker(draft, "义项判断模型"); judgePanel.Children.Add(judgeOptions);
         void RefreshOptions()
         {
@@ -120,8 +130,10 @@ public sealed partial class SettingsWindow : Window
             finally { if (!connectionLifetime.IsCancellationRequested) subscriptions.IsEnabled = true; }
         }
         subscriptions.Click += async (_, _) => await ReadSubscriptions();
-        var custom = AddCompatibleConnection(connectionTab, settings, RefreshModels, () => online.IsChecked == true, textMetadata, textRoot);
-        customEntry.Click += (_, _) => { tabs.SelectedItem = connectionTab; ((ScrollViewer)connectionTab.Content).ScrollToTop(); };
+        var apiTab = new TabItem { Header = "API 连接", Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = new StackPanel { Margin = new(2,4,8,10) } } };
+        tabs.Items.Add(apiTab);
+        var custom = AddCompatibleConnection(apiTab, settings, RefreshModels, () => online.IsChecked == true, textMetadata, textRoot);
+        customEntry.Click += (_, _) => { tabs.SelectedItem = apiTab; ((ScrollViewer)apiTab.Content).ScrollToTop(); };
         accounts.Click += async (_, _) =>
         {
             tabs.SelectedItem = connectionTab;
@@ -146,10 +158,12 @@ public sealed partial class SettingsWindow : Window
         card.Children.Add(enabled);
         card.Children.Add(Text(dictionary.Languages, 15));
         card.Children.Add(Text($"{dictionary.Status}   ·   {dictionary.EntryCount:N0} 个检索词条   ·   {dictionary.Bytes / 1048576.0:N1} MB", 15,Muted));
-        card.Children.Add(Text($"{dictionary.Attribution}\n版本：{dictionary.Version}   ·   许可：{dictionary.License}", 14,Muted));
-        card.Children.Add(Text("词库位置", 14));
+        var detailsPanel = new StackPanel();
+        detailsPanel.Children.Add(Text($"{dictionary.Attribution}\n版本：{dictionary.Version}   ·   许可：{dictionary.License}", 14,Muted));
+        detailsPanel.Children.Add(Text("词库位置", 14));
         var location = new TextBox { Text = dictionary.Folder, IsReadOnly = true, BorderThickness = new(0), Background = Brushes.Transparent, TextWrapping = TextWrapping.Wrap, FontSize = 14, Padding = new(0), Foreground = Muted };
-        card.Children.Add(location);
+        detailsPanel.Children.Add(location);
+        card.Children.Add(new Expander { Header = "版本、许可与词库位置", Content = detailsPanel, Margin = new(0,4,0,0) });
         var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new(0,14,0,0) };
         var folder = new Button { Content = "打开词库文件夹", Foreground = Accent, Padding = new(0,6,16,6) };
         folder.Click += (_, _) => Open(dictionary.Folder); links.Children.Add(folder);
@@ -169,6 +183,8 @@ public sealed partial class SettingsWindow : Window
         windowOptions.Children.Add(Text("最小化后保留任务栏入口，可用 Win+2 切回。右下角托盘的 ξ 图标可打开词典、进入设置或直接退出。Windows 可能将图标放在折叠菜单中。", 14, Muted));
         windowOptions.Children.Add(Text("Esc 始终收起窗口；Ctrl+Q 和托盘中的“退出 LeXi”始终结束应用。", 14, Muted));
         windowOptions.Children.Add(Text("Alt+← 后退 · Alt+→ 前进\n顶部中间的 LeXi 区域可拖动窗口。", 14, Muted));
+        AddDataTab(tabs, settings, textRoot ?? App.UserRoot, session);
+        Group(general, "查询方式", online, connections, "查询模型", merge, "义项整理");
         save.Click += (_, _) =>
         {
             if (model.SelectedItem is not ModelChoice primaryValue || secondary.SelectedItem is not ModelChoice secondaryValue || judge.SelectedItem is not ModelChoice judgeValue)
@@ -178,6 +194,7 @@ public sealed partial class SettingsWindow : Window
             catch (CompatibleException ex) { modelError.Text = ex.Message; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
             candidate.JudgeProvider = judgeValue.Provider; candidate.JudgeModel = judgeValue.Id;
             candidate.InferenceProfiles = [.. draft.InferenceProfiles];
+            candidate.ParallelLookup = parallel.IsChecked == true;
             foreach (var selected in new[] { primaryValue }.Concat(candidate.ParallelLookup ? new[] { secondaryValue } : []).Concat(merge.IsChecked == true ? new[] { judgeValue } : []))
             {
                 var options = InferenceOptions.Selected(candidate, new(selected.Provider, selected.Id));

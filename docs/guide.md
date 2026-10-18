@@ -30,12 +30,14 @@ Windows 与 macOS 上的轻量桌面词典。输入中英文词语查看释义�
 
 ```powershell
 pwsh ./scripts/Build.ps1
+New-Item -ItemType Directory -Force ./artifacts/Lexi | Out-Null
+Copy-Item ./artifacts/Lexi-clean/* ./artifacts/Lexi -Recurse -Force
 pwsh ./scripts/Install-Dictionary.ps1
 pwsh ./scripts/Install-ExtendedDictionaries.ps1
 ./artifacts/Lexi/Lexi.exe
 ```
 
-构建输出到 `artifacts/Lexi/`。框架依赖版本需要 .NET 10 Desktop Runtime。词库安装脚本下载固定版本的 ECDICT，验证 SHA-256，再生成本地索引；不安装词库也能使用在线查询。
+构建输出到干净的 `artifacts/Lexi-clean/`；运行副本放在 `artifacts/Lexi/`，保留其中的个人数据。不要压缩运行副本用于分发；发布前更新版本号，再运行 `scripts/Package.ps1` 生成自带运行环境的干净 ZIP。框架依赖版本需要 .NET 10 Desktop Runtime。词库安装脚本下载固定版本的 ECDICT，验证 SHA-256，再生成本地索引；不安装词库也能使用在线查询。
 
 扩展词库来自官方公开下载渠道：
 

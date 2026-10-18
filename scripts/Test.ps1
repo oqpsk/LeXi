@@ -26,6 +26,8 @@ try {
     if ($LASTEXITCODE) { throw 'Extended dictionary/translation checks failed' }
     & dotnet $runner parallel-check (Join-Path $root '.cache/parallel-checks')
     if ($LASTEXITCODE) { throw 'Parallel dictionary checks failed' }
+    & dotnet $runner quality-check tests/fixtures/quality-cases.json
+    if ($LASTEXITCODE) { throw 'Definition quality harness failed' }
     & dotnet $runner lexical-check
     if ($LASTEXITCODE) { throw 'Lexical coverage checks failed' }
     & dotnet $runner compatible-check (Join-Path $root 'Lexi.Core') (Join-Path $root '.cache/compatible-checks')
@@ -42,5 +44,6 @@ try {
         & dotnet run --project tests/Lexi.PresentationChecks -c Release
         if ($LASTEXITCODE) { throw 'WPF resource construction checks failed' }
         & ./scripts/Test-ShellIcon.ps1
+        & ./scripts/Test-PackageChecks.ps1
     }
 } finally { Pop-Location }

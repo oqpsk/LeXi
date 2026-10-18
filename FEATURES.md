@@ -14,7 +14,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 窗口来到前台即可输入 | 不适用：窗口行为 | 已实现：窗口激活时聚焦输入框并全选，Ctrl+L 同 | 已实现：窗口来到前台时聚焦输入框并全选上次的查询，⌘L 同 |
 | 离线词典联合查询、简繁检索、词形匹配 | `OfflineLibrary`、`ChineseVariants`（内置 OpenCC 字表，各平台相同） | 已实现 | 已实现：词库位于 `~/Library/Application Support/LeXi/data` |
 | 输入停顿 TL;DR | `InputPreview` / `QuerySession.PreviewAsync`：先读已保存结果，再读启用的本地词库；显示实际匹配词；不联网，不写历史，不改变导航和当前结果 | 已实现：停顿 300 ms 显示紧凑 TL;DR，跟随建议选择；组字时等待，Esc/查询时取消；点击或 Enter 打开完整查询 | 已实现：通过 Host 的 `query.preview` 读取同一内容；相同停顿、组字与取消规则，原生卡片位于输入框下方 |
-| 输入建议 | `QuerySession.Suggest` | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原 | 已实现：列表悬于输入框下方；↑↓ 预览，Tab 或点击接受，Esc 还原；输入法组字时按键留给输入法 |
+| 输入建议 | `QuerySession.Suggest`：历史精确大小写、重复次数、近期查询优先，再接离线词库 | 已实现：↑↓ 预览，Tab 或点击接受，Esc 还原 | 已实现：列表悬于输入框下方；↑↓ 预览，Tab 或点击接受，Esc 还原；输入法组字时按键留给输入法 |
 | Wiktionary 在线来源与原文 | `OnlineDictionary`、`QueryView.Online` | 已实现：可展开原文与来源链接 | 已实现：可展开原文与来源链接 |
 | 同义项判断返回精简 | `SenseMerging`：仍逐对判断，仅返回高置信度合并关系；省略项按不确定处理，保留原文及 TL;DR 选择 | 已实现：同一 Core | 已实现：同一 Host/Core |
 | 双模型查词、流式预览、失败隔离 | `DictionaryCoordinator`、`QuerySession`；后台生成与预览采样、重复内容去重，最终结果完整校验 | 已实现：仅排队最新预览，输入/滚动/取消优先 | 已实现：Host 使用同一预览采样 |
@@ -29,7 +29,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 保存的结果与重新生成 | `SavedQueries`、`QuerySession.RegenerateAsync` | 已实现：底栏“重新生成” | 已实现：底栏“重新生成”，⌘R |
 | 在线补充开关 | `QuerySession.SetOnline`、`ControlText` | 已实现：底栏两态开关 | 已实现：底部玻璃按钮，以图标和文字区分在线与离线 |
 | 文本翻译与复制译文 | `Translation`、`TranslationView` | 已实现 | 已实现 |
-| 查询历史 | `QueryHistory` | 已实现：主页列表，可单条删除 | 已实现：主页列表，可单条删除；⌘Y |
+| 查询历史 | `QueryHistory`：最多 10,000 条，频次与原始大小写持久化 | 已实现：搜索与逐页加载、单条删除 | 已实现：搜索与逐页加载、单条删除；⌘Y |
 | 后退 / 前进 | `QueryNavigation`、`NavigationView` | 已实现：Alt+← / Alt+→ | 已实现：工具栏按钮，⌘[ / ⌘] |
 
 ## 设置与连接
@@ -40,8 +40,8 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | OAuth / API 连接入口与禁用状态 | `ModelCatalog` 统一 `OAuth \|` / `API \|` 前缀 | 已实现：模型选择上方并排入口；不支持的控件与标签置灰 | 已实现：查询设置顶部并排入口，打开对应连接表单；使用系统禁用样式 |
 | 模型 effort / 速度与接入模式标注 | `InferenceOptions`、模型能力缓存、Chat Completions 参数和官方 CLI 参数；档位显示名（Low … Extra High … Ultra），发送值不变 | 已实现：各模型下共用两个配置项；OAuth/API 分开保存；读取列表更新能力 | 已实现：每个模型下方一行“思考深度 · 速度”，两个菜单，能力说明作副标题；无可选档位的菜单置灰，悬停说明原因；使用 Host 同一能力和校验 |
 | 离线词典启停与信息 | `DictionaryCatalog` | 已实现：设置 → 离线词典 | 已实现：设置 → 离线词典；安装词库需 PowerShell 7 运行同一安装脚本 |
-| 自定义 OpenAI 兼容文本服务 | `CompatibleTextClient` / `CompatibleDictionary`：直接请求 HTTPS `/models`、`/chat/completions`；每次携带 CF Access 鉴权与 LeXi/版本号，API Key 可留空；JSON/SSE、取消、错误清理及端点隔离的缓存；用于查词、翻译和义项整理 | 已实现：设置 → OAuth / API 连接 → API 连接；读取列表后在“查询与模型”明确选择，凭据按地址由 Windows 当前用户加密 | 已实现：设置 → 查询 → API 连接（也可从“账号”进入）；读取列表并保存连接后在“查询”选择，凭据按地址保存在 Keychain；内置本地 Host 直接请求服务 |
-| 官方客户端登录与状态 | `ProviderConnection`、`ToolLocator`（不依赖 shell PATH） | 已实现：设置 → 账号连接 | 已实现：在“终端”中打开官方登录，完成后点击“检查状态” |
+| 自定义 OpenAI 兼容文本服务 | `CompatibleTextClient` / `CompatibleDictionary`：直接请求 HTTPS `/models`、`/chat/completions`；每次携带 CF Access 鉴权与 LeXi/版本号，API Key 可留空；JSON/SSE、取消、错误清理及端点隔离的缓存；用于查词、翻译和义项整理 | 已实现：设置 → API 连接；读取列表后在“查询与模型”明确选择，凭据按地址由 Windows 当前用户加密 | 已实现：设置 → 查询 → API 连接（也有独立 API 分类）；读取列表并保存连接后在“查询”选择，凭据按地址保存在 Keychain；内置本地 Host 直接请求服务 |
+| 官方客户端登录与状态 | `ProviderConnection`、`ToolLocator`（不依赖 shell PATH） | 已实现：设置 → OAuth 连接 | 已实现：在“终端”中打开官方登录，完成后点击“检查状态” |
 | 本地发音 | `SpeechCatalog.Local`（本机声线模型与校验） | 已实现：Windows SAPI 声线，可选“按文字语言自动选择”；生成 WAV 后按同一规则缓存 | 已实现：系统声线（`AVSpeechSynthesizer`），可选“按文字语言自动选择”；直接朗读，不生成缓存文件 |
 | 在线发音：OpenAI、Grok、ElevenLabs | `SpeechCatalog`（模型、声线、校验与提示）、`SpeechClient`、`ElevenLabsSpeech` | 已实现：设置 → 发音选择模型与声线，可试听 | 已实现：设置 → 发音选择模型与声线，可试听；通过 Host 的 `speech.*` 方法调用同一份 Core |
 | ElevenLabs 账号声线与 Voice ID | `SpeechClient.ElevenVoicesAsync`、`SpeechAudio.ElevenVoicesAsync`（离线时不读取） | 已实现：首次展开声线列表时读取，可刷新；“指定其他声线”填写 Voice ID | 已实现：点击“读取声线列表”读取，可刷新（SwiftUI 选择器没有展开时机）；“指定其他声线”填写 Voice ID |
@@ -67,3 +67,16 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 构建与分发 | `scripts/Build.ps1`，可生成自包含版本 | `apple/scripts/build-app.sh`，按构建机器架构生成本机签名的应用；Developer ID 签名与公证计划中 |
 | 发音状态 | 底栏显示生成、播放与错误状态 | 底栏显示生成、播放与错误状态；扬声器按钮显示播放或停止 |
 | 任务栏图标刷新 | `Refresh-TaskbarIcon.ps1` | 不适用：Dock 图标随应用包更新 |
+
+## 大版本准备：性能、恢复与数据
+
+| 功能 | 共享实现 | Windows | macOS |
+|---|---|---|---|
+| 首次生成等待 | `QuerySession`：模型开始前最多等待在线资料 1 秒；后到资料保留原文，不追加虚假引用 | 同 Core | 同 Host/Core |
+| 分步重试 | `QueryRetry` / `DictionaryCoordinator`：成功答案复用，保留原始证据和模型 | 底栏“重试未完成” | 底栏“重试未完成” |
+| 释义质量评估 | `DefinitionQuality`、24 类用例、离线回放评分与人工审读流程 | 开发检查；未进行在线 A/B 验证 | 共享同一评估 |
+| 设置布局与窗口记忆 | 平台原生窗口服务，独立于查词数据 | 左侧分类、分组卡片、独立 placement 文件 | 原生 NavigationSplitView、分组 Form、NSWindow frame autosave |
+| TTS 模型与重播 | `SpeechModels`：显式刷新 ElevenLabs 支持 TTS 的模型，保存目录和模型声线；音频缓存按文本/模型/声线区分 | 发音页刷新；文本右键再次播放上一段 | 发音页刷新；底栏再次朗读 |
+| 备份迁移 | `UserData`：预览、白名单、读取上限、校验后事务导入；合并历史，已有查询保留，设置可选 | 数据与迁移 | 原生文件面板与确认 |
+| 缓存管理 | `UserData`：中间缓存、语音、已保存查询分别统计/清理；与查询互斥 | 数据与迁移 | 数据与迁移 |
+| 干净分发 | 干净源码默认值；平台安全存储不进入程序 | ZIP 脚本已准备，未生成发布包 | 现有 bundle 构建；正式签名/公证仍待发布时完成 |

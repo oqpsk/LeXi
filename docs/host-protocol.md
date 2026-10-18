@@ -90,3 +90,13 @@ Windows 直接引用 Core，通过当前用户加密存储的读取函数提供�
 不兼容的变化提高 `HostServer.Protocol`。前端在 `initialize` 后检查 `protocol`，不一致时提示重新安装。新增字段和方法不改变版本号；前端忽略未知字段。
 
 `host-check` 在进程内用合成模型检查流式视图、取消、错误和设置，并分别以 `dotnet` 和单文件发布形式启动 Host 检查标准输出与退出行为。
+
+### Additive major-version preparation (protocol 1)
+
+`QueryView.canRetry` is an optional boolean for compatible clients. `query.retry` retries only failed stages from the saved input/model checkpoint; explicit regeneration keeps its existing meaning. Speech/window settings do not invalidate text checkpoints.
+
+`history.list` accepts optional `text` and `offset`, returns 50 matching entries plus `total`. Existing `entries`/`error` remain. Suggestions combine case-preserved dictionary history and the offline index; text translations are excluded.
+
+`data.usage` returns cache categories (`id`, `name`, `bytes`, `files`). `data.clear {category}` clears only `intermediate`, `speech` or `results`, and refuses while a query runs. `data.export {path}` writes a credential-free private backup; `data.inspect {path}` returns version/history/results/hasSettings before any write; `data.import {path,includeSettings}` validates and merges. The native front end must obtain file paths from a user file panel and request confirmation after preview. Credentials never enter an archive or response. Error messages do not contain file paths or file content.
+
+`speech.elevenModels {key}` explicitly refreshes the account's TTS-capable model catalog, then `speech.models` reads it. Key lifetime follows `speech.elevenVoices`; the key is never persisted by Host. Existing saved model selections are retained.

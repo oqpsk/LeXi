@@ -30,6 +30,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
     private static readonly JsonElement NoParameters = JsonDocument.Parse("{}").RootElement.Clone();
     private readonly Channel<string> outgoing = Channel.CreateUnbounded<string>(new() { SingleReader = true });
     private readonly ConcurrentDictionary<string, CancellationTokenSource> running = new();
+    private readonly SpeechClient metadata = speechClient ?? new();
     private readonly SpeechAudio speech = new(session.Paths.UserRoot, speechClient);
     private readonly CompatibleTextClient text = textClient ?? new();
 
@@ -60,7 +61,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             foreach (var request in running.Values) request.Cancel();
             await Task.WhenAll(handlers);
             session.Changed -= Publish;
-            speech.Dispose(); if (textClient == null) text.Dispose();
+            speech.Dispose(); if (speechClient == null) metadata.Dispose(); if (textClient == null) text.Dispose();
             if (shutdown != null) Reply(shutdown, new { });
             outgoing.Writer.TryComplete();
             await writer;
@@ -98,7 +99,9 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
         catch (CompatibleException e) { Fail(id, e.Code, e.Message); }
         catch (HostException e) { Fail(id, e.Code, e.Message); }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested) { Fail(id, "cancelled", "Request cancelled."); }
-        catch (JsonException e) { Fail(id, "invalid_params", e.Message); }
+        catch (JsonException) { Fail(id, "invalid_params", "数据格式无效。"); }
+        catch (InvalidDataException) { Fail(id, "invalid_data", "数据无效或备份版本不支持。"); }
+        catch (InvalidOperationException) { Fail(id, "operation_failed", "当前无法操作，请等待查询结束后重试。"); }
         // Unexpected failures report only their category; messages can contain local paths.
         catch (Exception e) { Fail(id, "internal_error", e.GetType().Name); }
         finally { running.TryRemove(key, out _); }
@@ -123,6 +126,20 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
                 await session.SubmitAsync(Text(p, "text"), Flag(p, "force"), false, Number(p, "scroll"));
                 return Position();
             }
+            case "query.retry":
+                using (token.Register(session.Cancel)) await session.RetryFailedAsync();
+                return Position();
+            case "data.usage": return new UserData(session.Paths.UserRoot).Usage();
+            case "data.inspect": return new UserData(session.Paths.UserRoot).Inspect(Text(p, "path"));
+            case "data.export":
+                await session.ManageDataAsync(async () => { await new UserData(session.Paths.UserRoot).ExportAsync(Text(p, "path"), session.Settings, session.History, token); return true; }); return new { };
+            case "data.import":
+            {
+                var imported = await session.ManageDataAsync(() => Task.FromResult(new UserData(session.Paths.UserRoot).Import(Text(p, "path"), session.Settings, session.History, Flag(p, "includeSettings"))));
+                session.SettingsSaved(""); return imported;
+            }
+            case "data.clear":
+                await session.ManageDataAsync(() => { new UserData(session.Paths.UserRoot).Clear(Text(p, "category")); return Task.FromResult(true); }); return new { };
             case "query.regenerate":
             {
                 using var stop = token.Register(session.Cancel);
@@ -142,7 +159,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             case "query.view": return session.View;
             case "suggest": return new { suggestions = session.Suggest(Text(p, "text")) };
             case "query.preview": return await session.PreviewAsync(Text(p, "text"), token);
-            case "history.list": return History();
+            case "history.list": return History(Text(p, "text", ""), (int)Number(p, "offset"));
             case "history.remove":
             {
                 var query = Text(p, "query"); var translation = Flag(p, "translation");
@@ -210,7 +227,10 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
                     clearEnvironment = provider == "claude" ? ProviderConnection.ClaudeClearedVariables : [] };
             }
             case "speech.models":
-                return new { models = SpeechCatalog.Models.Select(m => new { m.Provider, m.Id, m.Name, local = SpeechCatalog.IsLocal(m.Provider) }) };
+                return new { models = SpeechModels.Load(session.Paths.UserRoot, session.Settings).Select(m => new { m.Provider, m.Id, m.Name, local = SpeechCatalog.IsLocal(m.Provider) }) };
+            case "speech.elevenModels":
+                await Speech(() => SpeechModels.RefreshAsync(session.Paths.UserRoot, metadata, session.Settings.Online, Text(p, "key", ""), token));
+                return new { };
             case "speech.voices": return new { voices = SpeechCatalog.Voices(Text(p, "provider"), Text(p, "model")) };
             // Keys arrive with each call from the front end's secure storage. The host never keeps,
             // logs or returns them, and speech errors carry only Core's wording.
@@ -240,9 +260,10 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
 
     private object Position() { var view = session.View; return new { request = view.Request, revision = view.Revision }; }
 
-    private object History() => new
+    private object History(string text = "", int offset = 0) => new
     {
-        entries = session.History.Entries.Select(e => new { e.Query, e.Translation, e.QueriedAt, e.Preview, e.Kind }).ToArray(),
+        total = session.History.Entries.Count(e => e.Query.Contains(text, StringComparison.OrdinalIgnoreCase)),
+        entries = session.History.Search(text, offset).Select(e => new { e.Query, e.Translation, e.QueriedAt, e.Preview, e.Kind }).ToArray(),
         error = session.History.Error
     };
 
@@ -288,6 +309,8 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             try { SpeechCatalog.Validate("test", SpeechOptions.From(candidate)); }
             catch (InvalidOperationException e) { throw new HostException("invalid_settings", e.Message); }
         }
+        SpeechPreferences.Remember(session.Settings);
+        candidate.SpeechProfiles = session.Settings.SpeechProfiles; SpeechPreferences.Remember(candidate);
         var previous = session.QuerySettingsIdentity();
         foreach (var property in typeof(AppSettings).GetProperties().Where(x => x.CanRead && x.CanWrite))
             property.SetValue(session.Settings, property.GetValue(candidate));

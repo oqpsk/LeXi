@@ -35,6 +35,7 @@ struct LeXiApp: App {
         Settings {
             SettingsView(store: store)
         }
+        .windowResizability(.contentMinSize)
     }
 
     private func start() async {

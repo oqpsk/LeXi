@@ -9,6 +9,7 @@ public partial class MainWindow
     private int speechRequest;
     private string speechText = "";
     private bool audioPlaying;
+    private (string Text, string Key, SpeechOptions Options)? lastReading;
     private void StopSpeech()
     {
         speechRequest++; speech.Stop(); speakingKey = null; audioPlaying = false;
@@ -37,13 +38,14 @@ public partial class MainWindow
         await SpeakAsync(speechText, HeadingSpeech);
     }
     // key is the headword or the definition or example being read; only its controls show playback.
-    private async Task SpeakAsync(string text, string key)
+    private async Task SpeakAsync(string text, string key, SpeechOptions? selection = null)
     {
         StopSpeech(); var request = speechRequest; speakingKey = key;
+        var options = selection ?? SpeechOptions.From(settings); lastReading = (text, key, options);
         ShowSpeechVisuals();
         try
         {
-            await speech.PlayAsync(text, SpeechOptions.From(settings), settings.Online, message =>
+            await speech.PlayAsync(text, options, settings.Online, message =>
             { if (request == speechRequest) { if (key == HeadingSpeech) SpeechButton.ToolTip = message + " · 点击停止"; LookupStatus.Text = message; } },
                 started: () => { if (request == speechRequest) { audioPlaying = true; ShowSpeechVisuals(); } });
             if (request == speechRequest) LookupStatus.Text = "发音播放结束";

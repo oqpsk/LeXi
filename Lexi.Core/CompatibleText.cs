@@ -23,7 +23,7 @@ public sealed class CompatibleException(string code, string message) : InvalidOp
 public static class CompatibleText
 {
     public const string Provider = "compatible";
-    public const string DefaultBaseUrl = "https://ai.rwby.io/v1";
+    public const string DefaultBaseUrl = "";
     public const string MissingCredentials = "请在设置 → API 连接中填写 CF Access Client ID 和 Client Secret。";
     public const string AuthenticationFailed = "自定义文本服务鉴权失败，请检查 CF Access Client ID、Client Secret 及可选 API Key。";
     public const string StorageFailure = "自定义文本服务凭据无法读取或保存，请在设置中重新填写。";

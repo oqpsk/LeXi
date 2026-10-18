@@ -9,7 +9,7 @@ public sealed record QueryProviders(
 
 // The query lifecycle shared by every front end: routing, sources, caches, models, saved views,
 // history and navigation. Each step publishes a complete QueryView; front ends only render it.
-public sealed class QuerySession : IDisposable
+public sealed partial class QuerySession : IDisposable
 {
     private readonly object gate = new();
     private readonly OnlineDictionary web;
@@ -30,6 +30,9 @@ public sealed class QuerySession : IDisposable
     private QueryViewKind kind = QueryViewKind.Home;
     private string current = "", input = "", speechText = "", status = "正在准备词库…";
     private bool disposed;
+    private readonly object historyGate = new();
+    private int historyPending;
+    private readonly List<OfflineLibrary> retiredLibraries = [];
 
     public QuerySession(LexiPaths paths, Task<OfflineLibrary>? library = null, QueryProviders? providers = null,
         HttpMessageHandler? network = null, TimeProvider? clock = null,
@@ -65,7 +68,7 @@ public sealed class QuerySession : IDisposable
     public SavedQueries Saved => new(Cache);
     public QueryHistory History { get; }
     public QueryNavigation Navigation { get; } = new();
-    public Task<OfflineLibrary> Library { get; }
+    public Task<OfflineLibrary> Library { get; private set; }
     public QueryPresentation Presentation { get; } = new();
     public string Current { get { lock (gate) return current; } }
     public QueryView View { get; private set; }
@@ -93,7 +96,9 @@ public sealed class QuerySession : IDisposable
     public void UpdateReadyStatus() { lock (gate) { if (current.Length > 0) return; status = ReadyStatus(); Publish(); } }
     public void SetStatus(string text) { lock (gate) { status = text; Publish(); } }
 
-    public string[] Suggest(string text) => Settings.OfflineEnabled && Library.IsCompletedSuccessfully ? Library.Result.Suggest(text, Settings) : [];
+    public string[] Suggest(string text) => History.Suggest(text)
+        .Concat(Settings.OfflineEnabled && Library.IsCompletedSuccessfully ? Library.Result.Suggest(text, Settings) : [])
+        .Distinct(StringComparer.Ordinal).Take(10).ToArray();
 
     public Task<InputPreviewView?> PreviewAsync(string text, CancellationToken token = default) =>
         InputPreview.ReadAsync(text, Saved, Library, Settings, token);
@@ -107,11 +112,14 @@ public sealed class QuerySession : IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { SetStatus("设置暂时无法保存，请检查文件夹写入权限。"); return false; }
     }
     // Window-closing preferences do not invalidate dictionary or model results.
-    public string QuerySettingsIdentity()
+    public string QuerySettingsIdentity() => QueryIdentity(Settings);
+    private static string QueryIdentity(AppSettings settings) => JsonSerializer.Serialize(new
     {
-        var copy = Settings.ForModel(LookupModel.Primary(Settings)); copy.MinimizeOnClose = true;
-        return JsonSerializer.Serialize(copy, Json.Options);
-    }
+        settings.Online, settings.AutoAi, settings.OfflineEnabled, settings.DisabledDictionaries, settings.CodexPath,
+        settings.Provider, settings.Model, settings.SecondaryProvider, settings.SecondaryModel, settings.ParallelLookup,
+        settings.MergeSenses, settings.JudgeProvider, settings.JudgeModel, settings.CompatibleBaseUrl,
+        settings.CompatibleStreaming, settings.InferenceProfiles, settings.ReasoningEffort, settings.ServiceTier
+    }, Json.Options);
     public void SettingsSaved(string previousIdentity)
     {
         SaveSettings(); UpdateReadyStatus();
@@ -191,7 +199,7 @@ public sealed class QuerySession : IDisposable
         lock (gate)
         {
             if (recordVisit) { Navigation.RememberScroll(scroll); Navigation.Visit(""); }
-            request++; lookup?.Cancel();
+            request++; lookup?.Cancel(); retry = null;
             kind = QueryViewKind.Home; current = ""; input = ""; speechText = "";
             Presentation.ResetLexical(); Presentation.SetQuery("");
             progress.Reset();
@@ -199,13 +207,14 @@ public sealed class QuerySession : IDisposable
             Publish();
         }
     }
-    public bool RemoveHistory(HistoryEntry entry) { var removed = History.Remove(entry); lock (gate) Publish(); return removed; }
+    public bool RemoveHistory(HistoryEntry entry) { lock (gate) if (maintaining) return false; bool removed; lock (historyGate) removed = History.Remove(entry); lock (gate) Publish(); return removed; }
 
     // ---- Queries ----
     public Task RegenerateAsync() { var query = Current; return query.Length > 0 ? SubmitAsync(query, true) : Task.CompletedTask; }
 
     public async Task SubmitAsync(string raw, bool force = false, bool navigating = false, double scroll = 0)
     {
+        lock (gate) { if (maintaining) return; }
         var validation = Queries.Validate(raw);
         if (validation != null) { SetStatus(validation); return; }
         var timing = new LookupTiming(clock);
@@ -214,15 +223,25 @@ public sealed class QuerySession : IDisposable
         var savedDictionary = Saved.Dictionary(Queries.LookupKey(raw));
         var savedTranslation = Saved.TranslationResult(raw.Trim(), Translation.Target(raw.Trim()));
         var translating = navigating ? Navigation.Current.Translation : savedTranslation != null || savedDictionary == null && Queries.IsText(raw, knownTerm);
-        if (!navigating) lock (gate) { Navigation.RememberScroll(scroll); Navigation.Visit(raw.Trim(), translating); History.Record(raw, translating); }
-        if (translating) await TranslateAsync(raw.Trim(), force, timing);
-        else await LookupAsync(raw, force, timing);
+        Task historyWrite = Task.CompletedTask;
+        if (!navigating)
+        {
+            lock (gate) { Navigation.RememberScroll(scroll); Navigation.Visit(raw.Trim(), translating); historyPending++; }
+            historyWrite = Task.Run(() => { lock (historyGate) History.Record(raw, translating); });
+        }
+        try
+        {
+            if (translating) await TranslateAsync(raw.Trim(), force, timing);
+            else await LookupAsync(raw, force, timing);
+        }
+        finally { try { await historyWrite; } finally { if (!navigating) lock (gate) historyPending--; } }
+
     }
 
     private (long Id, CancellationToken Token) Begin(QueryViewKind next, string query, string text)
     {
         // Advance first: a cancelled flow resuming inline must already be stale.
-        request++; lookup?.Cancel(); lookup?.Dispose(); lookup = new();
+        request++; lookup?.Cancel(); lookup?.Dispose(); lookup = new(); retry = null; sourceFetchFailed.Clear();
         kind = next; current = query; input = text; speechText = text;
         return (request, lookup.Token);
     }
@@ -236,6 +255,7 @@ public sealed class QuerySession : IDisposable
         long id, progressId; CancellationToken token;
         lock (gate)
         {
+            if (maintaining) return;
             (id, token) = Begin(QueryViewKind.Dictionary, query, raw.Trim());
             Presentation.BeginDictionary(query, raw.Trim());
             status = "查询本地词库…";
@@ -244,8 +264,12 @@ public sealed class QuerySession : IDisposable
         }
         var notes = new List<string>();
         var sourceIncomplete = false;
+        var failedSources = SourceFailures.None;
         LocalHit[] local = [];
         Task pronunciationTask = Task.CompletedTask;
+        Task<OnlineEntry?>? earlySource = null;
+        var earlyWatch = System.Diagnostics.Stopwatch.StartNew();
+
         try
         {
             if (Saved.Dictionary(query, force) is { } saved) { Step(id, () => RestoreSavedCore(saved, timing, progressId)); return; }
@@ -260,7 +284,7 @@ public sealed class QuerySession : IDisposable
                     Step(id, () => Presentation.ApplyLocalWordForms(query, forms));
                 }
             }
-            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { notes.Add("本地词库不可用"); sourceIncomplete = true; failedSources |= SourceFailures.Offline; }
             token.ThrowIfCancellationRequested();
             Step(id, () => { Presentation.ShowLocal(local, query, Settings.OfflineEnabled); BeginOverviewCore(query, local); });
             if (local.Any(h => !string.IsNullOrWhiteSpace(h.Entry.Chinese + h.Entry.English + h.Entry.Original)) ||
@@ -302,14 +326,19 @@ public sealed class QuerySession : IDisposable
                 Step(id, () => status = "本地查询完成 · 正在查在线词典…");
                 try
                 {
-                    var fetched = await web.LookupAsync(query, token);
+                    earlyWatch.Restart(); earlySource ??= FetchSourceAsync(query, token);
+                    var budget = TimeSpan.FromMilliseconds(1000) - earlyWatch.Elapsed;
+                    if (!earlySource.IsCompleted && budget > TimeSpan.Zero)
+                        await Task.WhenAny(earlySource, Task.Delay(budget, token));
+                    var fetched = !modelsEnabled || earlySource.IsCompleted ? await earlySource : null;
                     token.ThrowIfCancellationRequested();
                     if (fetched != null) { online = fetched; await TryCacheAsync("online-v3", query, online); }
-                    else if (online == null) notes.Add("在线词典未收录");
+                    else if (online == null && earlySource.IsCompleted && !sourceFetchFailed.ContainsKey(id)) notes.Add("在线词典未收录");
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested) { notes.Add("在线查询超时"); sourceIncomplete = true; }
                 catch (Exception ex) when (ex is HttpRequestException or JsonException or InvalidDataException) { notes.Add("在线来源暂不可用"); sourceIncomplete = true; }
             }
+            if (sourceFetchFailed.ContainsKey(id)) { sourceIncomplete = true; failedSources |= SourceFailures.Online; }
             token.ThrowIfCancellationRequested();
             var onlineEntry = online;
             Step(id, () =>
@@ -325,6 +354,7 @@ public sealed class QuerySession : IDisposable
             if (!modelsEnabled)
             {
                 await pronunciationTask; token.ThrowIfCancellationRequested();
+                Step(id, () => retry = new(query, local, online, evidence, cachedAnswers, Settings.ForModel(LookupModel.Primary(Settings)), sourceIncomplete, failedSources));
                 await SaveDictionaryAsync(query, local, online, evidence, cachedAnswers, false, sourceIncomplete, token);
                 token.ThrowIfCancellationRequested();
                 Step(id, () =>
@@ -360,7 +390,14 @@ public sealed class QuerySession : IDisposable
                 Step(id, () => Presentation.ApplyAnswers(result, sourceEvidence));
                 if (result.Groups.Length > 0) timing.MarkFirst();
                 await pronunciationTask;
+                if (earlySource != null)
+                {
+                    var late = await earlySource;
+                    if (late != null) { online = late; Step(id, () => Presentation.ShowOnline(late, false)); }
+                    else if (sourceFetchFailed.ContainsKey(id)) { sourceIncomplete = true; failedSources |= SourceFailures.Online; }
+                }
                 token.ThrowIfCancellationRequested();
+                Step(id, () => retry = new(query, local, online, evidence, result, options, sourceIncomplete, failedSources));
                 await SaveDictionaryAsync(query, local, online, evidence, result, mergeEnabled, sourceIncomplete, token);
                 token.ThrowIfCancellationRequested();
                 var failures = result.Answers.Count(a => a.Phase == ModelPhase.Failed);
@@ -391,6 +428,21 @@ public sealed class QuerySession : IDisposable
         }
     }
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, bool> sourceFetchFailed = new();
+    private async Task<OnlineEntry?> FetchSourceAsync(string query, CancellationToken token)
+    {
+        long id; lock (gate) id = request;
+        try
+        {
+            using var stop = CancellationTokenSource.CreateLinkedTokenSource(token); stop.CancelAfter(TimeSpan.FromSeconds(8));
+            var entry = await web.LookupAsync(query, stop.Token);
+            if (entry != null && !token.IsCancellationRequested) await TryCacheAsync("online-v3", query, entry);
+            return entry;
+        }
+        catch (Exception e) when (e is HttpRequestException or IOException or JsonException or InvalidDataException or OperationCanceledException or TimeoutException)
+        { if (!token.IsCancellationRequested) sourceFetchFailed[id] = true; return null; }
+    }
+
     private async Task TranslateAsync(string text, bool force, LookupTiming timing)
     {
         var target = Translation.Target(text);
@@ -399,6 +451,7 @@ public sealed class QuerySession : IDisposable
         long id, progressId; CancellationToken token;
         lock (gate)
         {
+            if (maintaining) return;
             (id, token) = Begin(QueryViewKind.Translation, text, text);
             Presentation.BeginTranslation(text, target);
             progressId = progress.Begin(initialProgress);
@@ -514,6 +567,7 @@ public sealed class QuerySession : IDisposable
         Presentation.RestorePronunciation(saved.Pronunciation);
         if (saved.Online != null) Presentation.ShowOnline(saved.Online, true);
         Presentation.ApplyAnswers(saved.Result, saved.Evidence);
+        retry = saved.RetryOptions == null ? null : new(query, saved.Local, saved.Online, saved.Evidence, saved.Result, saved.RetryOptions, saved.SourceIncomplete, saved.FailedSources);
         timing.MarkFirst();
         var state = (saved.Result.Answers.Length > 0 ? QueryProgressState.Finished(saved.Result, saved.MergeEnabled,
             saved.SourceIncomplete, SpecialistReferences.Uncovered(query, saved.Result.Groups, saved.Evidence).Length) :
@@ -557,8 +611,8 @@ public sealed class QuerySession : IDisposable
     {
         token.ThrowIfCancellationRequested();
         SavedDictionary saved;
-        lock (gate) saved = new(query, local, Presentation.LocalWordForms, Presentation.OnlineWordForms, Presentation.SourceEtymologies,
-            online, evidence, result, Presentation.Pronunciation, merge, incomplete, clock.GetUtcNow());
+        lock (gate) { if (current != query || kind != QueryViewKind.Dictionary || token.IsCancellationRequested) return; saved = new(query, local, Presentation.LocalWordForms, Presentation.OnlineWordForms, Presentation.SourceEtymologies,
+            online, evidence, result, Presentation.Pronunciation, merge, incomplete, clock.GetUtcNow(), RetryOptions: retry?.Options, FailedSources: retry?.FailedSources ?? SourceFailures.None); }
         try { await Saved.SaveDictionaryAsync(saved, token); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* Keep the displayed result if persistence is unavailable. */ }
     }
@@ -592,7 +646,7 @@ public sealed class QuerySession : IDisposable
         Presentation.Pronunciation, progress.Current, progress.Generation, status, kind != QueryViewKind.Home && Settings.Online,
         new(Navigation.CanBack, Navigation.CanForward, QueryNavigation.Label(Navigation.Back), QueryNavigation.Label(Navigation.Forward)),
         Presentation.Local, Presentation.LocalHint, Presentation.Online, Presentation.OnlineHint, Presentation.Answers,
-        Presentation.QuickRead, Presentation.FormRows, Presentation.Etymology, Presentation.Translation);
+        Presentation.QuickRead, Presentation.FormRows, Presentation.Etymology, Presentation.Translation, CanRetry);
 
     public void Dispose()
     {
@@ -600,5 +654,6 @@ public sealed class QuerySession : IDisposable
         catalogStop.Cancel();
         claude.Dispose(); secondaryClaude.Dispose(); compatibleCredentials.Clear(); if (ownsCompatibleClient) compatibleClient.Dispose(); web.Dispose(); pronunciations.Dispose();
         if (Library.IsCompletedSuccessfully) Library.Result.Dispose();
+        foreach (var library in retiredLibraries) library.Dispose();
     }
 }

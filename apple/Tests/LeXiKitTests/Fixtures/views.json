@@ -1,7 +1,7 @@
 {
   "dictionary": {
     "request": 1,
-    "revision": 17,
+    "revision": 18,
     "kind": "dictionary",
     "query": "serendipity",
     "input": "serendipity",
@@ -132,11 +132,12 @@
     },
     "wordForms": [],
     "etymology": [],
-    "translation": null
+    "translation": null,
+    "canRetry": false
   },
   "translation": {
     "request": 3,
-    "revision": 33,
+    "revision": 34,
     "kind": "translation",
     "query": "The ship is ready.\nKeep 42 intact.",
     "input": "The ship is ready.\nKeep 42 intact.",
@@ -203,11 +204,12 @@
       "note": "",
       "complete": true,
       "error": ""
-    }
+    },
+    "canRetry": false
   },
   "preview": {
     "request": 3,
-    "revision": 31,
+    "revision": 32,
     "kind": "translation",
     "query": "The ship is ready.\nKeep 42 intact.",
     "input": "The ship is ready.\nKeep 42 intact.",
@@ -273,7 +275,8 @@
       "note": "",
       "complete": false,
       "error": ""
-    }
+    },
+    "canRetry": false
   },
   "streaming": {
     "request": 1,
@@ -352,7 +355,8 @@
     },
     "wordForms": [],
     "etymology": [],
-    "translation": null
+    "translation": null,
+    "canRetry": false
   },
   "home": {
     "request": 0,
@@ -395,6 +399,7 @@
     },
     "wordForms": [],
     "etymology": [],
-    "translation": null
+    "translation": null,
+    "canRetry": false
   }
 }

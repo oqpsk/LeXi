@@ -93,6 +93,28 @@ internal static partial class Program
                 finally { first.Close(); }
             }
             Check(WindowPosition.Load(file) == expected, "closing flushes the final moved and resized native bounds");
+            var settingsRoot = Path.Combine(folder, "settings-check"); Directory.CreateDirectory(settingsRoot);
+            var mainPlacement = Path.Combine(settingsRoot, "window-placement.json"); expected.Save(mainPlacement);
+            var settingsFile = Path.Combine(settingsRoot, "settings-window-placement.json");
+            var dialog = new SettingsWindow(new Lexi.Core.AppSettings(), [], null, textRoot: settingsRoot);
+            WindowPosition settingsBounds;
+            try
+            {
+                var handle = new WindowInteropHelper(dialog).EnsureHandle(); dialog.placement.CompleteStartup();
+                var origin = Read(handle);
+                SetHidden(handle, origin with { Right = origin.Left + 1020, Bottom = origin.Top + 810 }); settingsBounds = Read(handle);
+                Check(!IsWindowVisible(handle), "settings placement check never displays a window");
+            }
+            finally { dialog.Close(); }
+            var reopenedSettings = new SettingsWindow(new Lexi.Core.AppSettings(), [], null, textRoot: settingsRoot);
+            try
+            {
+                var handle = new WindowInteropHelper(reopenedSettings).EnsureHandle(); reopenedSettings.placement.CompleteStartup();
+                Check(Read(handle) == settingsBounds && WindowPosition.Load(settingsFile) == settingsBounds && WindowPosition.Load(mainPlacement) == expected,
+                    "settings size and position survive recreation independently of the main window and query settings");
+            }
+            finally { reopenedSettings.Close(); }
+
             var reopened = MakeWindow(); Theme.ApplyChrome(reopened);
             using (var memory = new WindowPlacement(reopened, file))
             {

@@ -7,6 +7,7 @@ internal static class SessionChecks
 {
     public static async Task Run(string fixture, string root)
     {
+        await MajorWorkflowChecks.Run(fixture,root);
         await InputPreviewChecks.Run(fixture,root);
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }

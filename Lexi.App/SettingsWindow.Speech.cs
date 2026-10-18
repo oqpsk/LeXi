@@ -15,7 +15,7 @@ public sealed partial class SettingsWindow
         var tab = new TabItem { Header = "发音", Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = panel } };
         tabs.Items.Add(tab);
         panel.Children.Add(Text("发声模型", 18));
-        var model = new ComboBox { ItemsSource = SpeechCatalog.Models, Margin = new(0,0,0,16) };
+        var model = new ComboBox { ItemsSource = SpeechModels.Load(App.UserRoot, settings), Margin = new(0,0,0,16) };
         panel.Children.Add(model); panel.Children.Add(Text("声线"));
         var voice = new SpeechVoicePicker { Style = (Style)FindResource(typeof(ComboBox)), Margin = new(0,0,0,8) }; panel.Children.Add(voice);
         var voiceStatus = Text("", 13, Muted); panel.Children.Add(voiceStatus);
@@ -25,6 +25,7 @@ public sealed partial class SettingsWindow
         var buttons = new WrapPanel();
         var load = ConnectionButton("刷新声线列表");
         AutomationProperties.SetName(load, "刷新 ElevenLabs 可用声线列表");
+        var refreshModels = ConnectionButton("刷新语音模型"); buttons.Children.Add(refreshModels);
         var apiPage = ConnectionButton("获取 API Key ↗");
         apiPage.Click += (_, _) => Open("https://elevenlabs.io/app/developers/api-keys");
         buttons.Children.Add(load); buttons.Children.Add(apiPage); eleven.Children.Add(buttons);
@@ -64,6 +65,8 @@ public sealed partial class SettingsWindow
         bool playing = false, closed = false, updating = false;
         int generation = 0, voiceGeneration = 0;
         string previousProvider = "";
+        string previousModel = "";
+        var profiles = (settings.SpeechProfiles ?? []).Where(p => p != null).GroupBy(p => p.Provider + ":" + p.Model).ToDictionary(g => g.Key, g => g.Last());
         SpeechVoice[]? elevenVoices = null;
         bool loadingVoices = false;
         SpeechVoice? lastEleven = settings.SpeechProvider == "elevenlabs" && SpeechCatalog.ValidElevenVoice(settings.SpeechVoice)
@@ -73,6 +76,8 @@ public sealed partial class SettingsWindow
         void Choices()
         {
             if (model.SelectedItem is not SpeechModel selected) return;
+            if (previousProvider.Length > 0 && voice.SelectedItem is SpeechVoice last)
+                profiles[previousProvider + ":" + previousModel] = new(previousProvider, previousModel, last.Id, last.Name);
             if (previousProvider == "elevenlabs") lastEleven = SpeechVoiceChoices.Pick("elevenlabs", voice.SelectedItem as SpeechVoice, "") ?? lastEleven;
             if (selected.Provider != previousProvider)
             { voiceGeneration++; voiceRequest?.Cancel(); loadingVoices = false; load.IsEnabled = true; }
@@ -80,8 +85,10 @@ public sealed partial class SettingsWindow
             var available = selected.Provider == "windows" ? LocalSpeech.Voices() : selected.Provider == "elevenlabs"
                 ? SpeechVoiceChoices.Eleven(elevenVoices, lastEleven) : SpeechCatalog.Voices(selected.Provider, selected.Id);
             if (available.Length == 0 && selected.Provider == "windows") available = [new("auto", "本机没有可用声线")];
-            var preferred = selected.Provider == "elevenlabs" ? lastEleven?.Id :
-                selected.Provider == settings.SpeechProvider && selected.Id == settings.SpeechModel ? settings.SpeechVoice : null;
+            var remembered = profiles.GetValueOrDefault(selected.Provider + ":" + selected.Id);
+            if (remembered != null && !available.Any(v => v.Id == remembered.Voice)) available = available.Append(new(remembered.Voice, remembered.Name)).ToArray();
+            var preferred = remembered?.Voice ?? (selected.Provider == "elevenlabs" ? lastEleven?.Id :
+                selected.Provider == settings.SpeechProvider && selected.Id == settings.SpeechModel ? settings.SpeechVoice : null);
             updating = true;
             try
             {
@@ -90,7 +97,7 @@ public sealed partial class SettingsWindow
                 if (previousProvider != selected.Provider) manual.Clear();
             }
             finally { updating = false; }
-            previousProvider = selected.Provider;
+            previousProvider = selected.Provider; previousModel = selected.Id;
             eleven.Visibility = selected.Provider == "elevenlabs" ? Visibility.Visible : Visibility.Collapsed;
             online.Visibility = selected.Provider == "windows" ? Visibility.Collapsed : Visibility.Visible;
             foreach (var (provider, group) in credentialPanels) group.Visibility = provider == selected.Provider ? Visibility.Visible : Visibility.Collapsed;
@@ -150,6 +157,24 @@ public sealed partial class SettingsWindow
             { if (!closed && request == voiceGeneration) voiceStatus.Text = ex.Message; }
             finally { if (!closed && request == voiceGeneration) { loadingVoices = false; load.IsEnabled = true; } }
         }
+        refreshModels.Click += async (_, _) =>
+        {
+            refreshModels.IsEnabled = false;
+            try
+            {
+                var selected = model.SelectedItem as SpeechModel;
+                await SpeechModels.RefreshAsync(App.UserRoot, metadata, settings.Online, SuppliedKey("elevenlabs") ?? secrets.Read("elevenlabs"), connectionLifetime.Token);
+                if (closed) return;
+                var list = SpeechModels.Load(App.UserRoot, settings);
+                if (selected != null && !list.Any(m => m.Provider == selected.Provider && m.Id == selected.Id)) list = list.Append(selected).ToArray();
+                model.ItemsSource = list;
+                model.SelectedItem = list.FirstOrDefault(m => m.Provider == selected?.Provider && m.Id == selected.Id) ?? list[0];
+                voiceStatus.Text = "已更新语音模型，当前选择保留。";
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or TimeoutException) { voiceStatus.Text = e.Message; }
+            finally { if (!closed) refreshModels.IsEnabled = true; }
+        };
         voice.Discover = LoadVoicesAsync;
         load.Click += async (_, _) => await voice.DiscoverAsync(true);
         preview.Click += async (_, _) =>
@@ -195,6 +220,7 @@ public sealed partial class SettingsWindow
                     else if (!string.IsNullOrWhiteSpace(field.Input.Password)) secrets.Save(provider, field.Input.Password);
                 settings.SpeechProvider = selected.Provider; settings.SpeechModel = selected.Id; settings.SpeechVoice = chosen.Id;
                 settings.SpeechVoiceName = chosen.Name;
+                settings.SpeechProfiles = profiles.Values.Take(100).ToArray(); SpeechPreferences.Remember(settings);
                 return true;
             }
             catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)

@@ -5,7 +5,9 @@ using Microsoft.VisualBasic.FileIO;
 using Lexi.Core;
 
 if (args.Length < 1) throw new ArgumentException("build-data <csv> <folder> | check <folder> [--fixture] | stream-check | live <folder> <assets> <cache> <word> [model] | bench-claude <assets> <work-folder> <words...> | cancel-check <assets> <work-folder>");
-if (args[0] == "compatible-check") await CompatibleChecks.Run(args[1], args[2]);
+if (args[0] == "quality-check") QualityChecks.Check(args[1]);
+else if (args[0] == "quality-score") QualityChecks.Score(args[1], args[2]);
+else if (args[0] == "compatible-check") await CompatibleChecks.Run(args[1], args[2]);
 else if (args[0] == "lexical-check") await LexicalChecks.Run();
 else if (args[0] == "speech-check") await SpeechChecks.Run();
 else if (args[0] == "usability-check") UsabilityChecks.Run(args[1]);

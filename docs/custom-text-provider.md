@@ -3,7 +3,7 @@
 Windows 与 macOS 可直接连接 OpenAI Chat Completions 兼容服务，用于查词、翻译和义项整理。
 
 1. 打开设置的“账号连接”（Windows）或“账号”（macOS），找到“自定义文本服务”。
-2. 填写 Base URL，默认 `https://ai.rwby.io/v1`。这是接口根地址，程序只追加 `models` 或 `chat/completions`，不会再追加 `/v1`。
+2. 填写 Base URL，默认 `https://api.example.org/v1`。这是接口根地址，程序只追加 `models` 或 `chat/completions`，不会再追加 `/v1`。
 3. 填写服务提供的 CF Access Client ID 与 Client Secret。额外的 API Key 可留空。三个字段都只保存在本机平台安全存储中，普通设置不包含这些值。
 4. 点击“读取模型列表”。鉴权成功后，由服务端提供可选模型。程序不会猜测或自动选择一个模型。
 5. Windows 返回“查询与模型”选择主要模型、第二模型或义项判断模型，再保存设置。macOS 先保存连接，再返回“查询”选择模型。

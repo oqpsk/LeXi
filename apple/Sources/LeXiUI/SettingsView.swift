@@ -7,17 +7,27 @@ import SwiftUI
 // saved settings intact. Controls use the system accent color.
 public struct SettingsView: View {
     @Bindable var store: LexiStore
+    @State private var selection: SettingsPage? = .general
     public init(store: LexiStore) { self.store = store }
 
     public var body: some View {
-        TabView {
-            Tab("通用", systemImage: "gearshape") { GeneralSettings() }
-            Tab("查询", systemImage: "text.magnifyingglass") { QuerySettings(store: store) }
-            Tab("词典", systemImage: "books.vertical") { DictionarySettings(store: store) }
-            Tab("账号", systemImage: "person.crop.circle") { ConnectionSettings(store: store) }
-            Tab("发音", systemImage: "speaker.wave.2") { SpeechSettings(store: store) }
+        NavigationSplitView {
+            List(SettingsPage.allCases, selection: $selection) { page in
+                Label(page.rawValue, systemImage: page.symbol).tag(page)
+            }.navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 220)
+        } detail: {
+            switch selection ?? .general {
+            case .general: GeneralSettings()
+            case .query: QuerySettings(store: store)
+            case .dictionary: DictionarySettings(store: store)
+            case .oauth: ConnectionSettings(store: store, destination: .oauth)
+            case .api: Form { CompatibleConnectionSettings(store: store) }.formStyle(.grouped)
+            case .speech: SpeechSettings(store: store)
+            case .data: DataSettings(store: store)
+            }
         }
-        .frame(width: 600, height: 560)
+        .frame(minWidth: 720, idealWidth: 860, minHeight: 520, idealHeight: 660)
+        .background(SettingsWindowMemory())
         // A glass pane like the query window; the grouped rows and the tab bar sit directly on it.
         .scrollContentBackground(.hidden)
         .glassWindow()
@@ -407,6 +417,7 @@ struct SpeechSettings: View {
     @State private var keyInputs: [String: String] = [:]
     @State private var savedKeys: Set<String> = []
     @State private var voiceStatus = ""
+    @State private var loadingModels = false
     @State private var loadingVoices = false
     @State private var voiceRequest = 0
     @State private var voiceTask: Task<Void, Never>?
@@ -434,7 +445,16 @@ struct SpeechSettings: View {
                     })) {
                         ForEach(voices) { Text($0.name).tag($0.id) }
                     }
-                    if model.provider == "elevenlabs" { elevenControls(model) }
+                    if model.provider == "elevenlabs" {
+                        Button("刷新语音模型") {
+                            Task {
+                                loadingModels = true; defer { loadingModels = false }
+                                do { try await store.refreshSpeechModels(key: typedKey("elevenlabs") ?? keys.read("elevenlabs") ?? ""); await load() }
+                                catch { message = error.localizedDescription }
+                            }
+                        }.disabled(loadingModels)
+                        elevenControls(model)
+                    }
                     if !message.isEmpty { Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
                 } header: {
                     Text("声音")
@@ -569,8 +589,9 @@ struct SpeechSettings: View {
             cancelVoiceLoading(); voiceStatus = ""; manualVoice = ""
         }
         speech.stop()
-        let preferred = next.provider == "elevenlabs" ? lastEleven?.id
-            : next.provider == settings.speechProvider && next.id == settings.speechModel ? settings.speechVoice : nil
+        let remembered = settings.speechProfiles?.first { $0.provider == next.provider && $0.model == next.id }
+        let preferred = remembered?.voice ?? (next.provider == "elevenlabs" ? lastEleven?.id
+            : next.provider == settings.speechProvider && next.id == settings.speechModel ? settings.speechVoice : nil)
         let available = voices(next, settings)
         guard let voice = available.first(where: { $0.id == preferred }) ?? available.first else { return }
         apply(next, voice)

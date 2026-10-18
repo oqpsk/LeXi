@@ -104,6 +104,7 @@ public final class LexiStore {
         _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll)) as SubmitResult?
         await refreshHistoryIfHome()
     }
+    public func retryFailed() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.retry") as SubmitResult? }
     public func regenerate() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.regenerate") as SubmitResult? }
     public func navigate(_ direction: Int, scroll: Double = 0) async -> QueryPage? {
         clearSuggestions()
@@ -146,13 +147,33 @@ public final class LexiStore {
     }
 
     // ---- History ----
+    public private(set) var historyFilter = ""
     public func refreshHistory() async {
-        if let list = try? await client?.call("history.list") as HistoryList? { history = list }
+        if let list = try? await client?.call("history.list", ["text": historyFilter]) as HistoryList? { history = list }
     }
+    public func searchHistory(_ text: String) async { historyFilter = text; await refreshHistory() }
+    public func moreHistory() async {
+        let parameters: [String: SettingValue] = ["text": .string(historyFilter), "offset": .integer(history.entries.count)]
+        if let next = try? await client?.call("history.list", parameters) as HistoryList? {
+            var list = HistoryList(entries: history.entries + next.entries, error: next.error); list.total = next.total; history = list
+        }
+    }
+    public func dataUsage() async throws -> [CacheUsage] { try await requireClient().call("data.usage") }
+    public func inspectBackup(_ path: String) async throws -> BackupPreview { try await requireClient().call("data.inspect", ["path": path]) }
+    public func exportBackup(_ path: String) async throws { let _: EmptyResponse = try await requireClient().call("data.export", ["path": path]) }
+    public func importBackup(_ path: String, includeSettings: Bool) async throws {
+        let _: BackupPreview = try await requireClient().call("data.import", ["path": SettingValue.string(path), "includeSettings": .bool(includeSettings)])
+        await refreshSettings(); await refreshHistory()
+    }
+    public func clearCache(_ category: String) async throws { let _: EmptyResponse = try await requireClient().call("data.clear", ["category": category]) }
+    public func refreshSpeechModels(key: String) async throws { let _: EmptyResponse = try await requireClient().call("speech.elevenModels", ["key": key]) }
+    private struct EmptyResponse: Decodable {}
+    private func requireClient() throws -> HostClient { guard let client else { throw CocoaError(.fileNoSuchFile) }; return client }
     private func refreshHistoryIfHome() async { if view.kind == .home { await refreshHistory() } }
     public func remove(_ entry: HistoryEntry) async {
         if let result = try? await client?.call("history.remove", RemoveHistory(query: entry.query, translation: entry.translation)) as HistoryRemoval? {
             history = result.history
+            if !historyFilter.isEmpty { await refreshHistory() }
         }
     }
 

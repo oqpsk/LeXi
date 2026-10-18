@@ -29,7 +29,7 @@ public sealed record QueryProgressState(QueryStage Stage, string Title, string D
         var failed = snapshot.Answers.Count(a => a.Phase == ModelPhase.Failed);
         var count = snapshot.Groups.Length + referenceCount;
         if (snapshot.MergeFailed) return new(QueryStage.Finished, "合并未完成",
-            MergeFailures.Describe(snapshot.MergeFailure) + $"。已保留 {count} 条释义；已停止整理，不会继续等待。可点击底部“重新生成”重试。",
+            MergeFailures.Describe(snapshot.MergeFailure) + $"。已保留 {count} 条释义；已停止整理，不会继续等待。可点击底部“重试未完成”，仅重试出错步骤。",
             QueryOutcome.Partial, MergeEnabled: merge, FailedStage: QueryStage.Merge);
         if (failed > 0) return new(QueryStage.Finished, failed == snapshot.Answers.Length ? "模型补充未完成" : "部分完成",
             "可用结果已保留 · 本次查询已结束", count > 0 ? QueryOutcome.Partial : QueryOutcome.Failed, MergeEnabled: merge, FailedStage: QueryStage.Supplement);

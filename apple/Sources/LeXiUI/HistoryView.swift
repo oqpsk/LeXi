@@ -5,9 +5,12 @@ import SwiftUI
 struct HistoryView: View {
     @Bindable var store: LexiStore
     let open: (HistoryEntry) -> Void
+    @State private var filter = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            TextField("搜索查询历史", text: $filter).textFieldStyle(.roundedBorder)
+                .task(id: filter) { try? await Task.sleep(for: .milliseconds(200)); guard !Task.isCancelled else { return }; await store.searchHistory(filter) }
             if !store.history.error.isEmpty || store.history.entries.isEmpty {
                 ContentUnavailableView {
                     Label("还没有查询历史", systemImage: "clock")
@@ -25,6 +28,9 @@ struct HistoryView: View {
                 }
                 .padding(.vertical, 4)
                 .contentGroup()
+                if store.history.entries.count < (store.history.total ?? store.history.entries.count) {
+                    Button("更多历史") { Task { await store.moreHistory() } }
+                }
             }
         }
     }

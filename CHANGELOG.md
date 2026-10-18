@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## Unreleased — major-version preparation
+
+- Redesign settings with category navigation on Windows and native sidebar/grouped forms on macOS. OAuth, API, speech and data management have their own pages. Settings windows resize and remember their own size/position, independently of query windows.
+- Limit initial online-source waiting to one second before starting generation, retaining late original text without creating retrospective citations. Completed saved results still require explicit regeneration to refresh.
+- Add “重试未完成” to retry failed model/source/merge stages while preserving successful provider results and their evidence. Translation retries only its failed generation stage; settings changes require explicit regeneration.
+- Keep up to 10,000 explicit history entries with repeat counts, searchable/paged browsing and history-aware input suggestions. Translation paragraphs remain private local data and are excluded from word suggestions.
+- Add explicit ElevenLabs TTS model discovery, capability filtering, persisted model catalogs and per-model voice preferences. Replay the previous reading with the same selected voice and cached audio; retain the verified Windows speech-start buffer.
+- Add selective backup/import with a preview, retaining existing queries by default. Exclude credentials, OAuth state, audio, installed dictionaries and window placement; machine client paths stay local. Add separate intermediate, speech and completed-query cache management.
+- Add a 24-case lexical quality corpus and offline scoring harness; reorganize prompt priorities around established Chinese names, central meanings, native fields and provenance. No additional paid model call or completed-cache invalidation. Online A/B quality results have not been collected.
+- Remove the personal default API endpoint. Prepare a clean self-contained portable ZIP process with public-file staging, symbol/state rejection, sensitive-pattern checks, extracted-ZIP verification and SHA-256. No release or distributable ZIP generated for this change.
+
 
 - Summon LeXi on macOS with ⌘2 from any app, the counterpart of Win+2: it brings the query window forward with the last query selected, or hides LeXi when its window is already in front, returning to the previous app. It is a system hot key that takes precedence over other apps' ⌘2 and needs no Accessibility permission. Settings → 通用 can turn it off and set LeXi to open at login. Closing the query window no longer quits LeXi.
 - Read definitions and examples aloud on Windows and macOS. Pointing at a Chinese or English definition, an example or its translation shows a speaker in the card's left margin, which becomes a stop button while that block plays; the block is tinted pale gold while it is read. The context menu starts with 朗读, or 朗读所选文字 to read only the selected words. Speech uses the voice chosen in settings with the same cache and limits as the headword, and each speaker now stops only its own item. On macOS these blocks are AppKit text views so 朗读 joins the system text menu; VoiceOver offers it as an action.

@@ -164,6 +164,7 @@ public struct QueryView: Decodable, Equatable, Sendable {
     public let progress: QueryProgress?
     public let progressGeneration: Int64
     public let status: String
+    public var canRetry: Bool? = nil
     public let canRegenerate: Bool
     public let navigation: NavigationState
     public let local: [LocalSource]
@@ -208,6 +209,7 @@ public struct HistoryEntry: Decodable, Equatable, Sendable, Identifiable {
     public var id: String { (translation ? "t:" : "d:") + query }
 }
 public struct HistoryList: Decodable, Equatable, Sendable {
+    public var total: Int? = nil
     public let entries: [HistoryEntry]
     public let error: String
     public static let empty = HistoryList(entries: [], error: "")
@@ -233,6 +235,7 @@ public struct AppSettings: Decodable, Equatable, Sendable {
     public let speechProvider: String
     public let speechModel: String
     public let speechVoice: String
+    public var speechProfiles: [SpeechProfile]? = nil
     public let speechVoiceName: String
 }
 public struct InferenceOption: Decodable, Equatable, Sendable, Hashable, Identifiable {
@@ -306,13 +309,14 @@ public struct LoginCommand: Decodable, Equatable, Sendable {
 
 // Settings changes are sent as a partial JSON object; only these value shapes are needed.
 public enum SettingValue: Encodable, Equatable, Sendable {
-    case bool(Bool), string(String), strings([String])
+    case bool(Bool), string(String), strings([String]), integer(Int)
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
         case .bool(let value): try container.encode(value)
         case .string(let value): try container.encode(value)
         case .strings(let value): try container.encode(value)
+        case .integer(let value): try container.encode(value)
         }
     }
 }

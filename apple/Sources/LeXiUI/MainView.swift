@@ -102,6 +102,12 @@ public struct MainView: View {
             GlassEffectContainer(spacing: 8) {
                 HStack(spacing: 8) {
                     if store.view.kind != .home {
+                        if speech.canRepeat {
+                            Button("再次朗读", systemImage: "speaker.wave.2") { speech.repeatLast(using: store) }
+                        }
+                        if store.view.canRetry == true {
+                            Button("重试未完成", systemImage: "arrow.clockwise.circle") { speech.stop(); Task { await store.retryFailed() } }
+                        }
                         Button(action: regenerate) { Label("重新生成", systemImage: "arrow.clockwise") }
                             .disabled(!canRegenerate)
                             .help(store.settings?.controls.regenerateTooltip ?? "")
