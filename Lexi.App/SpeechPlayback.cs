@@ -16,12 +16,13 @@ internal sealed class SpeechPlayback(string root) : IDisposable
             ? await files.PrepareAsync(text, options, online, (temp, stop) => LocalSpeech.GenerateAsync(text, options.Voice, temp, stop), status, token)
             : await files.OnlineAsync(text, options, online, () => suppliedKey ?? new SpeechKeys(root).Read(options.Provider), status, token);
         token.ThrowIfCancellationRequested();
-        var silence = SpeechOutput.PrepareSilence(root);
+        status("正在准备音频输出…");
+        using var padded = await SpeechPcmFile.PrepareAsync(path, token);
+        token.ThrowIfCancellationRequested();
         using var playback = new SpeechOutput(); output = playback;
         try
         {
-            status("正在准备音频输出…");
-            await playback.PlayAsync(path, silence, () => { status("正在播放合成发音…"); started?.Invoke(); }, token);
+            await playback.PlayAsync(padded.Path, () => { status("正在播放合成发音…"); started?.Invoke(); }, token);
         }
         finally { if (ReferenceEquals(output, playback)) output = null; }
     }

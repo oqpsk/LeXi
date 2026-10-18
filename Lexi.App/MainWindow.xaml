@@ -36,7 +36,21 @@
           </StackPanel>
         </Grid>
       </Border>
-      <ListBox x:Name="Suggestions" Grid.Row="2" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Suggestions_SelectionChanged" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="SearchBox_KeyDown" IsTabStop="False" KeyboardNavigation.TabNavigation="None" AutomationProperties.Name="词条建议" AutomationProperties.HelpText="上下键选择并填入输入框，可继续编辑；Enter 查询，Tab 保留所选词，Esc 恢复原输入。"/>
+      <StackPanel Grid.Row="2">
+        <Button x:Name="InputPreviewCard" Visibility="Collapsed" Click="InputPreview_Click" Margin="22,8,22,0"
+                Padding="12,10" Background="{StaticResource AccentSoft}" BorderThickness="0"
+                HorizontalContentAlignment="Stretch" Focusable="False" AutomationProperties.Name="输入释义预览">
+          <Button.Template><ControlTemplate TargetType="Button"><Border Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}"><ContentPresenter/></Border></ControlTemplate></Button.Template>
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+            <Border Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,10,0" Background="{StaticResource Accent}" CornerRadius="2">
+              <Path Data="{StaticResource QuickReadMark}" Fill="{StaticResource Canvas}" Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+            </Border>
+            <TextBlock x:Name="InputPreviewText" Grid.Column="1" FontSize="18" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="52" VerticalAlignment="Center"/>
+          </Grid>
+        </Button>
+      <ListBox x:Name="Suggestions" Visibility="Collapsed" MaxHeight="180" Margin="12,8" Background="Transparent" BorderThickness="0" Padding="2" FontSize="17" ScrollViewer.HorizontalScrollBarVisibility="Disabled" SelectionChanged="Suggestions_SelectionChanged" PreviewMouseLeftButtonUp="Suggestions_Click" PreviewKeyDown="SearchBox_KeyDown" IsTabStop="False" KeyboardNavigation.TabNavigation="None" AutomationProperties.Name="词条建议" AutomationProperties.HelpText="上下键选择并填入输入框，可继续编辑；Enter 查询，Tab 保留所选词，Esc 恢复原输入。"/>
+      </StackPanel>
       <ScrollViewer x:Name="ResultsScroll" Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,14,16,14">
         <StackPanel>
           <StackPanel x:Name="Welcome">

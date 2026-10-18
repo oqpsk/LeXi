@@ -44,8 +44,14 @@ public struct MainView: View {
             }
         }
         .safeAreaBar(edge: .top) {
-            SearchBar(store: store, text: $text, programmatic: $programmatic, cursor: $cursor, focused: $searchFocused, submit: submit)
-                .padding(.horizontal, 20).padding(.top, 2).padding(.bottom, 10)
+            VStack(spacing: 8) {
+                SearchBar(store: store, text: $text, programmatic: $programmatic, cursor: $cursor, focused: $searchFocused, submit: submit)
+                    .padding(.horizontal, 20).padding(.top, 2)
+                if searchFocused, let preview = store.inputPreview {
+                    Button { submit(preview.query) } label: { InputPreviewCard(preview: preview) }
+                        .buttonStyle(.plain).padding(.horizontal, 24)
+                }
+            }.padding(.bottom, 10)
         }
         .safeAreaBar(edge: .bottom) { bottomBar }
         .glassWindow()
@@ -145,6 +151,7 @@ public struct MainView: View {
         cursor = SuggestionCursor()
         setText(store.suggestions[index])
         store.clearSuggestions()
+        store.previewInput(text)
         searchFocused = true
     }
 

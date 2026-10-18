@@ -1,53 +1,24 @@
-using System.IO;
-using System.Text;
 using System.Windows.Media;
 
 namespace Lexi;
 
-// Prime the same default output with silence, overlapping the start of the real clip. A delay
-// before Play does not wake an idle output; replaying or seeking through muted speech can lose words.
-internal sealed class SpeechOutput(ISpeechTrack? voice = null, ISpeechTrack? primer = null) : IDisposable
+// Padding and speech share this one output stream. Priming a separate MediaPlayer does not
+// protect the next stream's first samples when the output/codec starts cold.
+internal sealed class SpeechOutput(ISpeechTrack? voice = null) : IDisposable
 {
-    internal static readonly TimeSpan LeadIn = TimeSpan.FromMilliseconds(350);
+    internal static readonly TimeSpan LeadIn = TimeSpan.FromMilliseconds(600);
     private readonly ISpeechTrack voice = voice ?? new MediaSpeechTrack();
-    private readonly ISpeechTrack primer = primer ?? new MediaSpeechTrack();
-    public async Task PlayAsync(string path, string silence, Action started, CancellationToken token)
+    public async Task PlayAsync(string paddedPath, Action started, CancellationToken token)
     {
-        await voice.OpenAsync(path, token);
-        await primer.OpenAsync(silence, token);
-        token.ThrowIfCancellationRequested();
-        primer.PlayFromStart();
-        await primer.WaitForProgressAsync(LeadIn, token);
+        await voice.OpenAsync(paddedPath, token);
         token.ThrowIfCancellationRequested();
         voice.PlayFromStart();
+        await voice.WaitForProgressAsync(LeadIn, token);
+        token.ThrowIfCancellationRequested();
         started();
         await voice.WaitForEndAsync(token);
     }
-    public void Dispose() { voice.Dispose(); primer.Dispose(); }
-
-    // A local playback aid, independent of the provider cache. Never edit or re-encode the speech.
-    internal static string PrepareSilence(string root)
-    {
-        var path = Path.Combine(root, "speech-cache", "output-startup-v1.wav");
-        if (File.Exists(path)) return path;
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        try
-        {
-            using (var file = File.Create(temp))
-            using (var writer = new BinaryWriter(file, Encoding.ASCII))
-            {
-                const int rate = 44100, bytes = rate * 2; // One second, mono, 16-bit PCM.
-                writer.Write("RIFF"u8); writer.Write(36 + bytes); writer.Write("WAVEfmt "u8);
-                writer.Write(16); writer.Write((short)1); writer.Write((short)1);
-                writer.Write(rate); writer.Write(bytes); writer.Write((short)2); writer.Write((short)16);
-                writer.Write("data"u8); writer.Write(bytes); writer.Write(new byte[bytes]);
-            }
-            File.Move(temp, path, true);
-        }
-        finally { if (File.Exists(temp)) File.Delete(temp); }
-        return path;
-    }
+    public void Dispose() => voice.Dispose();
 }
 
 internal interface ISpeechTrack : IDisposable

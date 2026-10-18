@@ -141,6 +141,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             case "query.cancel": session.Cancel(); return Position();
             case "query.view": return session.View;
             case "suggest": return new { suggestions = session.Suggest(Text(p, "text")) };
+            case "query.preview": return await session.PreviewAsync(Text(p, "text"), token);
             case "history.list": return History();
             case "history.remove":
             {
