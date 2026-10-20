@@ -41,10 +41,10 @@ internal static partial class Program
         Check(example.ContextMenu?.Items[0] is MenuItem { Header: "朗读" } && Text(sense.ExampleChinese).ContextMenu?.Items[0] is MenuItem { Header: "朗读" },
             "examples and their translations can be read aloud");
         Contents(ai).OfType<System.Windows.Controls.Primitives.ToggleButton>().Single(b => b.Content.ToString() == "例句").IsChecked = true;
-        CheckReadAloudGeometry(ai, new[] { definition, Text(sense.English), example, Text(sense.ExampleChinese) }, Check);
+        CheckReadAloudGeometry(main, ai, new[] { definition, Text(sense.English), example, Text(sense.ExampleChinese) }, Check);
         Console.WriteLine($"{count} read-aloud presentation checks passed without displaying windows");
     }
-    private static void CheckReadAloudGeometry(Panel answers, TextBox[] text, Action<bool, string> check)
+    private static void CheckReadAloudGeometry(MainWindow main, Panel answers, TextBox[] text, Action<bool, string> check)
     {
         var card = answers.Children.OfType<Border>().Single();
         answers.Children.Remove(card);
@@ -116,6 +116,38 @@ internal static partial class Program
                         var speaker=InkCenter(new(button.TranslatePoint(new Point(),root),button.RenderSize),false);
                         check(double.IsFinite(ink) && double.IsFinite(speaker) && Math.Abs(ink-speaker)<=1,
                             $"speaker pixels align with first-line text pixels at {width} DIP / {scale*100}% including serif italics and Chinese");
+                    }
+                    // Compare actual painted pixels, independently of the alignment calculation.
+                    // Only a static playing state is set; no audio, windows or desktop input.
+                    var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+                    void Playing(TextBox? item)
+                    {
+                        typeof(MainWindow).GetField("speakingKey", flags)!.SetValue(main, item == null ? null : Row(item).Tag);
+                        typeof(MainWindow).GetMethod("ShowReadAloud", flags)!.Invoke(main, null);
+                        root.UpdateLayout();
+                    }
+                    foreach (var item in text)
+                    {
+                        var surface = (Border)item.Parent;
+                        var origin = surface.TranslatePoint(new Point(), root);
+                        var textOrigin = item.TranslatePoint(new Point(), root);
+                        var glyphCenter = InkCenter(new(textOrigin, item.RenderSize), true);
+                        Playing(item);
+                        var highlighted = new RenderTargetBitmap(image.PixelWidth, image.PixelHeight,96*scale,96*scale,PixelFormats.Pbgra32);
+                        highlighted.Render(root);
+                        var painted = new byte[pixels.Length]; highlighted.CopyPixels(painted,image.PixelWidth*4,0);
+                        int top = image.PixelHeight, bottom = -1;
+                        for (int y = 0; y < image.PixelHeight; y++)
+                        for (int x = Math.Max(0,(int)Math.Ceiling((origin.X+1)*scale)); x < Math.Min(image.PixelWidth,(int)Math.Floor((origin.X+surface.ActualWidth-1)*scale)); x++)
+                        {
+                            int at = (y*image.PixelWidth+x)*4;
+                            if (Math.Abs(painted[at]-pixels[at]) > 3 || Math.Abs(painted[at+1]-pixels[at+1]) > 3 || Math.Abs(painted[at+2]-pixels[at+2]) > 3)
+                            { top = Math.Min(top,y); bottom = Math.Max(bottom,y); }
+                        }
+                        var backgroundCenter = bottom < 0 ? double.NaN : (top+bottom+1)/(2*scale);
+                        Playing(null);
+                        check(double.IsFinite(glyphCenter) && double.IsFinite(backgroundCenter) && Math.Abs(glyphCenter-backgroundCenter)<=1,
+                            $"reading background pixels center on all visible text lines at {width} DIP / {scale*100}%: glyph={glyphCenter:0.00}, background={backgroundCenter:0.00}");
                     }
                 }
             }

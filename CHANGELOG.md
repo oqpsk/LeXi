@@ -2,6 +2,8 @@
 
 ## Unreleased — major-version preparation
 
+- Windows read-aloud tint now centers on the visible text glyphs rather than the line box, matching Chinese definitions, English definitions, serif italic examples and wrapped paragraphs. Keep text position, highlight height and the speaker hover path unchanged; this is a WPF-only correction.
+
 - macOS light mode no longer turns grey over a dark desktop. Light glass now carries a near-white wash, so it reads as frosted white. The results sit on white groups instead of grey ones, and the TL;DR card is a clearer pale pink. The query capsule has a hairline edge, so it stays visible on near-white glass. Dark mode is unchanged.
 - Windows lookup workflow parity: summoning the window (including taskbar Win+2) consumes a fresh external copy once; optional selection reading uses UI Automation with surrounding text for Core's sentence-specific TL;DR. Native foreground/clipboard notifications carry only handles and sequence numbers. Actual reads run on summon in an isolated, time-limited helper, never synthesize Copy, and are cancelled when typing, clicking or leaving the window. Long text fills the field without submitting. Own copies and stale captures are ignored. Settings → 窗口 controls both options.
 - Windows keyboard results: ↓ / Tab enters senses after suggestions, ↑ ↓ navigates, Space reads/stops a sense, Enter toggles examples, Ctrl+C copies the sense, Esc returns to the query. Ctrl+D reads/stops the headword and Ctrl+Shift+C copies the TL;DR or translation. Core's 本句 marker is rendered; keyboard focus follows a sense when merging moves its wording into alternatives.
