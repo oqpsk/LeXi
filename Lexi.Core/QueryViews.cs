@@ -5,7 +5,9 @@ namespace Lexi.Core;
 public enum QueryViewKind { Home, Dictionary, Translation }
 public enum OriginalsMode { Keep, Collapse, Expand }
 
-public sealed record NavigationView(bool CanBack, bool CanForward, string BackLabel, string ForwardLabel);
+// PageId, BackId and ForwardId name the session's pages (QueryPage.Id); -1 when there is none that way.
+public sealed record NavigationView(bool CanBack, bool CanForward, string BackLabel, string ForwardLabel,
+    long PageId = 0, long BackId = -1, long ForwardId = -1);
 
 public sealed record LocalSourceView(string Name, string Headword, string Chinese, string English, string Original,
     string SourceUrl, string Attribution);

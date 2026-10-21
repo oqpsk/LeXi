@@ -4,12 +4,20 @@ namespace Lexi.Core;
 
 public sealed record LookupModel(string Provider, string Model)
 {
+    // A custom endpoint's model is named by its last segment ("codex/gpt-6.1-sol" is GPT-6.1 Sol), so
+    // progress rows and status lines stay short; pickers show the full id (ModelCatalog.Choice).
     public string Name => Provider switch
     {
-        CompatibleText.Provider => Model,
+        CompatibleText.Provider => Known(Model[(Model.LastIndexOf('/') + 1)..]),
         "claude" => Model switch { "haiku" => "Claude Haiku", "sonnet" => "Claude Sonnet", "opus" => "Claude Opus", "default" => "Claude 默认", _ => "Claude " + Model },
-        "anthropic" => Model switch { "claude-haiku-5-5" => "Claude Haiku 5.5", "claude-sonnet-5-5" => "Claude Sonnet 5.5", "claude-opus-5-5" => "Claude Opus 5.5", _ => Model },
-        _ => Model switch { "gpt-6-luna" => "GPT-6 Luna", "gpt-6.1-sol" => "GPT-6.1 Sol", "" => "Codex 默认", _ => Model }
+        "anthropic" => Known(Model),
+        _ => Model == "" ? "Codex 默认" : Known(Model)
+    };
+    private static string Known(string id) => id switch
+    {
+        "gpt-6-luna" => "GPT-6 Luna", "gpt-6.1-sol" => "GPT-6.1 Sol",
+        "claude-haiku-5-5" => "Claude Haiku 5.5", "claude-sonnet-5-5" => "Claude Sonnet 5.5", "claude-opus-5-5" => "Claude Opus 5.5",
+        _ => id
     };
     public static LookupModel Primary(AppSettings settings) => new(settings.Provider, settings.Model);
     public static LookupModel Secondary(AppSettings settings) => string.IsNullOrWhiteSpace(settings.SecondaryProvider)

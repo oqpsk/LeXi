@@ -44,6 +44,10 @@ public struct NavigationState: Decodable, Equatable, Sendable {
     public let canForward: Bool
     public let backLabel: String
     public let forwardLabel: String
+    // The session's page ids (Core's QueryPage.Id); -1 when there is no page that way. Older hosts omit them.
+    public var pageId: Int64? = nil
+    public var backId: Int64? = nil
+    public var forwardId: Int64? = nil
 }
 
 public struct LocalSource: Decodable, Equatable, Sendable, Identifiable {

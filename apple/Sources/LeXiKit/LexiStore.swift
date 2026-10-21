@@ -115,7 +115,8 @@ public final class LexiStore {
         clearSuggestions()
         await provideTextCredentials()
         _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll, context: context)) as SubmitResult?
-        await refreshHistoryIfHome()
+        // Core has recorded the query by now; the list is current before anyone goes back to it.
+        await refreshHistory()
     }
     public func retryFailed() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.retry") as SubmitResult? }
     public func regenerate() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.regenerate") as SubmitResult? }
@@ -197,7 +198,6 @@ public final class LexiStore {
     public func refreshSpeechModels(key: String) async throws { let _: EmptyResponse = try await requireClient().call("speech.elevenModels", ["key": key]) }
     private struct EmptyResponse: Decodable, Sendable {}
     private func requireClient() throws -> HostClient { guard let client else { throw CocoaError(.fileNoSuchFile) }; return client }
-    private func refreshHistoryIfHome() async { if view.kind == .home { await refreshHistory() } }
     public func remove(_ entry: HistoryEntry) async {
         if let result = try? await client?.call("history.remove", RemoveHistory(query: entry.query, translation: entry.translation)) as HistoryRemoval? {
             history = result.history; historyShown = historyRequest

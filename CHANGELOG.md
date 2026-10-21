@@ -2,6 +2,12 @@
 
 ## Unreleased — major-version preparation
 
+- iOS lookup layout and navigation.
+  - **Query box at the top.** The query box moves to the top, where the typing hand never covers it, with suggestions below it and the typing preview under them. The status line becomes the footer, as on the Mac.
+  - **No history search.** The home page drops the history search field, which people kept taking for the query box.
+  - **Edge swipes.** Swiping in from the left edge goes back and from the right edge goes forward, as in Safari. The page follows the finger over the page beneath, which waits slightly to the left and dimmed, as in any iOS app. Letting go past a third of the width, or with a flick, finishes the move at the finger's speed; otherwise the page springs back. The toolbar's back and forward buttons use the same slide, and the query box shows the new page's word as the slide sets off. The title and status line change as the page lands, and the page left behind no longer flashes for a frame after a slide. Strips along the edges take the swipe, so a row under the finger is not opened. Core now gives each page an id (`navigation.pageId`, `backId`, `forwardId`), so the page beneath is drawn as it was last shown, and history is refreshed after each lookup, so the list beneath is already in its new order.
+  - **Alignment.** The query capsule, suggestions and page content use the system's side margin (16 pt, 20 pt on the larger iPhones), so they line up with the toolbar's glass buttons on every model.
+- Name a custom endpoint's models by their last segment in progress rows and status lines ("codex/gpt-6.1-sol" is GPT-6.1 Sol); pickers keep the full id. On iOS, missing custom-service credentials point to 设置 → 模型服务 → 自定义文本服务.
 - Order macOS settings so that what you connect comes before what you choose. The sidebar runs 通用, OAuth 连接, API 连接, 查询与模型, 发音, 离线词典, 数据与迁移. 发音 runs 发音服务 (with 刷新语音模型 for ElevenLabs), then that service's API key, then 声线, then 试听.
 - Finish the iOS settings, data and speech details.
   - **Settings.** Settings are now a list like the system Settings, with each item on its own page. Connections come first: 模型服务, 查询与模型, then 发音 (service, then its key, then voices, then preview), 离线词典 and 数据与迁移, with 外观 and 关于 below.

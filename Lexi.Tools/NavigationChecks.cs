@@ -26,6 +26,12 @@ internal static class NavigationChecks
         for (int i = 0; i < 150; i++) trail.Visit("entry" + i);
         int steps = 0; while (trail.Move(-1) != null) steps++;
         Check(steps == QueryNavigation.Capacity - 1 && trail.Current.Query == "entry50", "the in-memory navigation trail has a bounded lifetime and capacity");
+        var pages = new QueryNavigation(); pages.Visit("a"); var first = pages.Current.Id; pages.RememberScroll(20); pages.Visit("b"); var second = pages.Current.Id;
+        pages.Move(-1);
+        Check(first > 0 && second > first && pages.Current.Id == first && pages.Forward?.Id == second && pages.Back?.Id == 0,
+            "each page keeps its own id through scrolling and back/forward moves");
+        pages.Visit("c");
+        Check(pages.Current.Id > second && pages.Forward == null, "a new branch gets a new page id");
         var work = Path.Combine(root, Guid.NewGuid().ToString("N")); Directory.CreateDirectory(work);
         File.WriteAllText(Path.Combine(work, "settings.json"), "{\"online\":false}");
         var settings = AppSettings.Load(work);
