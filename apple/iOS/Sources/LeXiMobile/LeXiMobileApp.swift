@@ -14,12 +14,6 @@ struct LeXiMobileApp: App {
                 .environment(speech)
                 .preferredColorScheme(Appearance(rawValue: appearance)?.scheme)
                 .task { await start() }
-                // lexi://lookup?q=word looks a word up, from Shortcuts, other apps or a link.
-                .onOpenURL { url in
-                    guard url.scheme == "lexi", let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                        .queryItems?.first(where: { $0.name == "q" })?.value, !query.isEmpty else { return }
-                    Task { await store.submit(query) }
-                }
         }
     }
 

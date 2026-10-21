@@ -25,6 +25,27 @@ struct RootView: View {
     @State private var shown: (request: Int64, page: Int64) = (-1, -1)
     // The system's side margin, which the toolbar's glass buttons keep: 16 pt, 20 on the larger iPhones.
     @State private var margin: CGFloat = 16
+    // Where the reader left each page, kept outside SwiftUI's state so that scrolling redraws nothing.
+    @State private var scroll = PageScroll()
+    @State private var position = ScrollPosition(edge: .top)
+    // A page reopened by back, forward or a relaunch returns to where it was left once its content is
+    // tall enough to scroll there; the reader scrolling first cancels it.
+    @State private var returning: (page: Int64, y: Double)?
+    // The page open when LeXi last left the screen, and when. iOS may close LeXi while the reader is in
+    // another app; coming back within half an hour reopens the page there, and later LeXi opens ready to
+    // type, as on the desktop.
+    @AppStorage("page.query") private var savedQuery = ""
+    @AppStorage("page.scroll") private var savedScroll: Double = 0
+    @AppStorage("page.left") private var savedAt: Double = 0
+    // Decided once, as LeXi opens.
+    @State private var reopens = !(UserDefaults.standard.string(forKey: "page.query") ?? "").isEmpty &&
+        Date.now.timeIntervalSince1970 - UserDefaults.standard.double(forKey: "page.left") < 30 * 60
+    @State private var launched = false
+    @State private var reopening: Double?
+    // A lookup asked for by a link before the lookup service had started.
+    @State private var linked: String?
+    @State private var lookupTime = LookupTime()
+    @Environment(\.scenePhase) private var scenePhase
     private static let edge: CGFloat = 20
 
     var body: some View {
@@ -32,7 +53,7 @@ struct RootView: View {
             ZStack {
                 if slide > 0, let id = target(back: true) {
                     // The page behind waits a little to the left and dimmed, as under a navigation pop.
-                    snapshot(drawn[id])
+                    snapshot(id)
                         .overlay { Color.black.opacity(0.08 * (1 - slide / max(width, 1))).allowsHitTesting(false) }
                         .offset(x: (slide - width) * 0.3)
                         .allowsHitTesting(false)
@@ -42,7 +63,7 @@ struct RootView: View {
                     .overlay(alignment: .leading) { if slide > 0 { PageEdge() } }
                     .offset(x: slide > 0 ? slide : slide * 0.3)
                 if slide < 0, let id = target(back: false) {
-                    snapshot(drawn[id])
+                    snapshot(id)
                         .overlay(alignment: .leading) { PageEdge() }
                         .offset(x: width + slide)
                         .allowsHitTesting(false)
@@ -66,33 +87,76 @@ struct RootView: View {
         .onChange(of: store.view.revision) { _, _ in pageDrawn() }
         .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
         .onChange(of: searching) { _, active in if !active { store.clearInputPreview() } }
-        // The lookup is ready the moment LeXi opens, as on the desktop. The field may join the
-        // hierarchy a moment after the first appearance, so focus is asked for again on the next turn.
-        .defaultFocus($searching, true)
+        .onChange(of: store.view.progress?.busy == true, initial: true) { _, busy in lookupTime.lookup(busy: busy) }
+        .onChange(of: scenePhase) { _, phase in if phase != .active { savePage() } }
+        .onChange(of: store.phase, initial: true) { _, phase in if phase == .ready { launch() } }
+        // lexi://lookup?q=word looks a word up, from Shortcuts, other apps or a link.
+        .onOpenURL { url in
+            guard url.scheme == "lexi", let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "q" })?.value, !query.isEmpty else { return }
+            if store.phase == .ready { setText(query); submit(query) } else { linked = query }
+        }
+        // The lookup is ready the moment LeXi opens, as on the desktop, unless a page is reopened. The
+        // field may join the hierarchy a moment after the first appearance, so focus is asked for again
+        // on the next turn.
+        .defaultFocus($searching, !reopens)
         .task {
             await Task.yield()
             // For UI checks and screenshots: `-LexiSettings YES` opens settings at launch.
-            if UserDefaults.standard.bool(forKey: "LexiSettings") { showSettings = true } else { searching = true }
+            if UserDefaults.standard.bool(forKey: "LexiSettings") { showSettings = true } else if !reopens { searching = true }
         }
+    }
+
+    // Once the lookup service has started: a lookup a link asked for, or else the page LeXi was closed
+    // on a little earlier, at the place it was read to.
+    private func launch() {
+        guard !launched else { return }
+        launched = true
+        if let linked { self.linked = nil; setText(linked); submit(linked); return }
+        // For UI checks and screenshots: `-LexiLookup <text>` looks something up instead (LeXiMobileApp).
+        guard UserDefaults.standard.string(forKey: "LexiLookup")?.isEmpty != false, reopens, store.view.kind == .home else { return }
+        reopening = savedScroll
+        searching = false
+        let query = savedQuery
+        Task { await store.submit(query, restore: true) }
+    }
+
+    private func savePage() {
+        savedQuery = page.kind == .home ? "" : page.input
+        savedScroll = page.kind == .home ? 0 : scroll.offset
+        savedAt = Date.now.timeIntervalSince1970
     }
 
     // The live page, or, right after a slide, the page it moved to as drawn until Core shows it.
     @ViewBuilder private var currentPage: some View {
-        if let arriving, let page = drawn[arriving] {
-            snapshot(page)
+        if let arriving, drawn[arriving] != nil {
+            snapshot(arriving)
         } else {
             ScrollView {
                 content
                     .padding(.horizontal, margin).padding(.top, 4).padding(.bottom, 24)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .scrollPosition($position)
+            .onScrollGeometryChange(for: ScrollPlace.self) { ScrollPlace($0) } action: { _, place in scrolled(place) }
+            .onScrollPhaseChange { _, phase in if phase == .interacting { returning = nil } }
             .scrollDismissesKeyboard(.interactively)
             .background(Color(uiColor: .systemGroupedBackground))
         }
     }
 
-    private func snapshot(_ page: QueryView?) -> some View {
-        PageSnapshot(store: store, speech: speech, page: page, margin: margin).equatable()
+    private func snapshot(_ id: Int64) -> some View {
+        PageSnapshot(store: store, speech: speech, page: drawn[id], offset: scroll.offsets[id] ?? 0, margin: margin).equatable()
+    }
+
+    private func scrolled(_ place: ScrollPlace) {
+        scroll.offset = place.offset
+        scroll.offsets[shown.page] = place.offset
+        guard let target = returning, target.page == shown.page else { return }
+        if abs(place.offset - target.y) < 1 { returning = nil }
+        else if place.room >= target.y { position.scrollTo(y: target.y) }
+        // The page came out shorter than when it was left: go as far as it reaches.
+        else if store.view.progress?.busy != true { position.scrollTo(y: place.room); returning = nil }
     }
 
     // The page a slide would go to, when it has been drawn (a host without page ids slides nothing).
@@ -108,10 +172,11 @@ struct RootView: View {
     private func pageDrawn() {
         let view = store.view
         guard let id = view.navigation.pageId, view.request != shown.request || id == shown.page else { return }
+        if view.request != shown.request, let y = reopening, view.kind != .home { reopening = nil; returning = (id, y) }
         shown = (view.request, id)
         drawn[id] = view
         // Core keeps 100 pages; the oldest snapshots go first.
-        while drawn.count > 100, let oldest = drawn.keys.min() { drawn[oldest] = nil }
+        while drawn.count > 100, let oldest = drawn.keys.min() { drawn[oldest] = nil; scroll.offsets[oldest] = nil }
         if arriving == id { arriving = nil }
     }
 
@@ -225,6 +290,8 @@ struct RootView: View {
         setText(page.kind == .home ? "" : page.input)
         withAnimation(Self.carry(velocity, from: slide, to: end)) { slide = end } completion: {
             arriving = destination
+            // The live page comes back where the snapshot shows it.
+            position = ScrollPosition(y: scroll.offsets[destination] ?? 0)
             var instant = Transaction(); instant.disablesAnimations = true
             withTransaction(instant) { slide = 0 }
             navigate(back ? -1 : 1)
@@ -293,7 +360,7 @@ struct RootView: View {
         }
         if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             store.clearSuggestions(); store.clearInputPreview()
-            if store.view.kind != .home { Task { await store.home() } }
+            if store.view.kind != .home { Task { await store.home(scroll: scroll.offset) } }
             return
         }
         Task { await store.suggest(value) }
@@ -305,32 +372,41 @@ struct RootView: View {
         speech.stop()
         store.clearSuggestions(); store.clearInputPreview()
         searching = false
-        Task { await store.submit(value) }
+        let from = scroll.offset
+        Task { await store.submit(value, scroll: from) }
     }
 
     private func clear() {
         setText("")
         store.clearSuggestions(); store.clearInputPreview()
-        Task { await store.home() }
+        let from = scroll.offset
+        Task { await store.home(scroll: from) }
         searching = true
     }
 
     private func regenerate() { guard canRegenerate else { return }; speech.stop(); Task { await store.regenerate() } }
 
-    private func goHome() { speech.stop(); setText(""); Task { await store.home() } }
+    private func goHome() { speech.stop(); setText(""); let from = scroll.offset; Task { await store.home(scroll: from) } }
 
     private func navigate(_ direction: Int) {
+        let navigation = store.view.navigation
+        if let id = direction < 0 ? navigation.backId : navigation.forwardId, let y = scroll.offsets[id], y > 0 { returning = (id, y) }
+        let from = scroll.offset
         Task {
             // Without an answer no view will replace the page a slide arrived at.
-            guard let page = await store.navigate(direction) else { arriving = nil; return }
+            guard let page = await store.navigate(direction, scroll: from) else { arriving = nil; returning = nil; return }
             if page.query.isEmpty { setText("") }
         }
     }
 
-    // A new page (from a link, history or back/forward) puts the keyboard away so the result shows.
+    // A new page (from a link, history or back/forward) puts the keyboard away so the result shows,
+    // and starts at the top unless it is one being returned to.
     private func pageChanged() {
         speech.stop()
         if store.view.kind != .home { setText(store.view.input); searching = false }
+        if launched { savedQuery = store.view.kind == .home ? "" : store.view.input }
+        guard let id = store.view.navigation.pageId else { return }
+        if returning?.page != id && reopening == nil { returning = nil; position.scrollTo(edge: .top) }
     }
 }
 
@@ -437,10 +513,18 @@ private struct PageSnapshot: View, Equatable {
     let store: LexiStore
     let speech: SpeechController
     let page: QueryView?
+    // Where the reader left the page.
+    let offset: Double
     let margin: CGFloat
+    @State private var position: ScrollPosition
+
+    init(store: LexiStore, speech: SpeechController, page: QueryView?, offset: Double, margin: CGFloat) {
+        self.store = store; self.speech = speech; self.page = page; self.offset = offset; self.margin = margin
+        _position = State(initialValue: ScrollPosition(y: offset))
+    }
 
     nonisolated static func == (a: Self, b: Self) -> Bool {
-        a.page?.navigation.pageId == b.page?.navigation.pageId && a.page?.revision == b.page?.revision && a.margin == b.margin
+        a.page?.navigation.pageId == b.page?.navigation.pageId && a.page?.revision == b.page?.revision && a.offset == b.offset && a.margin == b.margin
     }
 
     var body: some View {
@@ -452,8 +536,40 @@ private struct PageSnapshot: View, Equatable {
             .padding(.horizontal, margin).padding(.top, 4).padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .scrollPosition($position)
+        .onChange(of: offset) { _, y in position.scrollTo(y: y) }
         .scrollDisabled(true)
         .background(Color(uiColor: .systemGroupedBackground))
+    }
+}
+
+// How far a page is scrolled from its top, and how far it can be.
+private struct ScrollPlace: Equatable {
+    let offset: Double, room: Double
+    init(_ geometry: ScrollGeometry) {
+        offset = max(0, geometry.contentOffset.y + geometry.contentInsets.top)
+        room = max(0, geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom - geometry.containerSize.height)
+    }
+}
+
+private final class PageScroll {
+    var offset: Double = 0
+    var offsets: [Int64: Double] = [:]
+}
+
+// Asks iOS for time to finish a lookup the reader leaves running: an app is suspended a few seconds
+// after it leaves the screen, and a model can take twenty to answer. iOS grants about thirty.
+@MainActor private final class LookupTime {
+    private var task: UIBackgroundTaskIdentifier = .invalid
+    func lookup(busy: Bool) {
+        if busy, task == .invalid {
+            task = UIApplication.shared.beginBackgroundTask(withName: "LeXi lookup") { [weak self] in self?.end() }
+        } else if !busy { end() }
+    }
+    private func end() {
+        guard task != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(task)
+        task = .invalid
     }
 }
 

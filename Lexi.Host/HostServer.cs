@@ -122,7 +122,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             case "query.submit":
             {
                 using var stop = token.Register(session.Cancel);
-                await session.SubmitAsync(Text(p, "text"), Flag(p, "force"), false, Number(p, "scroll"), Text(p, "context", ""));
+                await session.SubmitAsync(Text(p, "text"), Flag(p, "force"), false, Number(p, "scroll"), Text(p, "context", ""), recordHistory: !Flag(p, "restore"));
                 return Position();
             }
             case "query.retry":

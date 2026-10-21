@@ -34,7 +34,7 @@ struct SettingsView: View {
                     .labelsHidden()
                 }
                 Section {
-                    LabeledContent("版本", value: store.version.isEmpty ? "—" : store.version)
+                    LabeledContent("版本", value: version)
                     SourceLink("词库与许可", url: "https://github.com/oqpsk/LeXi/blob/main/THIRD_PARTY_NOTICES.md")
                 } footer: {
                     Text("LeXi 不需要注册，不收集使用数据。只有查 Wiktionary、调用你选的模型和合成在线语音时才会联网。")
@@ -91,6 +91,12 @@ struct SettingsView: View {
     private var dictionarySummary: String {
         let count = store.dictionaries?.dictionaries.count ?? 0
         return count == 0 ? "未安装" : "\(count) 部"
+    }
+    // Core's version, with this build's number, so two builds of one version can be told apart.
+    private var version: String {
+        guard !store.version.isEmpty else { return "—" }
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        return build.isEmpty || build == store.version ? store.version : "\(store.version) (\(build))"
     }
 }
 

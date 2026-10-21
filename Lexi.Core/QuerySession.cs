@@ -249,7 +249,9 @@ public sealed partial class QuerySession : IDisposable
     }
 
     // context: the sentence the query was selected in (LookupContext), when the front end has one.
-    public async Task SubmitAsync(string raw, bool force = false, bool navigating = false, double scroll = 0, string? context = null)
+    // recordHistory: false reopens a page the reader already had open (iOS after the system closed the app):
+    // it becomes the current page with home behind it, and history keeps its order.
+    public async Task SubmitAsync(string raw, bool force = false, bool navigating = false, double scroll = 0, string? context = null, bool recordHistory = true)
     {
         lock (gate) { if (maintaining) return; pageContext = navigating || string.IsNullOrWhiteSpace(context) ? "" : context.Trim(); }
         var validation = Queries.Validate(raw);
@@ -261,11 +263,12 @@ public sealed partial class QuerySession : IDisposable
         var savedTranslation = Saved.TranslationResult(raw.Trim(), Translation.Target(raw.Trim()));
         var translating = navigating ? Navigation.Current.Translation : savedTranslation != null || savedDictionary == null && Queries.IsText(raw, knownTerm);
         Task historyWrite = Task.CompletedTask;
+        var recording = !navigating && recordHistory;
         if (!navigating)
         {
-            lock (gate) { Navigation.RememberScroll(scroll); Navigation.Visit(raw.Trim(), translating); historyPending++; }
+            lock (gate) { Navigation.RememberScroll(scroll); Navigation.Visit(raw.Trim(), translating); if (recording) historyPending++; }
             var submittedAt = clock.GetUtcNow();
-            historyWrite = Task.Run(() => { lock (historyGate) History.Record(raw, translating, submittedAt); });
+            if (recording) historyWrite = Task.Run(() => { lock (historyGate) History.Record(raw, translating, submittedAt); });
         }
         var sentence = navigating || string.IsNullOrWhiteSpace(context) ? null : context.Trim();
         try
@@ -273,7 +276,7 @@ public sealed partial class QuerySession : IDisposable
             if (translating) await TranslateAsync(raw.Trim(), force, timing);
             else await LookupAsync(raw, force, timing, sentence);
         }
-        finally { try { await historyWrite; } finally { if (!navigating) lock (gate) historyPending--; } }
+        finally { try { await historyWrite; } finally { if (recording) lock (gate) historyPending--; } }
         if (timing.Total != null)
         {
             var models = timing.Path is "models" or "translation" ? (translating ? [LookupModel.Primary(Settings)] : LookupModel.Selected(Settings))
