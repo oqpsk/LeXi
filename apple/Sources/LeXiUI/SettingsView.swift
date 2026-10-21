@@ -448,17 +448,12 @@ struct SpeechSettings: View {
     var body: some View {
         Form {
             if let settings = store.settings?.settings, let model = selected(settings) {
+                // The service, then its key, then the voices it offers.
                 Section {
                     Picker("模型", selection: Binding(get: { model.key }, set: { key in
                         if let next = models.first(where: { $0.key == key }) { choose(next, settings) }
                     })) {
                         ForEach(models, id: \.key) { Text($0.name).tag($0.key) }
-                    }
-                    let voices = voices(model, settings)
-                    Picker("声线", selection: Binding(get: { settings.speechVoice }, set: { id in
-                        if let voice = voices.first(where: { $0.id == id }) { manualVoice = ""; apply(model, voice) }
-                    })) {
-                        ForEach(voices) { Text($0.name).tag($0.id) }
                     }
                     if model.provider == "elevenlabs" {
                         Button("刷新语音模型") {
@@ -468,15 +463,25 @@ struct SpeechSettings: View {
                                 catch { message = error.localizedDescription }
                             }
                         }.disabled(loadingModels)
-                        elevenControls(model)
                     }
-                    if !message.isEmpty { Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
                 } header: {
-                    Text("声音")
+                    Text("发音服务")
                 } footer: {
                     Note(info(model))
                 }
                 if !model.local { keySection(model.provider) }
+                Section {
+                    let voices = voices(model, settings)
+                    Picker("声线", selection: Binding(get: { settings.speechVoice }, set: { id in
+                        if let voice = voices.first(where: { $0.id == id }) { manualVoice = ""; apply(model, voice) }
+                    })) {
+                        ForEach(voices) { Text($0.name).tag($0.id) }
+                    }
+                    if model.provider == "elevenlabs" { elevenControls(model) }
+                    if !message.isEmpty { Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
+                } header: {
+                    Text("声线")
+                }
                 Section {
                     HStack {
                         TextField("试听文字", text: $sample).labelsHidden()

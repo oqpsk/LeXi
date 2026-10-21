@@ -2,6 +2,7 @@
 
 ## Unreleased — major-version preparation
 
+- Order macOS settings so that what you connect comes before what you choose. The sidebar runs 通用, OAuth 连接, API 连接, 查询与模型, 发音, 离线词典, 数据与迁移. 发音 runs 发音服务 (with 刷新语音模型 for ElevenLabs), then that service's API key, then 声线, then 试听.
 - Finish the iOS settings, data and speech details.
   - **Settings.** Settings are now a list like the system Settings, with each item on its own page. Connections come first: 模型服务, 查询与模型, then 发音 (service, then its key, then voices, then preview), 离线词典 and 数据与迁移, with 外观 and 关于 below.
   - **数据与迁移.** Exports a backup that the Files app saves wherever you choose. Imports one picked from Files after showing what will be merged. Shows and clears the caches, as on the Mac. Backups move between the Mac and iOS.
