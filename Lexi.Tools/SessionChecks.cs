@@ -12,6 +12,7 @@ internal static class SessionChecks
         CandidateChecks.Run();
         await ContextChecks.Run(fixture, root);
         await FirstResultChecks.Run(fixture, root);
+        await DictionaryPackChecks.Run(fixture, root);
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
         var work = Path.Combine(Path.GetFullPath(root), Guid.NewGuid().ToString("N"));

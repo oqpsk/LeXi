@@ -2,6 +2,9 @@
 
 ## Unreleased — major-version preparation
 
+- iOS sets itself up without a Mac.
+  - **Download the offline dictionary.** 设置 → 离线词典 and the welcome sheet download ECDICT (34 MB, 171 MB installed) from this repository's release `dictionary-ecdict-bc015ed`, with progress and cancel. Core installs it only if the size and SHA-256 match the pack it pins, unpacks it beside the dictionaries, checks that it opens, then swaps it in and reloads without a restart. Installed dictionaries can be deleted. Host methods `dictionaries.install` and `dictionaries.remove`; `dictionaries.list` lists the packs. `Lexi.Tools pack-data` rebuilds the pack byte for byte.
+  - **Welcome sheet.** A device without an offline dictionary or a model service opens LeXi with a welcome sheet: download the dictionary, connect a model service, or start without them. Closing it with no model service turns off 自动补充双语释义, so lookups show the dictionaries and Wiktionary instead of two missing-key warnings; 设置 → 模型服务 offers to turn it back on once a service is set up.
 - iOS keeps your place.
   - **Lookups finish in the background.** A lookup still running when you switch apps asks iOS for time to finish (about 30 seconds), instead of stopping when LeXi is suspended a few seconds later.
   - **Back and forward return to where you were.** Each page remembers how far it was scrolled; the page beneath a slide is drawn there too, and a new page starts at the top.

@@ -328,7 +328,17 @@ public struct InstalledDictionary: Decodable, Equatable, Sendable, Identifiable 
     public let version: String
     public let attribution: String
 }
-public struct DictionaryList: Decodable, Sendable { public let dictionaries: [InstalledDictionary]; public let folder: String }
+public struct DictionaryList: Decodable, Sendable {
+    public let dictionaries: [InstalledDictionary]
+    public let folder: String
+    // Dictionaries the app can download in one piece (iOS); older hosts send none.
+    public let packs: [DictionaryPack]?
+}
+public struct DictionaryPack: Decodable, Equatable, Sendable, Identifiable {
+    public let id, name, languages, url, license: String
+    public let bytes, installedBytes: Int64
+    public let installed: Bool
+}
 
 public struct LoginStatus: Decodable, Equatable, Sendable { public let installed: Bool; public let signedIn: Bool; public let message: String }
 public struct LoginCommand: Decodable, Equatable, Sendable {
