@@ -750,7 +750,8 @@ public sealed partial class QuerySession : IDisposable
 
     private QueryView Build() => new(request, ++revision, kind, current, input, speechText, Presentation.Heading,
         Presentation.Pronunciation, progress.Current, progress.Generation, status, kind != QueryViewKind.Home && Settings.Online,
-        new(Navigation.CanBack, Navigation.CanForward, QueryNavigation.Label(Navigation.Back), QueryNavigation.Label(Navigation.Forward)),
+        new(Navigation.CanBack, Navigation.CanForward, QueryNavigation.Label(Navigation.Back), QueryNavigation.Label(Navigation.Forward),
+            Navigation.Current.Id, Navigation.Back?.Id ?? -1, Navigation.Forward?.Id ?? -1),
         Presentation.Local, Presentation.LocalHint, Presentation.Online, Presentation.OnlineHint, Presentation.Answers,
         Presentation.QuickRead, Presentation.FormRows, Presentation.Etymology, Presentation.Translation, CanRetry);
 

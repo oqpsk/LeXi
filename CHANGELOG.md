@@ -5,7 +5,8 @@
 - iOS lookup layout and navigation.
   - **Query box at the top.** The query box moves to the top, where the typing hand never covers it, with suggestions below it and the typing preview under them. The status line becomes the footer, as on the Mac.
   - **No history search.** The home page drops the history search field, which people kept taking for the query box.
-  - **Edge swipes.** Swiping in from the left edge goes back and from the right edge goes forward, as in Safari. A glass chevron follows the finger and a light tap confirms the turn; strips along the edges take the swipe, so a row under the finger is not opened.
+  - **Edge swipes.** Swiping in from the left edge goes back and from the right edge goes forward, as in Safari. The page follows the finger over the page beneath, which waits slightly to the left and dimmed, as in any iOS app. Letting go past a third of the width, or with a flick, finishes the move; otherwise the page springs back. The toolbar's back and forward buttons use the same slide. Strips along the edges take the swipe, so a row under the finger is not opened. Core now gives each page an id (`navigation.pageId`, `backId`, `forwardId`), so the page beneath is drawn as it was last shown.
+  - **Alignment.** The query capsule, suggestions and page content use the system margins, so they line up with the toolbar's glass buttons.
 - Name a custom endpoint's models by their last segment in progress rows and status lines ("codex/gpt-6.1-sol" is GPT-6.1 Sol); pickers keep the full id. On iOS, missing custom-service credentials point to 设置 → 模型服务 → 自定义文本服务.
 - Order macOS settings so that what you connect comes before what you choose. The sidebar runs 通用, OAuth 连接, API 连接, 查询与模型, 发音, 离线词典, 数据与迁移. 发音 runs 发音服务 (with 刷新语音模型 for ElevenLabs), then that service's API key, then 声线, then 试听.
 - Finish the iOS settings, data and speech details.

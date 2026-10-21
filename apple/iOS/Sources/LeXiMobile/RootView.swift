@@ -4,7 +4,8 @@ import SwiftUI
 
 // The one screen. The Liquid Glass query capsule sits at the top, where the hand typing below never
 // covers it, with suggestions under it; history fills the page before a query. The status line is
-// the footer, as on the Mac. Swiping in from an edge goes back or forward, as in Safari.
+// the footer, as on the Mac. Back and forward slide the page the iOS way: it follows the finger in
+// from the edge over the page beneath, which Safari mirrors for forward; the bars stay put.
 struct RootView: View {
     @Bindable var store: LexiStore
     var speech: SpeechController
@@ -13,23 +14,38 @@ struct RootView: View {
     @State private var programmatic = false
     @State private var showSettings = false
     @FocusState private var searching: Bool
-    // An edge swipe in progress: positive from the left edge (back), negative from the right (forward).
-    @State private var swipe: CGFloat = 0
-    private static let edge: CGFloat = 20, threshold: CGFloat = 90
+    // Each page as last drawn, by Core's page id, so a slide shows the page beneath or ahead as it was.
+    @State private var drawn: [Int64: QueryView] = [:]
+    // How far the current page has slid: positive towards the page behind, negative towards the one ahead.
+    @State private var slide: CGFloat = 0
+    @State private var width: CGFloat = 400
+    // The page a finished slide moved to, drawn from memory until Core's view for it arrives.
+    @State private var arriving: Int64?
+    private static let edge: CGFloat = 20
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                content
-                    .padding(.horizontal, 18).padding(.top, 4).padding(.bottom, 24)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            ZStack {
+                if slide > 0, let id = target(back: true) {
+                    // The page behind waits a little to the left and dimmed, as under a navigation pop.
+                    pageView(drawn[id]).offset(x: (slide - width) * 0.3)
+                        .overlay { Color.black.opacity(0.08 * (1 - slide / max(width, 1))).allowsHitTesting(false) }
+                        .allowsHitTesting(false)
+                }
+                currentPage
+                    .overlay { Color.black.opacity(slide < 0 ? 0.08 * -slide / max(width, 1) : 0).allowsHitTesting(false) }
+                    .offset(x: slide > 0 ? slide : slide * 0.3)
+                    .shadow(color: .black.opacity(slide > 0 ? 0.18 : 0), radius: 12)
+                if slide < 0, let id = target(back: false) {
+                    pageView(drawn[id]).offset(x: width + slide)
+                        .shadow(color: .black.opacity(0.18), radius: 12)
+                        .allowsHitTesting(false)
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             // A strip along each edge takes the swipe, so a row under the finger is not tapped as well.
-            .overlay(alignment: .leading) { ZStack(alignment: .leading) { edgeStrip(forward: false); swipeMark(forward: false) } }
-            .overlay(alignment: .trailing) { ZStack(alignment: .trailing) { edgeStrip(forward: true); swipeMark(forward: true) } }
-            .sensoryFeedback(.selection, trigger: abs(swipe) > Self.threshold) { _, armed in armed }
+            .overlay(alignment: .leading) { edgeStrip(forward: false) }
+            .overlay(alignment: .trailing) { edgeStrip(forward: true) }
             // In the safe area, so the list hangs just below the query capsule.
             .overlay(alignment: .top) { suggestions }
             .safeAreaBar(edge: .top) { searchBar }
@@ -40,6 +56,11 @@ struct RootView: View {
             .sheet(isPresented: $showSettings) { SettingsView(store: store, speech: speech) }
         }
         .onChange(of: store.view.request) { _, _ in pageChanged() }
+        .onChange(of: store.view.revision) { _, _ in
+            guard let id = store.view.navigation.pageId else { return }
+            drawn[id] = store.view
+            if arriving == id { arriving = nil }
+        }
         .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
         .onChange(of: searching) { _, active in if !active { store.clearInputPreview() } }
         // The lookup is ready the moment LeXi opens, as on the desktop. The field may join the
@@ -50,6 +71,41 @@ struct RootView: View {
             // For UI checks and screenshots: `-LexiSettings YES` opens settings at launch.
             if UserDefaults.standard.bool(forKey: "LexiSettings") { showSettings = true } else { searching = true }
         }
+    }
+
+    // The live page, or, right after a slide, the page it moved to as drawn until Core shows it.
+    @ViewBuilder private var currentPage: some View {
+        if let arriving, let page = drawn[arriving], store.view.navigation.pageId != arriving {
+            pageView(page)
+        } else {
+            ScrollView {
+                content
+                    .padding(.horizontal).padding(.top, 4).padding(.bottom, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color(uiColor: .systemGroupedBackground))
+        }
+    }
+
+    private func pageView(_ page: QueryView?) -> some View {
+        ScrollView {
+            Group {
+                if let page, page.kind != .home { EntryView(store: store, speech: speech, shown: page) }
+                else { HistoryView(store: store) { _ in } }
+            }
+            .padding(.horizontal).padding(.top, 4).padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollDisabled(true)
+        .background(Color(uiColor: .systemGroupedBackground))
+    }
+
+    // The page a slide would go to, when it has been drawn (a host without page ids slides nothing).
+    private func target(back: Bool) -> Int64? {
+        let navigation = store.view.navigation
+        guard let id = back ? navigation.backId : navigation.forwardId, id >= 0, back ? navigation.canBack : navigation.canForward else { return nil }
+        return id
     }
 
     @ViewBuilder private var content: some View {
@@ -79,7 +135,7 @@ struct RootView: View {
                 Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 22).padding(.vertical, 6)
+            .padding(.horizontal, 20).padding(.vertical, 6)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("查询状态：" + status)
         }
@@ -107,7 +163,7 @@ struct RootView: View {
             .padding(.horizontal, 18).padding(.vertical, 13)
             .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 26, style: .continuous))
         }
-        .padding(.horizontal, 14).padding(.top, 2).padding(.bottom, 6)
+        .padding(.horizontal).padding(.top, 2).padding(.bottom, 6)
     }
 
     // The preview of what is being typed sits below the suggestions, so the list a finger is
@@ -121,12 +177,13 @@ struct RootView: View {
                         .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 14).padding(.top, 6)
+            .padding(.horizontal).padding(.top, 6)
         }
     }
 
-    // Back from the left edge and forward from the right, once the drag is mostly sideways and
-    // only when there is a page that way. Past the threshold a light tap confirms it.
+    // Back from the left edge and forward from the right, once the drag is mostly sideways and only
+    // when there is a page that way. The page follows the finger; letting go past a third of the
+    // width, or with a flick, finishes the move, otherwise it springs back.
     @ViewBuilder private func edgeStrip(forward: Bool) -> some View {
         let navigation = store.view.navigation
         if forward ? navigation.canForward : navigation.canBack {
@@ -135,32 +192,25 @@ struct RootView: View {
                     .onChanged { value in
                         let dx = value.translation.width
                         guard abs(dx) > abs(value.translation.height) * 1.5 else { return }
-                        swipe = forward ? min(dx, 0) : max(dx, 0)
+                        slide = forward ? max(min(dx, 0), -width) : min(max(dx, 0), width)
                     }
-                    .onEnded { _ in
-                        let travelled = swipe
-                        withAnimation(.snappy(duration: 0.25)) { swipe = 0 }
-                        if travelled > Self.threshold { navigate(-1) } else if travelled < -Self.threshold { navigate(1) }
+                    .onEnded { value in
+                        let done = abs(slide) > width / 3 || abs(value.predictedEndTranslation.width) > width / 2
+                        if done && slide != 0 { finish(back: slide > 0) } else { withAnimation(.snappy(duration: 0.3)) { slide = 0 } }
                     })
                 .accessibilityHidden(true)
         }
     }
 
-    // A glass chevron that follows the finger in from the edge and fills once releasing would turn the page.
-    @ViewBuilder private func swipeMark(forward: Bool) -> some View {
-        let distance = forward ? -swipe : swipe
-        if distance > 0 {
-            let progress = min(distance / Self.threshold, 1)
-            Image(systemName: forward ? "chevron.forward" : "chevron.backward")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(progress >= 1 ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                .frame(width: 44, height: 44)
-                .glassEffect(.regular, in: .circle)
-                .scaleEffect(0.7 + 0.3 * progress)
-                .opacity(Double(progress))
-                .offset(x: (forward ? -1 : 1) * (min(distance, Self.threshold + 24) * 0.6 - 28))
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+    // Completes a move with the slide: the page leaves (or arrives) and the one revealed is drawn
+    // in place until Core's view for it arrives, so nothing jumps.
+    private func finish(back: Bool) {
+        guard let destination = target(back: back), drawn[destination] != nil else { navigate(back ? -1 : 1); slide = 0; return }
+        withAnimation(.smooth(duration: 0.32)) { slide = back ? width : -width } completion: {
+            arriving = destination
+            var instant = Transaction(); instant.disablesAnimations = true
+            withTransaction(instant) { slide = 0 }
+            navigate(back ? -1 : 1)
         }
     }
 
@@ -185,9 +235,9 @@ struct RootView: View {
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         let navigation = store.view.navigation
         ToolbarItemGroup(placement: .topBarLeading) {
-            Button { navigate(-1) } label: { Image(systemName: "chevron.backward") }
+            Button { finish(back: true) } label: { Image(systemName: "chevron.backward") }
                 .disabled(!navigation.canBack).accessibilityLabel("后退")
-            Button { navigate(1) } label: { Image(systemName: "chevron.forward") }
+            Button { finish(back: false) } label: { Image(systemName: "chevron.forward") }
                 .disabled(!navigation.canForward).accessibilityLabel("前进")
         }
         ToolbarItemGroup(placement: .topBarTrailing) {

@@ -6,9 +6,11 @@ import SwiftUI
 struct EntryView: View {
     @Bindable var store: LexiStore
     var speech: SpeechController
+    // A page as it was last drawn, shown beneath or ahead while a swipe slides the current one.
+    var shown: QueryView? = nil
 
     var body: some View {
-        let view = store.view
+        let view = shown ?? store.view
         VStack(alignment: .leading, spacing: 16) {
             HeadingRow(view: view, store: store, speech: speech)
             // As on the Mac: the TL;DR first, then one row of each model's state, then word forms.
