@@ -79,6 +79,11 @@ public sealed class CodexDictionary(string assetFolder, string userRoot)
         var result = await RunAsync(request.Prompt, "sense-merge.schema.json", settings, token, "sense-merge.instructions.txt", 25);
         return SenseMerging.Parse(result, request);
     }
+    public async Task<ContextPick> ContextAsync(ContextRequest request, AppSettings settings, CancellationToken token)
+    {
+        var result = await RunAsync(request.Prompt, "context.schema.json", settings, token, "context.instructions.txt", 25);
+        return LookupContext.Parse(result, request);
+    }
     private async Task<string> RunAsync(string prompt, string schemaFile, AppSettings settings, CancellationToken token,
         string instructionsFile = "dictionary.instructions.txt", int timeoutSeconds = 70)
     {

@@ -50,6 +50,9 @@ public sealed class ApiDictionary(string assetFolder, HttpMessageHandler? handle
     public async Task<SenseMergePlan> JudgeSensesAsync(LookupModel model, SenseMergeRequest request, string key, CancellationToken token) =>
         SenseMerging.Parse(await CallAsync(model, "sense-merge.instructions.txt", "sense-merge.schema.json", request.Prompt, key, 25, 4096, token), request);
 
+    public async Task<ContextPick> ContextAsync(LookupModel model, ContextRequest request, string key, CancellationToken token) =>
+        LookupContext.Parse(await CallAsync(model, "context.instructions.txt", "context.schema.json", request.Prompt, key, 25, 1024, token), request);
+
     // One more attempt when the reply fails structural validation, as the Claude Code path does.
     private static async Task<T> Retry<T>(Func<int, Task<T>> run)
     {

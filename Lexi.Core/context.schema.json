@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "inputHash": {
+      "type": "string"
+    },
+    "senseId": {
+      "type": "string",
+      "description": "The id of the supplied sense the query has in this sentence, or an empty string when none fits."
+    },
+    "gloss": {
+      "type": "string",
+      "maxLength": 40,
+      "description": "The query's meaning in this sentence, in concise simplified Chinese; empty when unsure."
+    }
+  },
+  "required": [
+    "inputHash",
+    "senseId",
+    "gloss"
+  ]
+}

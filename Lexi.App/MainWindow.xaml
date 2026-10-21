@@ -31,7 +31,6 @@
             <TextBlock x:Name="Placeholder" Text="查一个词，或翻译一段文字…" IsHitTestVisible="False" VerticalAlignment="Center" Foreground="{StaticResource Muted}" FontSize="20"/>
           </Grid>
           <StackPanel x:Name="SearchActions" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-            <local:QueryProgressView x:Name="QueryProgress" Margin="0,0,4,0"/>
             <Button Style="{StaticResource IconButton}" Click="Search_Click" ToolTip="查询 · Enter" AutomationProperties.Name="查询"><Path Data="{StaticResource EnterIcon}" Style="{StaticResource IconPath}"/></Button>
           </StackPanel>
         </Grid>
@@ -64,8 +63,7 @@
           </StackPanel>
           <StackPanel x:Name="EntryPanel" Visibility="Collapsed">
             <TextBlock x:Name="EntryHeading" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"><Run x:Name="Headword" FontSize="30" FontWeight="SemiBold"/><Run Text="&#160;&#160;"/><Run x:Name="Phonetic" Foreground="{StaticResource Muted}"/><Run x:Name="PhoneticLabel" FontSize="12" Foreground="{StaticResource Muted}"/><InlineUIContainer BaselineAlignment="TextBottom"><Button x:Name="SpeechButton" Click="Speech_Click" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="播放合成发音" AutomationProperties.Name="播放或停止合成发音"><Path Data="{StaticResource SpeakerIcon}" Style="{StaticResource IconPath}"/></Button></InlineUIContainer><InlineUIContainer BaselineAlignment="TextBottom"><ToggleButton x:Name="EtymologyButton" Style="{StaticResource LexicalIconToggle}" Margin="4,0,0,0" Visibility="Collapsed" ToolTip="语源 · 词的来历" AutomationProperties.Name="展开或收起语源"><Path Data="{StaticResource RosettaIcon}" Style="{StaticResource IconPath}"/></ToggleButton></InlineUIContainer></TextBlock>
-            <StackPanel x:Name="FormsPanel"/>
-            <Border x:Name="QuickReadCard" Visibility="Collapsed" Background="{StaticResource AccentSoft}" BorderThickness="0" CornerRadius="7" Padding="12,9,12,10" Margin="0,2,0,14">
+            <Border x:Name="QuickReadCard" Visibility="Collapsed" Background="{StaticResource AccentSoft}" BorderThickness="0" CornerRadius="7" Padding="12,9,12,10" Margin="0,2,0,10">
               <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <Border x:Name="QuickReadGuide" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,10,0" Background="{StaticResource Accent}" CornerRadius="2">
@@ -77,8 +75,11 @@
                   <TextBox.RenderTransform><TranslateTransform Y="-2"/></TextBox.RenderTransform>
                 </TextBox>
                 <TextBlock x:Name="QuickReadState" Grid.Column="2" Visibility="Collapsed" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                <Border x:Name="QuickReadPlaceholder" Grid.Column="1" Visibility="Collapsed" Height="12" Margin="0,8" MaxWidth="340" HorizontalAlignment="Stretch" Background="{StaticResource Stroke}" CornerRadius="4" IsHitTestVisible="False"/>
               </Grid>
             </Border>
+            <local:QueryProgressView x:Name="QueryProgress"/>
+            <StackPanel x:Name="FormsPanel"/>
             <StackPanel x:Name="AiPanel"/>
             <StackPanel x:Name="LocalPanel"/>
             <StackPanel x:Name="OnlinePanel"/>

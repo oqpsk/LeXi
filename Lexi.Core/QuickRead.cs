@@ -1,9 +1,11 @@
 namespace Lexi.Core;
 
-public sealed record QuickMeaning(string Text, string Label, bool Core = false);
+public sealed record QuickMeaning(string Text, string Label, bool Core = false, bool Provisional = false);
 
 // Select existing completed definitions. Domain/display order is not evidence
 // of centrality. Legacy/offline excerpts remain available but are labeled as such.
+// Until any model completes, a streamed sense the model has finished and marked as the core
+// meaning previews the overview; it is labeled provisional and replaced by completed answers.
 public static class QuickRead
 {
     public static string ValidGloss(string? value) => value is { Length: > 0 and <= 32 } &&
@@ -34,10 +36,17 @@ public static class QuickRead
         // Keep the name instead of clipping an explanation mid-clause.
         return combined.Length <= 32 ? combined : term;
     }
-    public static QuickMeaning[] Create(SenseGroup[] groups, SpecialistReference[] uncovered, LocalHit[] local)
+    private static string Label(AiSense sense)
+    { var label = LexicalLabels.Usage(sense.Register); return label.Length > 0 ? label : LexicalLabels.PartOfSpeech(sense.PartOfSpeech); }
+    // lead: the model whose completed answer first gave the overview. Until the judge ranks meanings
+    // across models, each model marks its own core meaning, often the same meaning in other words;
+    // only the lead's are shown, so a second model finishing never lists a near-duplicate beside it.
+    public static QuickMeaning[] Create(SenseGroup[] groups, SpecialistReference[] uncovered, LocalHit[] local, LookupModel? lead = null)
     {
         var complete = groups.Where(g => g.Variants.Any(v => !v.Provisional)).ToArray();
         var assessed = complete.Any(g => g.OverviewAssessed);
+        bool Led(SenseGroup g) => g.Variants.Any(v => !v.Provisional && v.Model == lead);
+        if (!assessed && lead != null && complete.Any(Led)) complete = complete.Where(Led).ToArray();
         var selected = assessed
             ? complete.Where(g => g.OverviewRank != null).OrderBy(g => g.OverviewRank).ToArray()
             : complete.Where(g => g.Variants.Any(v => !v.Provisional && v.Sense.CoreMeaning == true)).ToArray();
@@ -47,12 +56,10 @@ public static class QuickRead
         var choices = new List<QuickMeaning>();
         foreach (var group in core ? selected : complete)
         {
-            var candidate = group.Variants.First(v => !v.Provisional);
+            var candidate = group.Variants.FirstOrDefault(v => !v.Provisional && !assessed && v.Model == lead) ?? group.Variants.First(v => !v.Provisional);
             var sense = candidate.Sense;
             var alternateTerm = group.Variants.Where(v => !v.Provisional).Select(v => ValidGloss(v.Sense.ChineseTerm)).FirstOrDefault(t => t.Length > 0) ?? "";
-            var text = SummaryText(sense, alternateTerm);
-            var label = LexicalLabels.Usage(sense.Register);
-            choices.Add(new(text, label.Length > 0 ? label : LexicalLabels.PartOfSpeech(sense.PartOfSpeech), core));
+            choices.Add(new(SummaryText(sense, alternateTerm), Label(sense), core));
         }
         // Do not pad a deliberately short core summary with unrelated meanings.
         if (!core)
@@ -60,6 +67,9 @@ public static class QuickRead
         if (choices.All(c => c.Text.Length == 0) && !core)
             choices.AddRange(local.Where(h => h.Dictionary.AllowAiEvidence).Select(h =>
                 new QuickMeaning(Excerpt(h.Entry.Chinese), h.Dictionary.Name)));
+        if (complete.Length == 0 && choices.All(c => c.Text.Length == 0))
+            choices.AddRange(groups.Select(g => g.Variants.FirstOrDefault(v => v.Provisional && v.Sense.CoreMeaning == true))
+                .OfType<SenseCandidate>().Select(v => new QuickMeaning(SummaryText(v.Sense), Label(v.Sense), true, true)));
         return choices.Where(c => c.Text.Length > 0).DistinctBy(c => c.Text).Take(2).ToArray();
     }
 }

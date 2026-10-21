@@ -12,7 +12,7 @@ struct InputPreviewCard: View {
                 .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(LexiTheme.pink.opacity(0.12), in: .rect(cornerRadius: 18, style: .continuous))
+        .background(LexiTheme.quickReadFill, in: .rect(cornerRadius: 18, style: .continuous))
         .help(hint)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(verbatim: "TL;DR · \(message)"))

@@ -55,6 +55,7 @@ internal sealed record CancelResult(bool Cancelled);
 [JsonSerializable(typeof(CacheUsage[]))]
 [JsonSerializable(typeof(BackupPreview))]
 [JsonSerializable(typeof(InputPreviewView))]
+[JsonSerializable(typeof(LookupCandidate))]
 [JsonSerializable(typeof(QueryView))]
 [JsonSerializable(typeof(AppSettings))]
 internal partial class HostJson : JsonSerializerContext;

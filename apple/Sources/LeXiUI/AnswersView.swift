@@ -6,18 +6,22 @@ import SwiftUI
 struct AnswersCard: View {
     let answers: Answers
     @Bindable var store: LexiStore
+    var keyboard: SenseKeyboard? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(answers.references.enumerated()), id: \.element.key) { index, reference in
                 Row(first: index == 0) { ReferenceRow(reference: reference, store: store) }
             }
+            let keys = answers.senses.map(\.key)
             ForEach(Array(answers.senses.enumerated()), id: \.element.key) { index, sense in
                 Row(first: index + answers.references.count == 0) {
                     VStack(alignment: .leading, spacing: 4) {
                         SenseHeadingText(heading: sense.heading)
                         SenseContent(sense: sense, store: store)
                     }
+                    .keyboardSense(sense, keys: keys, keyboard: keyboard, store: store)
+                    .id(sense.key)
                 }
             }
             ForEach(Array(answers.notices.enumerated()), id: \.offset) { _, notice in
@@ -62,7 +66,17 @@ struct SenseHeadingText: View {
         if !heading.usage.isEmpty { text = Text("\(text)\(Text("  " + heading.usage))") }
         if heading.abbreviation { text = Text("\(text)\(Text("  缩写"))") }
         if heading.provisional { text = Text("\(text)\(Text(" · 生成中"))") }
-        return text.font(.subheadline).foregroundStyle(.secondary).help(heading.tooltip)
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            text.font(.subheadline).foregroundStyle(.secondary)
+            // The sense the query has in the sentence it was selected in, tagged like the TL;DR it feeds.
+            if heading.inContext == true {
+                Text("本句").font(.caption2.weight(.semibold)).foregroundStyle(.black)
+                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .background(LexiTheme.pink, in: .capsule)
+                    .accessibilityLabel("本句语境中的义项")
+            }
+        }
+        .help(heading.tooltip)
     }
 }
 

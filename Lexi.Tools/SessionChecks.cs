@@ -9,6 +9,9 @@ internal static class SessionChecks
     {
         await MajorWorkflowChecks.Run(fixture,root);
         await InputPreviewChecks.Run(fixture,root);
+        CandidateChecks.Run();
+        await ContextChecks.Run(fixture, root);
+        await FirstResultChecks.Run(fixture, root);
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
         var work = Path.Combine(Path.GetFullPath(root), Guid.NewGuid().ToString("N"));
@@ -127,6 +130,31 @@ internal static class SessionChecks
         var both = new[] { new ModelAnswer(primary, ModelPhase.Complete, Entry("a", "b")), new ModelAnswer(secondary, ModelPhase.Complete, Entry("c")) };
         var snapshot = new LookupSnapshot(both, SenseMerging.Group(both));
         var waiting = new LookupSnapshot([new(primary,ModelPhase.Pending,Entry("cached"),true)], []);
+        var workSettings = new AppSettings { Provider=primary.Provider, Model=primary.Model, SecondaryProvider=secondary.Provider, SecondaryModel=secondary.Model, ParallelLookup=true, JudgeProvider="codex", JudgeModel="judge-fixture" };
+        var pendingWork = QueryProgressState.Dictionary(true,true).WithWork(workSettings);
+        Check(pendingWork.Items.Length == 3 && pendingWork.Items.All(i => i.State == QueryWorkState.Pending),
+            "model slots wait for dictionary evidence without pretending generation has started");
+        var workSnapshot = new LookupSnapshot([new(primary,ModelPhase.Streaming,Entry("new")),new(secondary,ModelPhase.Pending)],[]);
+        var actorProgress = QueryProgressState.Updating(workSnapshot,true).WithWork(workSettings,workSnapshot);
+        Check(actorProgress.Items.Select(i=>i.State).SequenceEqual([QueryWorkState.Generating,QueryWorkState.Querying,QueryWorkState.Pending]) &&
+            actorProgress.Items[0].Name==primary.Name && actorProgress.Items[2].Name=="judge-fixture",
+            "per-model output, waiting and the configured judge are sent as separate shared states");
+        var mergeWork = QueryProgressState.Updating(snapshot with { Merging=true },true).WithWork(workSettings,snapshot with { Merging=true });
+        Check(mergeWork.Items.Select(i=>i.State).SequenceEqual([QueryWorkState.Complete,QueryWorkState.Complete,QueryWorkState.Merging]),
+            "completed providers stay complete while only the judge shows merging");
+        var failedWork = QueryProgressState.Finished(snapshot with { MergeFailed=true },true).WithWork(workSettings,snapshot with { MergeFailed=true });
+        Check(failedWork.Items[^1].State==QueryWorkState.Failed && failedWork.Items.Take(2).All(i=>i.State==QueryWorkState.Complete) && failedWork.Warning,
+            "judge failure keeps successful actor states and remains explicitly incomplete");
+        Check(actorProgress.Interrupted("已停止","已保留").Items.All(i=>i.Activity==QueryActivity.Idle) &&
+            QueryProgressState.Translating(true).WithWork(workSettings).Items is [{ State:QueryWorkState.Generating }] &&
+            QueryProgressState.Translated(true).WithWork(workSettings).Items is [{ State:QueryWorkState.Complete }],
+            "cancellation stops actor activity and translation uses only its primary model");
+        Check(QueryProgressState.Finished(snapshot,true).WithWork(workSettings,snapshot,false).Items.All(i=>i.Key!="judge") &&
+            QueryProgressState.Finished(snapshot,true,true).WithWork(workSettings,snapshot).Items.Any(i=>i.Key=="failure"&&i.State==QueryWorkState.Failed),
+            "restored data does not claim the current judge and source failure cannot look fully complete");
+        Check(QueryProgressState.Translated(true).Restored && !QueryProgressState.Translated().Restored &&
+            mergeWork.Interrupted("已停止","已有结果已保留").Items.Select(i=>i.State).SequenceEqual([QueryWorkState.Complete,QueryWorkState.Complete,QueryWorkState.Failed]),
+            "cache restoration is explicit and cancelling a judge preserves completed providers");
         Check(QueryProgressState.Dictionary(true,true).Activity == QueryActivity.Querying &&
             QueryProgressState.Updating(waiting,true).Activity == QueryActivity.Querying &&
             QueryProgressState.Updating(new([new(primary,ModelPhase.Streaming,Entry("new"))],[]),true).Activity == QueryActivity.Generating &&

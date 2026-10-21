@@ -27,7 +27,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
         TypeInfoResolver = JsonTypeInfoResolver.Combine(HostJson.Default, Json.Resolver),
         // One converter per enum: the generic form needs no code generated at run time.
         Converters = { Camel<QueryViewKind>(), Camel<OriginalsMode>(), Camel<ModelPhase>(), Camel<QueryStage>(), Camel<QueryOutcome>(),
-            Camel<QueryActivity>(), Camel<MergeFailureKind>(), Camel<ModelAccessFailure>(), Camel<SourceFailures>() },
+            Camel<QueryActivity>(), Camel<QueryWorkState>(), Camel<MergeFailureKind>(), Camel<ModelAccessFailure>(), Camel<SourceFailures>() },
         // Chinese text stays readable; JSON still escapes every control character, so one message is one line.
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
@@ -122,7 +122,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             case "query.submit":
             {
                 using var stop = token.Register(session.Cancel);
-                await session.SubmitAsync(Text(p, "text"), Flag(p, "force"), false, Number(p, "scroll"));
+                await session.SubmitAsync(Text(p, "text"), Flag(p, "force"), false, Number(p, "scroll"), Text(p, "context", ""));
                 return Position();
             }
             case "query.retry":
@@ -159,6 +159,7 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             case "query.view": return session.View;
             case "suggest": return new SuggestResult(session.Suggest(Text(p, "text")));
             case "query.preview": return await session.PreviewAsync(Text(p, "text"), token);
+            case "query.candidate": return LookupCandidates.From(Text(p, "text", ""), p.TryGetProperty("surrounding", out var around) && around.ValueKind == JsonValueKind.String ? around.GetString() : null, (int)Math.Clamp(Number(p, "start"), -1, int.MaxValue));
             case "history.list": return History(Text(p, "text", ""), (int)Number(p, "offset"));
             case "history.remove":
             {

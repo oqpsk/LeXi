@@ -14,5 +14,7 @@
     <Content Include="../Lexi.Core/dictionary.instructions.txt" Link="assets/dictionary.instructions.txt" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="../Lexi.Core/sense-merge.schema.json" Link="assets/sense-merge.schema.json" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     <Content Include="../Lexi.Core/sense-merge.instructions.txt" Link="assets/sense-merge.instructions.txt" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="../Lexi.Core/context.schema.json" Link="assets/context.schema.json" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="../Lexi.Core/context.instructions.txt" Link="assets/context.instructions.txt" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 </Project>

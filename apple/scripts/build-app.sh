@@ -30,8 +30,14 @@ cp "$bin/LeXi" "$app/Contents/MacOS/LeXi"
 cp "$work/host/lexi-host" "$app/Contents/Helpers/lexi-host"
 cp -R "$work/host/assets" "$app/Contents/Resources/assets"
 sed "s/__VERSION__/$version/g" "$root/apple/Resources/Info.plist" > "$app/Contents/Info.plist"
-swift "$root/apple/scripts/make-icon.swift" "$root/docs/brandmark.svg" "$work/AppIcon.iconset"
-iconutil -c icns "$work/AppIcon.iconset" -o "$app/Contents/Resources/AppIcon.icns"
+# An Icon Composer icon: macOS draws its rounded shape, glass and shadow, so the corners match every
+# other app. actool writes Assets.car and an AppIcon.icns fallback.
+icon="$work/AppIcon.icon"
+rm -rf "$icon"; cp -R "$root/apple/Resources/AppIcon.icon" "$icon"
+swift "$root/apple/scripts/make-icon.swift" "$root/docs/brandmark.svg" "$icon"
+xcrun actool "$icon" --compile "$app/Contents/Resources" --platform macosx --minimum-deployment-target 26.0 \
+    --app-icon AppIcon --output-partial-info-plist "$work/AppIcon.plist" > "$work/actool.log"
+[ -f "$app/Contents/Resources/Assets.car" ] || { cat "$work/actool.log" >&2; echo "actool did not compile AppIcon.icon" >&2; exit 1; }
 cp "$root/LICENSE" "$root/THIRD_PARTY_NOTICES.md" "$app/Contents/Resources/"
 cp -R "$root/licenses" "$app/Contents/Resources/licenses"
 

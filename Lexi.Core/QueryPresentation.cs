@@ -44,7 +44,7 @@ public sealed class QueryPresentation
     }
 
     public void SetQuery(string query) => Query = query;
-    private void ClearSources() { Local = []; LocalHint = ""; Online = null; OnlineHint = ""; Answers = null; Translation = null; }
+    private void ClearSources() { Local = []; LocalHint = ""; Online = null; OnlineHint = ""; Answers = null; baseAnswers = null; Snapshot = null; Translation = null; }
 
     // ---- Word forms ----
     public void ResetWordForms()
@@ -106,7 +106,8 @@ public sealed class QueryPresentation
     public void ResetLexical()
     {
         SourceEtymologies = []; modelEtymologies.Clear(); etymologyIdentity = ""; Etymology = [];
-        overviewLocal = []; overviewFromModel = false; overviewCore = false; QuickRead = QuickReadView.Hidden;
+        overviewLocal = []; overviewFromModel = false; overviewCore = false; overviewLead = null; QuickRead = QuickReadView.Hidden;
+        baseQuickRead = QuickReadView.Hidden; context = null;
     }
     public void ApplySourceEtymology(EtymologyExcerpt[] excerpts) { SourceEtymologies = excerpts; RefreshEtymology(); }
     private void ApplyModelEtymology(LookupSnapshot snapshot)
@@ -133,20 +134,66 @@ public sealed class QueryPresentation
     public void BeginOverview(LocalHit[] local) => overviewLocal = local;
     private void ApplyQuickRead(LookupSnapshot snapshot, SpecialistReference[] uncovered, bool finalized)
     {
+        QuickRead = baseQuickRead; // Start from the entry's own overview, never from the context overlay.
         var generated = snapshot.Groups.Any(g => g.Variants.Any(v => !v.Provisional));
         if (!generated && overviewFromModel && !finalized && snapshot.Provisional)
         { QuickRead = Caption(QuickRead, "缓存预览"); return; }
         var meanings = QuickReadSelection(snapshot, uncovered);
         overviewFromModel = generated && meanings.Length > 0;
         if (meanings.Length == 0) { QuickRead = QuickRead with { Visible = false }; return; }
-        var state = !generated ? "词典摘录" : !finalized || snapshot.Provisional ? "预览" :
+        var streamed = meanings.All(m => m.Provisional);
+        var state = streamed ? "预览" : !generated ? "词典摘录" : !finalized || snapshot.Provisional ? "预览" :
             snapshot.MergeFailed || snapshot.Answers.Any(a => a.Phase == ModelPhase.Failed) ? "部分结果" : "已整理";
         overviewCore = meanings.All(m => m.Core);
         QuickRead = Caption(QuickRead, state) with { Visible = true, Text = string.Join("；", meanings.Select(m => m.Text)),
             Tooltip = string.Join("\n", meanings.Select(m => m.Label + "：" + m.Text)) };
+        if (streamed) QuickRead = QuickRead with { Explanation = "模型仍在生成，先显示它已写完的核心义项；全部完成后会更新。" };
     }
-    private QuickMeaning[] QuickReadSelection(LookupSnapshot snapshot, SpecialistReference[] uncovered) =>
-        Lexi.Core.QuickRead.Create(snapshot.Groups, uncovered, overviewLocal);
+
+    // ---- The sentence the query was selected in ----
+    // The entry's own TL;DR and senses stay as built; the context only overlays them, so a later
+    // stream, merge or retry rebuilds them and the pick is laid on again.
+    private QuickReadView baseQuickRead = QuickReadView.Hidden;
+    private AnswersView? baseAnswers;
+    // The model answers behind the senses on the page, for the context pick.
+    public LookupSnapshot? Snapshot { get; private set; }
+    private (string Sentence, ContextPick? Pick)? context;
+    public void BeginContext(string sentence) { context = (sentence, null); Overlay(); }
+    public void ApplyContext(string sentence, ContextPick pick) { context = (sentence, pick); Overlay(); }
+    public void ContextFailed() { context = null; Overlay(); }
+    private void Overlay()
+    {
+        QuickRead = context switch
+        {
+            null => baseQuickRead,
+            { Pick: null } when baseQuickRead.Visible => baseQuickRead with { State = "本句语境判断中", ShowState = true, Caption = "TL;DR · 本句语境判断中" },
+            { Pick: { Gloss.Length: > 0 } pick, Sentence: var sentence } => baseQuickRead with
+            {
+                Visible = true, Text = pick.Gloss, State = "本句语境", ShowState = true, Caption = "TL;DR · 本句语境",
+                Tooltip = "原句：" + sentence + (baseQuickRead.Text.Length > 0 ? "\n一般释义：" + baseQuickRead.Text : ""),
+                Explanation = "按选中文字所在的句子判断的意思；其他用法见下方义项。"
+            },
+            _ => baseQuickRead
+        };
+        // A pick made before the merge may name a sense that now sits among another's alternatives;
+        // the sense shown for that group carries the mark.
+        var key = context?.Pick?.SenseId ?? "";
+        static SenseView Mark(SenseView s) => s with { Heading = s.Heading with { InContext = true } };
+        Answers = baseAnswers == null || key.Length == 0 ? baseAnswers : baseAnswers with
+        {
+            Senses = baseAnswers.Senses.Select(s => s.Key == key ? Mark(s) : s.Alternatives.Any(a => a.Key == key)
+                ? Mark(s) with { Alternatives = s.Alternatives.Select(a => a.Key == key ? Mark(a) : a).ToArray() } : s).ToArray()
+        };
+    }
+    // The first model to complete leads the overview until the merge ranks every answer; it stays the
+    // lead while its answer stands, so the TL;DR does not change when the other model finishes.
+    private LookupModel? overviewLead;
+    private QuickMeaning[] QuickReadSelection(LookupSnapshot snapshot, SpecialistReference[] uncovered)
+    {
+        var answered = snapshot.Answers.Where(a => a.Phase != ModelPhase.Streaming && a.Entry is { Found: true, Senses.Length: > 0 }).Select(a => a.Model).ToArray();
+        if (overviewLead == null || !answered.Contains(overviewLead)) overviewLead = answered.FirstOrDefault();
+        return Lexi.Core.QuickRead.Create(snapshot.Groups, uncovered, overviewLocal, overviewLead);
+    }
     private QuickReadView Caption(QuickReadView view, string state) => view with
     {
         State = state, Caption = "TL;DR · " + state, ShowState = state is "预览" or "缓存预览" or "部分结果",
@@ -207,8 +254,11 @@ public sealed class QueryPresentation
         ApplyModelEtymology(snapshot);
         var query = Query.Length > 0 ? Query : firstWord ?? evidence?.Word ?? "";
         var uncovered = SpecialistReferences.Uncovered(query, snapshot.Groups, evidence);
+        Snapshot = snapshot;
         ApplyQuickRead(snapshot, uncovered, finalized);
-        Answers = BuildAnswers(snapshot, evidence, uncovered);
+        baseQuickRead = QuickRead;
+        baseAnswers = BuildAnswers(snapshot, evidence, uncovered);
+        Overlay();
     }
 
     public static AnswersView BuildAnswers(LookupSnapshot snapshot, OnlineEntry? evidence, SpecialistReference[] uncovered)

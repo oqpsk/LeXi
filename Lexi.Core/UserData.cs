@@ -14,7 +14,7 @@ internal sealed record BackupManifest(string Product, int Version);
 public sealed class UserData(string root)
 {
     private static readonly string[] Intermediate = ["online-v2", "online-v3", "pronunciations-v2", "pronunciations-v3",
-        "ai-v3", "ai-v4", "ai-v5", "ai-v6", "sense-merge-v1", "sense-merge-v2", "sense-merge-v3", "sense-merge-v4", "sense-merge-v5", "sense-merge-v6", "sense-merges-v1", "sense-merges-v2", "sense-merges-v3", "sense-merges-v4", "sense-merges-v5", "sense-merges-v6", "translations-v1", "word-forms-v1", "word-forms-v2"];
+        "ai-v3", "ai-v4", "ai-v5", "ai-v6", "sense-merge-v1", "sense-merge-v2", "sense-merge-v3", "sense-merge-v4", "sense-merge-v5", "sense-merge-v6", "sense-merges-v1", "sense-merges-v2", "sense-merges-v3", "sense-merges-v4", "sense-merges-v5", "sense-merges-v6", "translations-v1", "word-forms-v1", "word-forms-v2", LookupContext.CacheKind, TimingLog.Folder];
     private static readonly string[] Results = [SavedQueries.DictionaryKind, SavedQueries.TranslationKind];
     private static string[] Folders(string id) => id switch
     { "intermediate" => Intermediate, "speech" => ["speech-cache"], "results" => Results, _ => throw new UserDataException("未知缓存类别。") };

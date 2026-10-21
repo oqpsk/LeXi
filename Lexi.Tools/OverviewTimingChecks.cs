@@ -31,10 +31,34 @@ internal static class OverviewTimingChecks
         var fresh = new[] { answers[0] with { Entry=answers[0].Entry! with { Senses=[peripheral with {CoreMeaning=false},central with {CoreMeaning=true}] } } };
         check(QuickRead.Create(SenseMerging.Group(fresh),[],[]) is [{Text:"核心概念",Core:true}],
             "completed model core metadata works during preview, disabled merging and judge failure without another request");
+        var echo = new ModelAnswer(secondary, ModelPhase.Complete, new("fixture", true, [alternate with { CoreMeaning=true }], "", "unverified"));
+        ModelAnswer[] both = [fresh[0], echo];
+        check(QuickRead.Create(SenseMerging.Group(both),[],[],primary) is [{Text:"核心概念"}] &&
+            QuickRead.Create(SenseMerging.Group(both),[],[],secondary) is [{Text:"核心概念的另一种说法"}],
+            "before the merge the TL;DR shows the leading model's core meaning, not each model's wording side by side");
+        check(QuickRead.Create(SenseMerging.Group(answers,plan with {Overview=["m0s0","m0s1"]}),[],[],secondary).Select(m=>m.Text).SequenceEqual(new[]{peripheral.Gloss,central.Gloss}),
+            "once the judge has ranked meanings across models, no model leads the overview");
+        var page = new QueryPresentation();
+        page.BeginDictionary("fixture", "fixture");
+        page.ApplyAnswers(new([new(primary, ModelPhase.Pending), echo], SenseMerging.Group([new(primary, ModelPhase.Pending), echo])), null, false);
+        var early = page.QuickRead.Text;
+        page.ApplyAnswers(new(both, SenseMerging.Group(both)), null, false);
+        check(early == "核心概念的另一种说法" && page.QuickRead.Text == early,
+            "the model that finished first keeps the TL;DR when the other model finishes");
+        page.ApplyAnswers(new(both, SenseMerging.Group(both, plan with {Overview=["m0s1"]})), null);
+        check(page.QuickRead.Text == "核心概念", "the merge's ranking replaces the leading model's overview");
         var declines = SenseMerging.Group(fresh,new("fixture",[],[]));
         check(QuickRead.Create(declines,[],[]).All(m=>!m.Core), "an explicit uncertain overview overrides model guesses and stays an excerpt");
-        check(QuickRead.Create(SenseMerging.Group([fresh[0] with { Phase=ModelPhase.Streaming }]),[],[]).Length==0,
-            "provisional core flags never enter the overview");
+        var streaming = fresh[0] with { Phase=ModelPhase.Streaming };
+        check(QuickRead.Create(SenseMerging.Group([streaming]),[],[]) is [{Text:"核心概念",Core:true,Provisional:true}],
+            "a streamed sense the model has finished and marked as core previews the overview, labeled provisional");
+        check(QuickRead.Create(SenseMerging.Group([streaming with { Entry=streaming.Entry! with { Senses=[central with {CoreMeaning=null}] } }]),[],[]).Length==0,
+            "a streamed sense without a core flag never previews the overview");
+        check(QuickRead.Create(SenseMerging.Group([streaming, answers[1]]),[],[]) is [{Text:"核心概念的另一种说法",Provisional:false}],
+            "a completed answer replaces streamed previews");
+        var excerpt = new LocalHit(new("Fixture", "en-zh", 1, 1, "", "", "", "", true), new("fixture", "", "", "a. 本地词典的释义", "", 0));
+        check(QuickRead.Create(SenseMerging.Group([streaming]),[],[excerpt]) is [{Text:"a. 本地词典的释义",Provisional:false}],
+            "a local dictionary excerpt keeps the overview while a model is still streaming");
         foreach(var invalid in new[]{new[]{"unknown"},new[]{"m0s1","m0s1"},new[]{"m0s0","m0s1","m1s0"}})
         {
             try { SenseMerging.Parse(JsonSerializer.Serialize(plan with {Overview=invalid},Json.Flexible),request); check(false,"bad overview accepted"); }

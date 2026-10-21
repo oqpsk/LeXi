@@ -74,6 +74,14 @@ internal static class HostChecks
                 inputPreview.GetProperty("text").GetString()=="你好" && ReferenceEquals(beforePreview,session.View) && session.History.Entries.Count==0 &&
                 (await client.Call("query.preview",new {text="hel"})).GetProperty("result").ValueKind==JsonValueKind.Null,
                 "the native preview endpoint exposes shared local glosses without publishing a query or recording history");
+            var candidate = (await client.Call("query.candidate", new { text = "“serendipity,”" })).GetProperty("result");
+            Check(candidate.GetProperty("text").GetString() == "serendipity" && candidate.GetProperty("submit").GetBoolean() &&
+                (await client.Call("query.candidate", new { text = "https://example.org" })).GetProperty("result").ValueKind == JsonValueKind.Null &&
+                ReferenceEquals(beforePreview, session.View) && session.History.Entries.Count == 0,
+                "summoning with copied or selected text uses Core's lookup rule without starting a query");
+            var selected = (await client.Call("query.candidate", new { text = "bank", surrounding = "Prices rose. We sat on the bank of the river.", start = 27 })).GetProperty("result");
+            Check(selected.GetProperty("context").GetString() == "We sat on the bank of the river." && selected.GetProperty("submit").GetBoolean(),
+                "a selection read with its surrounding text carries the sentence it came from");
 
             var submitted = (await client.Call("query.submit", new { text = "serendipity" })).GetProperty("result");
             var request = submitted.GetProperty("request").GetInt64();
@@ -91,6 +99,11 @@ internal static class HostChecks
                 .Select(v => v.GetProperty("progress").GetProperty("activity").GetString()).ToArray();
             Check(activities.Contains("querying") && activities.Contains("generating") && activities.Contains("merging") && activities.Last()=="idle",
                 "native clients receive Core's query, output, merge and idle animation states");
+            var actorStates = views.Where(v => v.GetProperty("progress").ValueKind == JsonValueKind.Object)
+                .SelectMany(v => v.GetProperty("progress").GetProperty("items").EnumerateArray()).ToArray();
+            Check(new[] { "pending", "querying", "generating", "merging", "complete" }.All(state => actorStates.Any(i=>i.GetProperty("state").GetString()==state)) &&
+                actorStates.All(i=>i.GetProperty("name").GetString()?.Length>0 && i.GetProperty("accessibleName").GetString()?.Length>0),
+                "native result rows receive named, accessible per-actor states including the independent judge");
             Check(final.GetProperty("answers").GetProperty("senses")[0].GetProperty("alternativesLabel").GetString() == "其他表述 · 1" &&
                 final.GetProperty("quickRead").GetProperty("caption").GetString() == "TL;DR · 已整理",
                 "merged senses and the overview reach the front end fully worded");

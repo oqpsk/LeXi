@@ -19,6 +19,7 @@
 			<key>CFBundleURLSchemes</key><array><string>lexi</string></array>
 		</dict>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key><false/>
 	<key>LSRequiresIPhoneOS</key><true/>
 	<key>MinimumOSVersion</key><string>26.0</string>
 	<key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>

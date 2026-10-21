@@ -39,12 +39,24 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 
 `progress.activity` 是可选的增量字段，取 `idle`、`querying`、`generating`、`merging`。Core 区分等待模型与收到新释义/译文，缓存文本不冒充新输出；终态与取消均为 `idle`。旧视图缺少字段时原生前端保留静态标志。该字段只驱动动效，不改变 `stage`、状态文字或查询生命周期。
 
+`progress.items` 是可选的增量数组，每项含 `key`、`name`、`state`、`detail`、`activity` 和 `accessibleName`。`state` 取 `pending`、`querying`、`generating`、`merging`、`complete`、`failed`；查询模型与义项判断模型各占一项，翻译只含主要模型。前端用图标表达状态、单行显示名称；详情保留在提示与辅助功能中。成功终态可播放一次 CRT 收束并移除该行；缓存直接恢复时不重播，部分失败与中断保留警示。`items` 不改变协议版本，旧前端可忽略，旧视图可缺省。TL;DR 始终位于状态行和词形变化之前，计时留在底栏。
+
+`progress.restored` 为可选布尔字段，明确标记本轮是否直接恢复完整缓存；为 `true` 时成功终态不播放退场动画，即使前端曾短暂显示等待。缺省为 `false`，不影响旧客户端。
+
+### 本句语境
+
+`query.submit` 带 `context` 时，各查询模型都给出结果后（与同义项合并同时进行），Core 用义项判断模型做一次轻量判断（`context.instructions.txt`、`context.schema.json`）：从各模型已完成的义项中选出查询词在这句话里的意思，并给出一句简短中文。结果按查询、句子与各模型义项缓存于 `context-picks-v1`；合并前后请求相同，恢复已保存页面时直接复用。TL;DR 改为这句话里的意思（`caption` 为 `TL;DR · 本句语境`，提示中含原句与一般释义），对应义项的 `heading.inContext` 为 `true`；该义项合并后成为另一义项的其他表述时，标记显示在该组的义项上。其余义项不变。判断进行中 TL;DR 显示“本句语境判断中”；离线、关闭自动补充、无法判断或判断失败时保持一般 TL;DR。词条本身的生成与缓存不受句子影响；“重新生成”沿用本页句子。
+
+### 首个结果与计时
+
+模型仍在生成、尚无完成的回答时，若某个模型已经写完一条并标为核心含义的义项，TL;DR 先显示它，`quickRead.state` 为 `预览`；本地词库摘录和已完成的回答优先。每次查询结束后，Core 把各阶段耗时（本地、在线来源、首条义项、TL;DR、各模型、合并、本句语境、总耗时）追加到用户目录的 `diagnostics/lookup-timings-v1.jsonl`，只记日期、查询路径、模型名与毫秒数，不记查询词、句子或释义；保留最近 1000 条，随“中间缓存”一同统计和清除。`Lexi.Tools timing-report <用户目录>` 输出各路径的中位数与 90 分位。
+
 ## 方法
 
 | 方法 | 参数 | 结果 |
 |---|---|---|
 | `initialize` | — | `protocol`、`version`、`platform`、`paths`、当前 `view`、`settings`（同 `settings.get`）。等待离线词库加载 |
-| `query.submit` | `text`，可选 `force`、`scroll` | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送 |
+| `query.submit` | `text`，可选 `force`、`scroll`、`context`（查询词所在的句子，见 `query.candidate`） | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送 |
 | `query.regenerate` | — | 跳过已保存结果重新查询当前页面 |
 | `query.navigate` | `direction`（-1 或 1），可选 `scroll` | `{page, view}`；`page` 为 `null` 表示已到边界 |
 | `query.home` | 可选 `scroll` | 返回查询历史页面 |
@@ -52,6 +64,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `query.view` | — | 当前 `QueryView` |
 | `suggest` | `text` | `{suggestions}` |
 | `query.preview` | `text` | `{query, headword, text, source}` 或 `null`。只读已保存的 TL;DR 和启用的本地词库；保持大小写缓存身份，显示实际匹配词；不联网、不记录历史、不发布或改变当前视图；支持 `cancel` |
+| `query.candidate` | `text`，可选 `surrounding`、`start` | `{text, submit, context}` 或 `null`。用户在其他应用中按全局快捷键呼出 LeXi 时，前端把选中的文字或刚复制的文字交给 Core 判断：去掉随词带来的引号和标点；单行且不超过 64 个字符时 `submit` 为 `true`，直接查询；更长或多行的文字只填入输入框；链接、路径、邮箱和无效输入返回 `null`。前端能读到选区前后的文字时传 `surrounding` 与选区在其中的起点 `start`（UTF-16），Core 截出所在句子作为 `context`，前端随 `query.submit` 交回。不发起查询、不记录历史 |
 | `history.list` | — | `{entries: [{query, translation, queriedAt, preview, kind}], error}` |
 | `history.remove` | `query`、`translation` | `{removed, history}` |
 | `settings.get` | — | `{settings, models, judgeModels, controls}`；`controls` 为在线开关与重新生成的共享文字 |
