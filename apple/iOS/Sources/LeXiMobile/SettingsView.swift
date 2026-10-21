@@ -296,58 +296,233 @@ struct ModelSection: View {
     private func apply(_ changes: [String: SettingValue]) { Task { error = await store.update(changes) } }
 }
 
+// Speech, as on the Mac: system voices, OpenAI, Grok and ElevenLabs. Keys stay in this device's
+// Keychain (the OpenAI key above also serves speech); ElevenLabs reads the account's voices or takes
+// a Voice ID.
 struct SpeechSection: View {
     @Bindable var store: LexiStore
     var speech: SpeechController
+    private let keys = KeychainSpeechKeys()
     @State private var models: [SpeechModel] = []
-    @State private var voices: [SpeechVoice] = []
-    @State private var message: String?
+    @State private var catalog: [String: [SpeechVoice]] = [:]
+    @State private var systemVoices: [SpeechVoice] = []
+    @State private var accountVoices: [SpeechVoice]?
+    @State private var lastEleven: SpeechVoice?
+    @State private var manualVoice = ""
+    @State private var keyInput = ""
+    @State private var savedKeys: Set<String> = []
+    @State private var voiceStatus = ""
+    @State private var loadingModels = false
+    @State private var loadingVoices = false
+    @State private var voiceRequest = 0
+    @State private var voiceTask: Task<Void, Never>?
+    @State private var message = ""
 
     var body: some View {
-        Section {
-            if let settings = store.settings?.settings, !models.isEmpty {
-                Picker("发音模型", selection: Binding(get: { settings.speechProvider + ":" + settings.speechModel }, set: { key in
-                    guard let model = models.first(where: { $0.key == key }) else { return }
-                    Task { await choose(model) }
-                })) { ForEach(models, id: \.key) { Text($0.name).tag($0.key) } }
-                Picker("声线", selection: Binding(get: { settings.speechVoice }, set: { id in
-                    guard let voice = voices.first(where: { $0.id == id }), let model = models.first(where: { $0.key == settings.speechProvider + ":" + settings.speechModel }) else { return }
-                    Task { message = await store.update(["speechProvider": .string(model.provider), "speechModel": .string(model.id), "speechVoice": .string(voice.id), "speechVoiceName": .string(voice.name)]) }
-                })) { ForEach(voices) { Text($0.name).tag($0.id) } }
-                Button { speech.toggle("Hello, this is LeXi.", id: "preview", using: store) } label: {
-                    Label(speech.speakingID == "preview" ? "停止" : "试听", systemImage: speech.speakingID == "preview" ? "stop.fill" : "play.fill")
+        Group {
+            if let settings = store.settings?.settings, let model = selected(settings) {
+                Section {
+                    Picker("发音模型", selection: Binding(get: { model.key }, set: { key in
+                        if let next = models.first(where: { $0.key == key }) { choose(next, settings) }
+                    })) { ForEach(models, id: \.key) { Text($0.name).tag($0.key) } }
+                    let voices = voices(model, settings)
+                    Picker("声线", selection: Binding(get: { settings.speechVoice }, set: { id in
+                        if let voice = voices.first(where: { $0.id == id }) { manualVoice = ""; apply(model, voice) }
+                    })) { ForEach(voices) { Text($0.name).tag($0.id) } }
+                    if model.provider == "elevenlabs" { elevenControls(model) }
+                    Button { preview(model, settings) } label: {
+                        Label(speech.speakingID == "preview" ? "停止" : "试听", systemImage: speech.speakingID == "preview" ? "stop.fill" : "play.fill")
+                    }
+                    if speech.speakingID == "preview" || !speech.status.isEmpty, !speech.status.isEmpty {
+                        Text(speech.status).font(.callout).foregroundStyle(.secondary)
+                    }
+                    if !message.isEmpty { Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.callout) }
+                } header: {
+                    Text("发音")
+                } footer: {
+                    Text(info(model))
                 }
-                if speech.speakingID == "preview" || !speech.status.isEmpty, !speech.status.isEmpty {
-                    Text(speech.status).font(.callout).foregroundStyle(.secondary)
-                }
+                if model.provider == "xai" || model.provider == "elevenlabs" { keySection(model.provider) }
             } else {
-                ProgressView()
+                Section("发音") { ProgressView() }
             }
-            if let message { Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.callout) }
-        } header: {
-            Text("发音")
-        } footer: {
-            Text("本机声线离线可用；在线语音按服务商的 API 计费，生成过的发音会缓存。在 Mac 或 Windows 上设置的 Grok、ElevenLabs 密钥不会同步到这里。")
         }
         .task { await load() }
+        .onChange(of: keyInput) { if store.settings?.settings.speechProvider == "elevenlabs" { invalidateVoices() } }
+        .onDisappear { cancelVoiceLoading(); keyInput = "" }
+    }
+
+    @ViewBuilder private func elevenControls(_ model: SpeechModel) -> some View {
+        HStack {
+            Button(accountVoices == nil ? "读取声线列表" : "刷新声线列表") { loadVoices() }.disabled(loadingVoices)
+            if loadingVoices { ProgressView().padding(.leading, 6) }
+            Spacer()
+            Button("刷新语音模型") {
+                Task {
+                    loadingModels = true; defer { loadingModels = false }
+                    do { try await store.refreshSpeechModels(key: typedKey ?? keys.read("elevenlabs") ?? ""); await load() }
+                    catch { message = SpeechController.message(error) }
+                }
+            }.disabled(loadingModels)
+        }
+        .buttonStyle(.borderless)
+        Text(voiceStatusText).font(.caption).foregroundStyle(.secondary)
+        TextField("Voice ID", text: $manualVoice, prompt: Text("指定其他声线：粘贴 Voice ID"))
+            .textInputAutocapitalization(.never).autocorrectionDisabled()
+            .onSubmit { applyManual(model) }
+    }
+
+    private func keySection(_ provider: String) -> some View {
+        let saved = savedKeys.contains(provider)
+        return Section {
+            SecureField(KeychainSpeechKeys.title(provider), text: $keyInput, prompt: Text(saved ? "留空保留已有密钥" : "粘贴 API Key"))
+                .textInputAutocapitalization(.never).autocorrectionDisabled()
+                .onSubmit { saveKey(provider) }
+            HStack {
+                Label(saved ? "已保存" : "未填写", systemImage: saved ? "checkmark.circle.fill" : "circle")
+                    .font(.caption).foregroundStyle(saved ? AnyShapeStyle(.green) : AnyShapeStyle(.secondary))
+                Spacer()
+                Button("清除", role: .destructive) { removeKey(provider) }.disabled(!saved)
+                Button("保存") { saveKey(provider) }.disabled(typedKey == nil)
+            }
+            .buttonStyle(.borderless)
+        } header: {
+            Text(provider == "xai" ? "Grok 发音密钥" : "ElevenLabs 发音密钥")
+        } footer: {
+            Text(provider == "elevenlabs" ? "粘贴创建时复制的完整 Secret Key；API Key ID 无法用于连接。密钥只保存在本机钥匙串，不会从 Mac 同步。" : "密钥只保存在本机钥匙串，不会从 Mac 同步。")
+        }
+    }
+
+    private var voiceStatusText: String {
+        if !voiceStatus.isEmpty { return voiceStatus }
+        guard let accountVoices else { return "读取声线列表即可选择账号可用的声线；读取不会生成音频。" }
+        return accountVoices.isEmpty ? "账号未返回可用声线，可粘贴 Voice ID。" : "已读取 \(accountVoices.count) 条可用声线。"
+    }
+
+    private func info(_ model: SpeechModel) -> String {
+        if model.local { return "本机声线离线可用，“按文字语言自动选择”为中文或英文挑选声线。生成过的在线发音会缓存。" }
+        switch model.provider {
+        case "xai": return "Grok TTS 的模型由服务管理，可选择声线；使用单独的 API Key 与 API 额度。"
+        case "elevenlabs": return "使用 ElevenLabs 账号额度。ElevenReader 套餐与此分开。"
+        default: return "使用 OpenAI 官方语音接口和上方的 OpenAI API Key，声线随模型切换。"
+        }
+    }
+
+    private func selected(_ settings: AppSettings) -> SpeechModel? {
+        models.first { $0.provider == settings.speechProvider && $0.id == settings.speechModel } ?? models.first
+    }
+
+    // The saved voice stays listed even when it is not installed or not in a loaded list.
+    private func voices(_ model: SpeechModel, _ settings: AppSettings) -> [SpeechVoice] {
+        let current = model.provider == settings.speechProvider && model.id == settings.speechModel
+        let saved = SpeechVoice(id: settings.speechVoice, name: settings.speechVoiceName.isEmpty ? "已保存的声线" : settings.speechVoiceName)
+        if model.provider == "elevenlabs" {
+            return SpeechChoices.eleven(loaded: accountVoices, saved: current ? saved : lastEleven, initial: catalog[model.key] ?? [])
+        }
+        let list = model.local ? systemVoices : catalog[model.key] ?? []
+        return current && !list.contains(where: { $0.id == saved.id }) ? [saved] + list : list
     }
 
     private func load() async {
-        models = await store.speechModels().filter { $0.local || $0.provider == "openai" }
-        guard let settings = store.settings?.settings, let model = models.first(where: { $0.provider == settings.speechProvider && $0.id == settings.speechModel }) ?? models.first else { return }
-        voices = await choices(model)
+        systemVoices = SystemVoices.choices()
+        savedKeys = Set(KeychainSpeechKeys.providers.filter { keys.hasSaved($0) })
+        let list = await store.speechModels()
+        var voices: [String: [SpeechVoice]] = [:]
+        for model in list where !model.local { voices[model.key] = await store.speechVoices(provider: model.provider, model: model.id) }
+        catalog = voices
+        if let settings = store.settings?.settings, settings.speechProvider == "elevenlabs" {
+            lastEleven = SpeechVoice(id: settings.speechVoice, name: settings.speechVoiceName.isEmpty ? "已保存的声线" : settings.speechVoiceName)
+        }
+        models = list
     }
 
-    private func choices(_ model: SpeechModel) async -> [SpeechVoice] {
-        model.local ? SystemVoices.choices() : await store.speechVoices(provider: model.provider, model: model.id)
-    }
-
-    private func choose(_ model: SpeechModel) async {
+    // Same voice rules as the Mac: ElevenLabs returns to its last voice, the saved model keeps its
+    // saved voice, and any other model starts with its first voice.
+    private func choose(_ next: SpeechModel, _ settings: AppSettings) {
+        if next.provider != settings.speechProvider { cancelVoiceLoading(); voiceStatus = ""; manualVoice = ""; keyInput = "" }
         speech.stop()
-        voices = await choices(model)
-        guard let voice = voices.first else { return }
-        message = await store.update(["speechProvider": .string(model.provider), "speechModel": .string(model.id),
-                                      "speechVoice": .string(voice.id), "speechVoiceName": .string(voice.name)])
+        let remembered = settings.speechProfiles?.first { $0.provider == next.provider && $0.model == next.id }
+        let preferred = remembered?.voice ?? (next.provider == "elevenlabs" ? lastEleven?.id
+            : next.provider == settings.speechProvider && next.id == settings.speechModel ? settings.speechVoice : nil)
+        let available = voices(next, settings)
+        guard let voice = available.first(where: { $0.id == preferred }) ?? available.first else { return }
+        apply(next, voice)
+    }
+
+    private func apply(_ model: SpeechModel, _ voice: SpeechVoice) {
+        speech.stop()
+        Task { _ = await update(model, voice) }
+    }
+
+    private func update(_ model: SpeechModel, _ voice: SpeechVoice) async -> Bool {
+        let error = await store.update(["speechProvider": .string(model.provider), "speechModel": .string(model.id),
+                                        "speechVoice": .string(voice.id), "speechVoiceName": .string(voice.name)])
+        message = error ?? ""
+        if error == nil, model.provider == "elevenlabs" { lastEleven = voice }
+        return error == nil
+    }
+
+    private func applyManual(_ model: SpeechModel) {
+        let id = manualVoice.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !id.isEmpty else { return }
+        speech.stop()
+        Task { if await update(model, SpeechVoice(id: id, name: "自定义声线")) { manualVoice = "" } }
+    }
+
+    // A Voice ID typed but not yet applied is previewed, as on the Mac.
+    private func preview(_ model: SpeechModel, _ settings: AppSettings) {
+        if speech.speakingID == "preview" { speech.stop(); return }
+        let manual = manualVoice.trimmingCharacters(in: .whitespacesAndNewlines)
+        let voice = model.provider == "elevenlabs" && !manual.isEmpty ? manual : settings.speechVoice
+        speech.play("Hello, this is LeXi.", SpeechSelection(provider: model.provider, model: model.id, voice: voice),
+                    key: model.local ? nil : typedKey, using: store, finished: "试听结束", id: "preview")
+    }
+
+    private func loadVoices() {
+        guard !loadingVoices else { return }
+        cancelVoiceLoading()
+        let request = voiceRequest
+        loadingVoices = true
+        voiceStatus = "正在读取可用声线…"
+        let typed = typedKey
+        voiceTask = Task {
+            do {
+                let key = try typed ?? keys.read("elevenlabs") ?? ""
+                let loaded = try await store.elevenVoices(key: key)
+                guard request == voiceRequest else { return }
+                accountVoices = loaded
+                voiceStatus = loaded.isEmpty ? "账号未返回可用声线，可粘贴 Voice ID。" : "已读取 \(loaded.count) 条可用声线，请选择后试听。"
+            } catch {
+                if request == voiceRequest { voiceStatus = SpeechController.message(error) }
+            }
+            if request == voiceRequest { loadingVoices = false }
+        }
+    }
+
+    private func cancelVoiceLoading() { voiceRequest += 1; voiceTask?.cancel(); voiceTask = nil; loadingVoices = false }
+
+    // A changed key makes the loaded account voices stale.
+    private func invalidateVoices() {
+        cancelVoiceLoading(); accountVoices = nil
+        voiceStatus = "连接信息已更改，可重新读取声线列表。"
+    }
+
+    private var typedKey: String? {
+        let value = keyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+
+    private func saveKey(_ provider: String) {
+        guard let value = typedKey else { return }
+        do { try keys.save(provider, value); keyInput = ""; savedKeys.insert(provider); message = "" }
+        catch { message = SpeechController.message(error) }
+    }
+
+    private func removeKey(_ provider: String) {
+        do {
+            try keys.remove(provider); savedKeys.remove(provider); message = ""
+            if provider == "elevenlabs" { invalidateVoices() }
+        } catch { message = SpeechController.message(error) }
     }
 }
 

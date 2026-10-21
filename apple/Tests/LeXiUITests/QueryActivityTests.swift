@@ -3,6 +3,7 @@ import LeXiKit
 import SwiftUI
 import Testing
 @testable import LeXiUI
+@testable import LeXiShared
 
 @MainActor @Suite struct QueryActivityChecks {
     @Test(arguments: [18.0,24.0]) func geometryStaysInsideItsBox(_ size: Double) {

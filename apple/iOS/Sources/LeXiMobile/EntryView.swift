@@ -1,4 +1,5 @@
 import LeXiKit
+import LeXiShared
 import SwiftUI
 
 // One dictionary or translation page, drawn exactly from the QueryView Lexi.Core published.
@@ -10,8 +11,25 @@ struct EntryView: View {
         let view = store.view
         VStack(alignment: .leading, spacing: 16) {
             HeadingRow(view: view, store: store, speech: speech)
+            // As on the Mac: the TL;DR first, then one row of each model's state, then word forms.
+            VStack(alignment: .leading, spacing: 0) {
+                if view.quickRead.visible {
+                    QuickReadCard(quickRead: view.quickRead).padding(.bottom, 10)
+                } else if view.kind == .dictionary && view.progress?.busy == true {
+                    HStack(spacing: 12) {
+                        QuickReadBadge()
+                        RoundedRectangle(cornerRadius: 4).fill(.quaternary).frame(maxWidth: 220).frame(height: 12)
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(LexiTheme.pink.opacity(0.14), in: .rect(cornerRadius: 20, style: .continuous))
+                    .accessibilityLabel("TL;DR 等待释义").padding(.bottom, 10)
+                }
+                ResultProgressBar(progress: view.progress, generation: view.progressGeneration) {
+                    speech.stop(); Task { await store.retryFailed() }
+                }
+            }
             if !view.wordForms.isEmpty { WordFormsView(rows: view.wordForms) }
-            if view.quickRead.visible { QuickReadCard(quickRead: view.quickRead) }
             if view.kind == .translation {
                 if let translation = view.translation { TranslationCard(translation: translation, store: store) }
             } else {

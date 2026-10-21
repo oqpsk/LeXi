@@ -2,10 +2,14 @@ import LeXiKit
 import SwiftUI
 
 // The actors and their states arrive from Core. Only the one-shot CRT retirement is local.
-struct ResultProgressBar: View {
+// Shared by the Mac and iOS windows.
+public struct ResultProgressBar: View {
     let progress: QueryProgress?
     let generation: Int64
     let retry: () -> Void
+    public init(progress: QueryProgress?, generation: Int64, retry: @escaping () -> Void) {
+        self.progress = progress; self.generation = generation; self.retry = retry
+    }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var observedGeneration: Int64 = -1
@@ -20,7 +24,7 @@ struct ResultProgressBar: View {
         let reduceMotion, background: Bool
     }
 
-    var body: some View {
+    public var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30, paused: started == nil || reduceMotion || scenePhase == .background)) { context in
             let frame = CRTShutdown.frame(started.map { context.date.timeIntervalSince($0) / 0.95 } ?? 0)
             ZStack {
@@ -72,6 +76,9 @@ struct ResultProgressBar: View {
                     Text(progress.stageLabels.joined(separator: "\n")).font(.caption).foregroundStyle(.secondary)
                 }
                 .padding(14).frame(maxWidth: 360, alignment: .leading)
+                #if os(iOS)
+                .presentationCompactAdaptation(.popover)
+                #endif
             }
         }
         .onChange(of: progress) { _, value in

@@ -1,4 +1,5 @@
 import LeXiKit
+import LeXiShared
 import SwiftUI
 
 // The one screen. Results scroll beneath a floating Liquid Glass search capsule at the bottom,
@@ -31,6 +32,7 @@ struct RootView: View {
         }
         .onChange(of: store.view.request) { _, _ in pageChanged() }
         .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
+        .onChange(of: searching) { _, active in if !active { store.clearInputPreview() } }
         // The lookup is ready the moment LeXi opens, as on the desktop. The field may join the
         // hierarchy a moment after the first appearance, so focus is asked for again on the next turn.
         .defaultFocus($searching, true)
@@ -63,8 +65,14 @@ struct RootView: View {
     private var searchBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             if store.view.kind != .home && !status.isEmpty {
-                Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(1).padding(.horizontal, 8)
-                    .accessibilityLabel("查询状态：" + status)
+                // The Mac footer's soft matrix beside the status; nothing spins in the query capsule.
+                HStack(spacing: 8) {
+                    QueryActivityMark(activity: store.view.progress?.activity ?? .idle, size: 14).foregroundStyle(.secondary)
+                    Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                }
+                .padding(.horizontal, 8)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("查询状态：" + status)
             }
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
@@ -77,7 +85,6 @@ struct RootView: View {
                     .autocorrectionDisabled()
                     .onChange(of: text) { old, value in edited(old, value) }
                     .accessibilityLabel("查询")
-                if store.view.progress?.busy == true { ProgressView().controlSize(.small) }
                 if !text.isEmpty {
                     Button { clear() } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
                         .buttonStyle(.plain)
@@ -90,8 +97,22 @@ struct RootView: View {
         .padding(.horizontal, 14).padding(.bottom, 6)
     }
 
+    // The preview of what is being typed sits above the suggestions, so the list under the thumb
+    // never moves when the preview arrives.
     @ViewBuilder private var suggestions: some View {
-        if searching && !store.suggestions.isEmpty {
+        if searching && (!store.suggestions.isEmpty || store.inputPreview != nil) {
+            VStack(spacing: 8) {
+                if let preview = store.inputPreview {
+                    Button { setText(preview.query); submit(preview.query) } label: { InputPreviewCard(preview: preview) }
+                        .buttonStyle(.plain)
+                }
+                if !store.suggestions.isEmpty { suggestionList }
+            }
+            .padding(.horizontal, 14).padding(.bottom, 10)
+        }
+    }
+
+    private var suggestionList: some View {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(store.suggestions.prefix(6).enumerated()), id: \.offset) { _, word in
                     Button { setText(word); submit(word) } label: {
@@ -105,10 +126,8 @@ struct RootView: View {
             }
             .padding(.vertical, 6)
             .glassEffect(.regular, in: .rect(cornerRadius: 22, style: .continuous))
-            .padding(.horizontal, 14).padding(.bottom, 10)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("输入建议")
-        }
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
@@ -122,6 +141,9 @@ struct RootView: View {
         ToolbarItemGroup(placement: .topBarTrailing) {
             Menu {
                 if store.view.kind != .home {
+                    if store.view.canRetry == true {
+                        Button { speech.stop(); Task { await store.retryFailed() } } label: { Label("重试未完成", systemImage: "arrow.clockwise.circle") }
+                    }
                     Button { regenerate() } label: { Label("重新生成", systemImage: "arrow.clockwise") }.disabled(!canRegenerate)
                 }
                 Button { Task { await store.setOnline(!online) } } label: {
@@ -143,24 +165,25 @@ struct RootView: View {
             setText(old); submit(old); return
         }
         if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            store.clearSuggestions()
+            store.clearSuggestions(); store.clearInputPreview()
             if store.view.kind != .home { Task { await store.home() } }
             return
         }
         Task { await store.suggest(value) }
+        store.previewInput(value)
     }
 
     private func submit(_ value: String) {
         guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         speech.stop()
-        store.clearSuggestions()
+        store.clearSuggestions(); store.clearInputPreview()
         searching = false
         Task { await store.submit(value) }
     }
 
     private func clear() {
         setText("")
-        store.clearSuggestions()
+        store.clearSuggestions(); store.clearInputPreview()
         Task { await store.home() }
         searching = true
     }
@@ -183,43 +206,107 @@ struct RootView: View {
     }
 }
 
+// Recent explicit submissions, searchable and loaded a page at a time, as on the Mac. Deleting a row
+// never deletes cached definitions.
 struct HistoryView: View {
     @Bindable var store: LexiStore
     let open: (HistoryEntry) -> Void
+    @State private var filter: String
+
+    init(store: LexiStore, open: @escaping (HistoryEntry) -> Void) {
+        self.store = store; self.open = open
+        // Coming back home keeps the search that is still applied to the list.
+        _filter = State(initialValue: store.historyFilter)
+    }
 
     var body: some View {
-        if store.history.entries.isEmpty {
-            ContentUnavailableView {
-                Label("查一个词", systemImage: "character.book.closed")
-            } description: {
-                Text(store.history.error.isEmpty ? "在下方输入单词、短语或一段文字。查过的内容会留在这里。" : store.history.error)
-            }
-            .padding(.top, 40)
-        } else {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("最近查询").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.horizontal, 4)
-                VStack(spacing: 0) {
-                    ForEach(Array(store.history.entries.enumerated()), id: \.element.id) { index, entry in
-                        if index > 0 { Divider().padding(.leading, 18) }
-                        Button { open(entry) } label: {
-                            HStack(spacing: 12) {
-                                Text(entry.preview)
-                                    .font(entry.translation ? .system(size: 17) : LexiTheme.lexical(19))
-                                    .lineLimit(1).foregroundStyle(.primary)
-                                Spacer(minLength: 8)
-                                Text(entry.kind).font(.caption).foregroundStyle(.secondary)
-                            }
-                            .padding(.horizontal, 18).padding(.vertical, 13)
-                            .contentShape(.rect)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button(role: .destructive) { Task { await store.remove(entry) } } label: { Label("从历史中删除", systemImage: "trash") }
+        let searching = !filter.isEmpty || !store.historyFilter.isEmpty
+        Group {
+            if !store.history.error.isEmpty || store.history.entries.isEmpty && !searching {
+                ContentUnavailableView {
+                    Label("查一个词", systemImage: "character.book.closed")
+                } description: {
+                    Text(store.history.error.isEmpty ? "在下方输入单词、短语或一段文字。查过的内容会留在这里。" : store.history.error)
+                }
+                .padding(.top, 40)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    // The query capsule below looks words up; this field only filters the list.
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField("搜索历史", text: $filter)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled().submitLabel(.search)
+                        if !filter.isEmpty {
+                            Button { filter = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+                                .buttonStyle(.plain).accessibilityLabel("清除搜索")
                         }
                     }
+                    .font(.callout)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(.quaternary.opacity(0.6), in: .capsule)
+                    .accessibilityElement(children: .contain).accessibilityLabel("搜索查询历史")
+                    Text("最近查询").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.horizontal, 4)
+                    if store.history.entries.isEmpty {
+                        Text("没有匹配的历史。").foregroundStyle(.secondary).padding(.vertical, 8).padding(.horizontal, 4)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(store.history.entries.enumerated()), id: \.element.id) { index, entry in
+                                if index > 0 { Divider().padding(.leading, 18) }
+                                row(entry)
+                                    // The next page loads as the last row comes into view.
+                                    .onAppear { if index == store.history.entries.count - 1 && hasMore { Task { await store.moreHistory() } } }
+                            }
+                        }
+                        .contentGroup()
+                    }
                 }
-                .contentGroup()
             }
         }
+        .task(id: filter) {
+            guard filter != store.historyFilter else { return }
+            try? await Task.sleep(for: .milliseconds(200)); guard !Task.isCancelled else { return }
+            await store.searchHistory(filter)
+        }
+    }
+
+    private var hasMore: Bool { store.history.entries.count < (store.history.total ?? store.history.entries.count) }
+
+    private func row(_ entry: HistoryEntry) -> some View {
+        Button { open(entry) } label: {
+            HStack(spacing: 12) {
+                Text(entry.preview)
+                    .font(entry.translation ? .system(size: 17) : LexiTheme.lexical(19))
+                    .lineLimit(1).foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                Text(entry.kind).font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 18).padding(.vertical, 13)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("重新查询：" + entry.preview)
+        .contextMenu {
+            Button(role: .destructive) { Task { await store.remove(entry) } } label: { Label("从历史中删除", systemImage: "trash") }
+        }
+    }
+}
+
+// The TL;DR of what is being typed, as on the Mac: the saved result or a local dictionary's, shown
+// after a short pause without going online. A tap opens the full page.
+struct InputPreviewCard: View {
+    let preview: InputPreview
+    private var message: String { "\(preview.label)：\(preview.text)" }
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            QuickReadBadge()
+            Text(verbatim: message).font(.system(size: 16, weight: .medium))
+                .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 11)
+        .glassEffect(.regular.tint(LexiTheme.pink.opacity(0.35)), in: .rect(cornerRadius: 22, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: "TL;DR · \(message)"))
+        .accessibilityHint(Text(preview.source))
     }
 }

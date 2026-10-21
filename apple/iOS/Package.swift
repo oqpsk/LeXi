@@ -15,7 +15,7 @@ let package = Package(
     platforms: [.iOS(.v26)],
     dependencies: [.package(name: "LeXi", path: "..")],
     targets: [
-        .executableTarget(name: "LeXiMobile", dependencies: [.product(name: "LeXiKit", package: "LeXi")], linkerSettings: [
+        .executableTarget(name: "LeXiMobile", dependencies: [.product(name: "LeXiKit", package: "LeXi"), .product(name: "LeXiShared", package: "LeXi")], linkerSettings: [
             .unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__entitlements", "-Xlinker", entitlements]),
         ]),
     ]

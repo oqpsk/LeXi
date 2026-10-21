@@ -20,7 +20,7 @@ public sealed class ApiKeys
     }
     public bool Has(string provider) => keys.ContainsKey(provider);
     public string For(string provider) => keys.TryGetValue(provider, out var key) ? key :
-        throw new InvalidOperationException($"请在设置 → 模型中填写 {ApiDictionary.ServiceName(provider)} API Key。");
+        throw new InvalidOperationException($"请在“设置 → 模型服务”中填写 {ApiDictionary.ServiceName(provider)} API Key。");
 }
 
 // Model access with the user's own API keys, for platforms without the official subscription

@@ -66,7 +66,7 @@ apple/scripts/build-ios.sh --device            # 生成 artifacts/ios-device/LeX
 2. 用数据线连接 iPhone，在手机上点 Trust；在 Settings → Privacy & Security → Developer Mode 打开开发者模式并重启。
 3. 让 Xcode 登记这台设备并生成开发证书与描述文件：用 Xcode 在这台设备上运行任意一个选了你团队的 iOS 项目一次，或对这样的项目运行 `xcodebuild -allowProvisioningUpdates -allowProvisioningDeviceRegistration -destination 'platform=iOS,id=<UDID>' build`。
 
-之后 `build-ios.sh --device [UDID]` 会自动挑选：连接中的设备（未指定时）、Xcode 文件夹中仍有效且包含这台设备与 `io.github.oqpsk.lexi`（或通配符）的开发描述文件、该文件列出且钥匙串中有私钥的证书，以及其中的团队（`apple/scripts/ios-signing.swift`）。权限按团队写进签名，描述文件放进应用；仓库中不保存任何账号信息。装好的版本在描述文件到期（通常一年）前都能打开。
+之后 `build-ios.sh --device [UDID]` 会自动挑选：连接中的设备（未指定时）、Xcode 文件夹中仍有效且包含这台设备与 `io.github.oqpsk.lexi`（或通配符）的开发描述文件、该文件列出且钥匙串中有私钥的证书，以及其中的团队（`apple/scripts/ios-signing.swift`）。权限按团队写进签名，描述文件放进应用；仓库中不保存任何账号信息。安装后，脚本把这台 Mac 已安装的离线词库（`~/Library/Application Support/LeXi/data`，未改动的文件跳过）复制到设备上的应用数据目录，输入建议与本地释义随之可用；`LEXI_DICTIONARIES` 可指定其他文件夹，设为空则跳过。装好的版本在描述文件到期（通常一年）前都能打开。
 
 如果 `xcrun simctl boot` 一直没有结果，或 xcodebuild 提示 “CoreSimulator is out of date”，说明系统中的模拟器组件比 Xcode 旧：打开一次 Xcode 并按提示安装附加组件，或运行 `xcodebuild -runFirstLaunch`（需要管理员密码），然后重新启动模拟器。
 

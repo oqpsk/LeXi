@@ -6,7 +6,7 @@
 # --run boots the named simulator if needed, then installs and opens the app (default: the booted one).
 # --device builds for an iPhone or iPad (artifacts/ios-device), signs it for development with the
 # certificate and provisioning profile Xcode created for your team, then installs and opens it on the
-# named device or the one connected (see apple/README.md).
+# named device or the one connected, with this Mac's offline dictionaries (see apple/README.md).
 set -euo pipefail
 root=${0:A:h:h:h}
 run=false; device=booted; target=simulator
@@ -71,6 +71,16 @@ if [[ $target == device ]]; then
   codesign --force --sign "${signing[2]}" --entitlements "$work/device.entitlements" "$app"
   echo "Built $app ($version, iOS device)"
   xcrun devicectl device install app --device "$device" "$app"
+  # The offline dictionaries this Mac has installed, so suggestions and local definitions work on the
+  # device too; unchanged files are skipped. LEXI_DICTIONARIES names another folder, or "" skips this.
+  dictionaries=${LEXI_DICTIONARIES-$HOME/Library/Application Support/LeXi/data}
+  if [[ -n $dictionaries && -d $dictionaries ]]; then
+    for file in "$dictionaries"/**/*(.N); do
+      xcrun devicectl device copy to --device "$device" --domain-type appDataContainer --domain-identifier "$bundle" \
+        --source "$file" --destination "Library/Application Support/LeXi/data/${file#$dictionaries/}" >/dev/null
+    done
+    echo "Copied the offline dictionaries from $dictionaries"
+  fi
   xcrun devicectl device process launch --device "$device" "$bundle"
   exit 0
 fi

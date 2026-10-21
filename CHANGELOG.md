@@ -2,6 +2,13 @@
 
 ## Unreleased — major-version preparation
 
+- Bring the iOS app closer to the Mac.
+  - **Progress.** The TL;DR comes first, then the query progress row, then the word forms. The progress row, with its soft-matrix marks and CRT retirement, is now the Mac's own view, shared through `LeXiShared`. A failed model retries from the row or from 更多操作, and the status line shows the soft matrix instead of a spinner.
+  - **Typing preview.** Pausing while typing shows the TL;DR from saved results and local dictionaries above the suggestions, so the list never moves.
+  - **History.** History can be searched and loads further pages as it scrolls.
+  - **Speech.** Speech offers Grok and ElevenLabs, with account voices or a Voice ID, beside the system voices and OpenAI.
+  - **Dictionaries.** `build-ios.sh --device` copies the Mac's installed offline dictionaries to the device, so suggestions and local definitions work there.
+  - **Wording.** A missing API key now points to 设置 → 模型服务.
 - Use the custom text service on iOS. 设置 → 自定义文本服务 takes the same OpenAI-compatible endpoint, CF Access credentials and optional API key as the Mac's API connection, kept per address in the device's Keychain, and reads its model list. The service's models are offered beside the OpenAI and Anthropic API models for the first and second lookup models and the sense judge, which now keeps its provider. Each model with options gets thinking depth and speed beneath its picker, as on the Mac. Settings copied from a Mac keep the custom service and drop the subscription clients.
 - Install LeXi on an iPhone or iPad for development: `apple/scripts/build-ios.sh --device` builds for the device, signs with the certificate and profile Xcode created for your team, and installs and opens it.
 - macOS light mode no longer turns grey over a dark desktop. Light glass now carries a near-white wash, so it reads as frosted white. The results sit on white groups instead of grey ones, and the TL;DR card is a clearer pale pink. The query capsule has a hairline edge, so it stays visible on near-white glass. Dark mode is unchanged.
@@ -20,7 +27,7 @@
 - Add `Lexi.Embed`: the host server compiled with NativeAOT into a library the iOS app loads, speaking the same protocol through `lexi_start`, `lexi_send` and `lexi_close`. It uses the NativeAOT runtime pack from NuGet, so no .NET iOS workload is needed. `LeXiKit` gains `HostTransport` with a process transport (macOS) and `EmbeddedTransport`; `SpeechController` moves to `LeXiKit` for both apps. A Swift test drives a macOS build of the library through the same path.
 - Reach models with API keys where the subscription clients cannot run (iOS): OpenAI Responses API with strict structured output and Anthropic Messages API with a forced tool, using the same instructions, schemas and validation. Keys stay in memory through the host's new `keys.set`. `api-check` covers requests, parsing, retry, errors, keys, model rules and a routed session.
 - Generate Core's and the host's JSON serializers at build time instead of by reflection, so Core runs under NativeAOT. Cache keys, hashes and prompts are unchanged byte for byte, and a NativeAOT `lexi-host` passes host-check. The shapes added since — cache keys with a custom endpoint or per-model effort and speed, the version 2 translation key, the sense-merge prompt's pair count, the retry checkpoints' settings identity, the backup manifest, the custom endpoint's chat request, the OAuth catalog requests and the host's data, history, model and speech replies — are named types as well, and the new `json-check` compares each with the anonymous object it replaced.
-- On iOS the OAuth model catalog, retry, typing preview, history search, the soft-matrix animations and backup are not offered yet (FEATURES.md); Core skips the OAuth catalog read where the subscription clients cannot run, and the sense judge on API keys follows its model id.
+- On iOS the OAuth model catalog and backup are not offered yet (FEATURES.md); Core skips the OAuth catalog read where the subscription clients cannot run, and the sense judge on API keys follows its model id.
 
 - Replace the query-row loading spinner with the same soft-matrix activity used in the footer on Windows and macOS. Share stage changes and motion preferences, keep the query-row mark unframed, and retain terminal check/warning symbols, keyboard/click stage details and stable control alignment.
 

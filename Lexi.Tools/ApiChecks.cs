@@ -70,7 +70,7 @@ internal static class ApiChecks
         var keys = new ApiKeys();
         string Missing(string provider) { try { keys.For(provider); return ""; } catch (InvalidOperationException e) { return e.Message; } }
         keys.Set("openai", "  " + Key + "  ");
-        Check(keys.For("openai") == Key && Missing("anthropic") == "请在设置 → 模型中填写 Anthropic API Key。", "keys are trimmed and a missing key names its service");
+        Check(keys.For("openai") == Key && Missing("anthropic") == "请在“设置 → 模型服务”中填写 Anthropic API Key。", "keys are trimmed and a missing key names its service");
         keys.Set("openai", "");
         Check(!keys.Has("openai") && !ApiKeys.Supports("codex"), "an empty key removes it; only API services take keys");
 
