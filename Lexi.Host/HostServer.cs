@@ -278,8 +278,9 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
     private SettingsResult Settings()
     {
         var settings = session.Settings;
-        // API platforms offer the API models; elsewhere the OAuth catalogs and the text endpoint's models.
-        var models = ModelCatalog.ApiOnly ? ModelCatalog.ApiChoices(settings) : InferenceOptions.Available(session.Paths.UserRoot, settings);
+        // API platforms offer the API models and the text endpoint's; elsewhere the OAuth catalogs and the text endpoint's.
+        var models = ModelCatalog.ApiOnly ? ModelCatalog.ApiChoices(settings, InferenceOptions.Available(session.Paths.UserRoot, settings))
+            : InferenceOptions.Available(session.Paths.UserRoot, settings);
         return new(settings, models, ModelCatalog.JudgeChoices(models), new(ControlText.OnlineLabel(settings.Online),
             ControlText.OnlineTooltip(settings.Online), ControlText.RegenerateTooltip(settings.Online)));
     }

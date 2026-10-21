@@ -87,26 +87,26 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 缓存管理 | `UserData`：中间缓存（含本句语境判断与查询耗时记录）、语音、已保存查询分别统计/清理；与查询互斥 | 数据与迁移 | 数据与迁移 |
 | 干净分发 | 干净源码默认值；平台安全存储不进入程序 | ZIP 脚本已准备，未生成发布包 | 现有 bundle 构建；正式签名/公证仍待发布时完成 |
 
-## iOS（模拟器预览）
+## iOS
 
-iOS 应用（`apple/iOS`）目前只在模拟器中运行：安装到设备或上架需要 Apple 开发者账号。iOS 不能启动进程，`Lexi.Core` 以 NativeAOT 库（`Lexi.Embed`）运行在应用内，收发与 macOS 相同的 Host 协议。界面遵循 iOS 的设计规范，功能与两个桌面版对齐；下表只列出 iOS 的状态与差别。
+iOS 应用（`apple/iOS`）可在模拟器中运行；有 Apple 开发者账号时，`build-ios.sh --device` 以开发签名装到连接的 iPhone 或 iPad。iOS 不能启动进程，`Lexi.Core` 以 NativeAOT 库（`Lexi.Embed`）运行在应用内，收发与 macOS 相同的 Host 协议。界面遵循 iOS 的设计规范，功能与两个桌面版对齐；下表只列出 iOS 的状态与差别。
 
 | 功能 | iOS | 说明 |
 |---|---|---|
 | 查词、翻译、输入建议、历史、后退 / 前进、重新生成、在线补充 | 已实现 | 共用 Core；搜索框在屏幕底部，Return 查询，粘贴的换行保留给翻译；`lexi://lookup?q=…` 直接查词 |
-| 模型访问 | 已实现：OpenAI 与 Anthropic API Key | 没有官方客户端，不能使用 ChatGPT / Claude 订阅；密钥存入钥匙串，只在内存中交给 Core（`keys.set`），按服务商的 API 计费 |
-| 双模型、义项合并、TL;DR、来源与原文、词形、音标、词源 | 已实现 | 同一份 Core 规则；义项判断可用任一 API 服务 |
+| 模型访问 | 已实现：OpenAI 与 Anthropic API Key、自定义文本服务 | 没有官方客户端，不能使用 ChatGPT / Claude 订阅；密钥与凭据存入本机钥匙串，只在内存中交给 Core（`keys.set`、`text.credentials`），不从 Mac 同步 |
+| 双模型、义项合并、TL;DR、来源与原文、词形、音标、词源 | 已实现 | 同一份 Core 规则；查询模型与义项判断可用任一 API 服务或自定义文本服务 |
 | 模型流式预览 | 计划 | API 路径一次返回完整结果 |
 | 朗读释义与例句 | 已实现：长按选择“朗读”，播放中的段落以淡金色底标出 | 触屏没有悬停，因此不显示边距扬声器 |
 | 发音 | 已实现：本机声线、OpenAI 语音 | Grok、ElevenLabs 计划 |
 | 离线词库 | 已实现：读取数据目录中已安装的词库 | 应用内下载与安装计划 |
 | 外观 | 已实现：跟随系统、浅色、深色 | |
 | 订阅模型目录（OAuth） | 不适用 | 需要官方客户端 |
-| 自定义文本服务 | 计划 | iOS 目前只接入 OpenAI 与 Anthropic API Key |
-| 每个模型的 effort 与速度 | 计划 | API 路径使用服务默认档位 |
+| 自定义文本服务 | 已实现：设置 → 自定义文本服务 | 与 macOS 的 API 连接相同：Base URL、CF Access 凭据、可选 API Key、读取模型列表、逐片显示；模型列表标“自定义服务” |
+| 每个模型的 effort 与速度 | 已实现：自定义文本服务的模型 | 每个模型选择器下一行，按服务端能力提供选项，同一模型共用一套；OpenAI 与 Anthropic API Key 的模型使用服务默认档位 |
 | 重试未完成 | 计划 | Core 已保存重试检查点；iOS 尚无入口 |
 | 输入时预览本地 TL;DR | 计划 | 共用 `query.preview`；iOS 搜索框尚未显示 |
 | 历史搜索与分页 | 计划 | iOS 显示最近一页历史；保存上限同为 10,000 条 |
 | 底栏与查询行的 soft matrix 动画、朗读声纹 | 计划 | 播放中的段落以淡金色底标出 |
 | 备份迁移与缓存管理 | 计划 | 共用 `UserData`；iOS 尚无文件入口 |
-| 设备安装与分发 | 计划 | 需要 Apple 开发者账号 |
+| 设备安装与分发 | 已实现：开发签名装机（`build-ios.sh --device`） | TestFlight 与上架计划 |

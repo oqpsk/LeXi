@@ -251,13 +251,15 @@ public final class LexiStore {
     }
 
     // ---- Custom text service ----
-    public var queryModels: [ModelChoice] {
-        let saved = settings?.models ?? []
+    public var queryModels: [ModelChoice] { withReadModels(settings?.models ?? []) }
+    // The host's judges (Codex or the text endpoint on the Mac; the API services or the text endpoint
+    // on iOS), with the endpoint models just read.
+    public var judgeChoices: [ModelChoice] { withReadModels(settings?.judgeModels ?? []) }
+    private func withReadModels(_ saved: [ModelChoice]) -> [ModelChoice] {
         guard let endpoint = settings?.settings.compatibleBaseUrl,
               (try? TextCredentials.endpoint(endpoint)) == compatibleModelsEndpoint else { return saved }
         return saved + compatibleModels.filter { model in !saved.contains(where: { $0.key == model.key }) }
     }
-    public var judgeChoices: [ModelChoice] { queryModels.filter { $0.provider == "codex" || $0.provider == "compatible" } }
     public func clearCompatibleModels() { compatibleModels = []; compatibleModelsEndpoint = "" }
     public func textModels(_ baseUrl: String, credentials: TextCredentials) async throws -> [ModelChoice] {
         guard let client else { throw HostError.exited }

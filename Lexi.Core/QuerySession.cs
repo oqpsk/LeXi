@@ -700,7 +700,7 @@ public sealed partial class QuerySession : IDisposable
         ContextRequest? contextRequest;
         lock (gate) { if (id != request) return; contextRequest = LookupContext.Request(query, sentence, Presentation.Snapshot); }
         if (contextRequest == null) return;
-        var judge = new LookupModel(Settings.JudgeProvider, Settings.JudgeModel);
+        var judge = ModelCatalog.Judge(Settings);
         var options = Settings.ForModel(judge);
         var key = contextRequest.InputHash + ":" + judge.CacheKey("", options);
         if (Cache.Read<ContextPick>(LookupContext.CacheKind, key) is { } saved)

@@ -1,8 +1,8 @@
 import LeXiKit
 import SwiftUI
 
-// iOS has no official subscription clients, so models are reached with the user's own API keys.
-// Keys stay in the Keychain on this device and reach Lexi.Core in memory only.
+// iOS has no official subscription clients, so models are reached with the user's own API keys or
+// custom text service. Keys stay in the Keychain on this device and reach Lexi.Core in memory only.
 struct SettingsView: View {
     @Bindable var store: LexiStore
     var speech: SpeechController
@@ -13,6 +13,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 KeysSection(store: store)
+                CustomServiceSection(store: store)
                 if let payload = store.settings { ModelSection(store: store, payload: payload) }
                 SpeechSection(store: store, speech: speech)
                 DictionarySection(store: store)
@@ -74,7 +75,7 @@ struct KeysSection: View {
         } header: {
             Text("模型服务")
         } footer: {
-            Text("iOS 上没有官方客户端，LeXi 用你自己的 API Key 访问 OpenAI 与 Anthropic，按服务商的 API 计费，与 ChatGPT、Claude 订阅分开。密钥只保存在本机钥匙串。OpenAI 的密钥也用于 OpenAI 在线语音。")
+            Text("iOS 上没有官方客户端，LeXi 用你自己的 API Key 访问 OpenAI 与 Anthropic，按服务商的 API 计费，与 ChatGPT、Claude 订阅分开；也可以在下方接入自定义文本服务。密钥只保存在本机钥匙串。OpenAI 的密钥也用于 OpenAI 在线语音。")
         }
         .onAppear { saved = Set(ModelKeys.providers.filter { keys.hasSaved($0) }) }
     }
@@ -98,6 +99,115 @@ struct KeysSection: View {
     }
 }
 
+// The custom text service, as on the Mac: an OpenAI-compatible endpoint. Its credentials are kept per
+// address in this device's Keychain; nothing comes over from the Mac.
+struct CustomServiceSection: View {
+    @Bindable var store: LexiStore
+    private let keys: any TextCredentialStore = KeychainTextCredentials()
+    @State private var baseUrl = ""
+    @State private var clientId = ""
+    @State private var clientSecret = ""
+    @State private var apiKey = ""
+    @State private var streaming = true
+    @State private var saved = false
+    @State private var message = "读取模型列表后，在下方“查询”中选择模型。"
+    @State private var loading = false
+    @State private var generation = 0
+    @State private var request: Task<Void, Never>?
+
+    var body: some View {
+        Section {
+            TextField("Base URL", text: $baseUrl, prompt: Text("Base URL，例如 https://…/v1"))
+                .keyboardType(.URL).textContentType(.URL)
+            SecureField("CF Access Client ID", text: $clientId, prompt: Text(saved ? "CF Access Client ID · 留空保留" : "CF Access Client ID"))
+            SecureField("CF Access Client Secret", text: $clientSecret, prompt: Text(saved ? "CF Access Client Secret · 留空保留" : "CF Access Client Secret"))
+            SecureField("API Key", text: $apiKey, prompt: Text(saved ? "API Key · 留空保留" : "API Key（可选）"))
+            Toggle("逐片显示生成结果", isOn: $streaming)
+            HStack {
+                Button("读取模型列表") { load() }.disabled(loading || baseUrl.isEmpty)
+                if loading { ProgressView().padding(.leading, 6) }
+                Spacer()
+                Button("保存连接") { save() }.disabled(baseUrl.isEmpty)
+            }
+            .buttonStyle(.borderless)
+            if saved { Button("清除此地址的凭据", role: .destructive) { remove() } }
+            Text(message).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+        } header: {
+            Text("自定义文本服务")
+        } footer: {
+            Text("OpenAI 兼容接口，可以填 Mac 上用的同一个地址。凭据按地址保存在本机钥匙串，不会从 Mac 同步；API Key 可留空。只用于文本，发音另行设置。")
+        }
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+        .onAppear {
+            if baseUrl.isEmpty {
+                baseUrl = store.settings?.settings.compatibleBaseUrl ?? ""
+                streaming = store.settings?.settings.compatibleStreaming ?? true
+                saved = keys.hasSaved(baseUrl)
+            }
+        }
+        .onChange(of: baseUrl) { old, _ in
+            // Filling in the saved address on appear is not an edit: keep the opening guidance.
+            guard !old.isEmpty else { return }
+            invalidate(); clientId = ""; clientSecret = ""; apiKey = ""; saved = keys.hasSaved(baseUrl)
+        }
+        .onChange(of: clientId) { _, _ in invalidate() }
+        .onChange(of: clientSecret) { _, _ in invalidate() }
+        .onChange(of: apiKey) { _, _ in invalidate() }
+        .onDisappear { request?.cancel() }
+    }
+    private func invalidate() {
+        generation += 1; request?.cancel(); loading = false; store.clearCompatibleModels()
+        message = "请读取模型列表，再选择要使用的模型。"
+    }
+    private func credentials(_ endpoint: String) throws -> TextCredentials {
+        let previous: TextCredentials
+        if !clientId.isEmpty, !clientSecret.isEmpty { previous = (try? keys.read(endpoint)) ?? TextCredentials() }
+        else { previous = try keys.read(endpoint) ?? TextCredentials() }
+        let value = TextCredentials(clientId: clientId.isEmpty ? previous.clientId : clientId,
+            clientSecret: clientSecret.isEmpty ? previous.clientSecret : clientSecret, apiKey: apiKey.isEmpty ? previous.apiKey : apiKey)
+        try value.validate(); return value
+    }
+    private func load() {
+        request?.cancel(); generation += 1
+        let current = generation
+        loading = true; message = "正在读取模型列表…"
+        request = Task { @MainActor in
+            defer { if current == generation { loading = false } }
+            do {
+                let endpoint = try TextCredentials.endpoint(baseUrl)
+                let models = try await store.textModels(endpoint, credentials: credentials(endpoint))
+                guard !Task.isCancelled, current == generation else { return }
+                store.keepTextModels(models, baseUrl: endpoint)
+                message = models.isEmpty ? "鉴权成功，服务端暂未提供可用模型。" : "已读取 \(models.count) 个模型。保存连接后，在下方“查询”中选择主要模型、第二个模型或义项判断模型。"
+            } catch {
+                if !Task.isCancelled, current == generation { message = error.localizedDescription }
+            }
+        }
+    }
+    private func save() {
+        do {
+            let endpoint = try TextCredentials.endpoint(baseUrl)
+            try keys.save(endpoint, credentials(endpoint))
+            saved = true
+            Task { @MainActor in
+                if let error = await store.update(["compatibleBaseUrl": .string(endpoint), "compatibleStreaming": .bool(streaming)]) { message = error }
+                else { message = "连接已保存。在下方“查询”中选择要使用的模型。" }
+            }
+        } catch { message = error.localizedDescription }
+    }
+    private func remove() {
+        do {
+            try keys.remove(baseUrl); invalidate(); clientId = ""; clientSecret = ""; apiKey = ""; saved = false
+            let endpoint = baseUrl
+            Task { @MainActor in
+                await store.forgetTextCredentials(endpoint)
+                message = "已清除此地址的凭据。"
+            }
+        } catch { message = error.localizedDescription }
+    }
+}
+
 struct ModelSection: View {
     @Bindable var store: LexiStore
     let payload: SettingsPayload
@@ -108,20 +218,23 @@ struct ModelSection: View {
         Section {
             Toggle("在线补充", isOn: binding(settings.online, "online"))
             Toggle("自动补充双语释义", isOn: binding(settings.autoAi, "autoAi"))
-            picker("主要模型", payload.models, selected: settings.provider + ":" + settings.model) { ["provider": .string($0.provider), "model": .string($0.id)] }
+            picker("主要模型", store.queryModels, selected: settings.provider + ":" + settings.model) { ["provider": .string($0.provider), "model": .string($0.id)] }
+            inferenceControls(store.queryModels, selected: settings.provider + ":" + settings.model)
             Toggle("双模型同时查词", isOn: binding(settings.parallelLookup, "parallelLookup"))
             if settings.parallelLookup {
-                picker("第二个模型", payload.models, selected: secondaryKey(settings)) { ["secondaryProvider": .string($0.provider), "secondaryModel": .string($0.id)] }
+                picker("第二个模型", store.queryModels, selected: secondaryKey(settings)) { ["secondaryProvider": .string($0.provider), "secondaryModel": .string($0.id)] }
+                inferenceControls(store.queryModels, selected: secondaryKey(settings))
             }
             Toggle("自动整理同类义项", isOn: binding(settings.mergeSenses, "mergeSenses"))
             if settings.mergeSenses {
-                picker("义项判断模型", payload.judgeModels, selected: judgeKey(settings)) { ["judgeModel": .string($0.id)] }
+                picker("义项判断模型", store.judgeChoices, selected: judgeKey(settings)) { ["judgeProvider": .string($0.provider), "judgeModel": .string($0.id)] }
+                inferenceControls(store.judgeChoices, selected: judgeKey(settings))
             }
             if let error { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.callout) }
         } header: {
             Text("查询")
         } footer: {
-            Text("两个模型独立查词，先返回的释义先显示；缺少某个服务的密钥时，只有那个模型无法查询。")
+            Text("两个模型独立查词，先返回的释义先显示；缺少某个服务的密钥时，只有那个模型无法查询。思考深度和速度跟着模型保存，同一模型在不同位置共用一套。")
         }
     }
 
@@ -130,8 +243,11 @@ struct ModelSection: View {
             ? (settings.provider == "anthropic" ? "openai:gpt-6-luna" : "anthropic:claude-haiku-5-5")
             : settings.secondaryProvider + ":" + settings.secondaryModel
     }
+    // As Lexi.Core's judge: the saved provider, or, for a judge saved before it was stored, the model id's service.
     private func judgeKey(_ settings: AppSettings) -> String {
-        (settings.judgeModel.hasPrefix("claude") ? "anthropic:" : "openai:") + settings.judgeModel
+        let provider = settings.judgeProvider ?? ""
+        let service = ["openai", "anthropic", "compatible"].contains(provider) ? provider : settings.judgeModel.hasPrefix("claude") ? "anthropic" : "openai"
+        return service + ":" + settings.judgeModel
     }
 
     private func binding(_ value: Bool, _ key: String) -> Binding<Bool> {
@@ -144,6 +260,37 @@ struct ModelSection: View {
         })) {
             ForEach(choices, id: \.key) { Text($0.label).tag($0.key) }
         }
+    }
+
+    // One row under each model picker, so the effort and speed it shows belong to that model.
+    @ViewBuilder
+    private func inferenceControls(_ models: [ModelChoice], selected: String) -> some View {
+        if let model = models.first(where: { $0.key == selected }), let options = model.options {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("思考深度 · 速度").lineLimit(1)
+                    Spacer(minLength: 8)
+                    inferencePicker("思考深度", options.effortChoices, value: model.effort ?? "") { value in
+                        Task { error = await store.configureInference(model, effort: value, speed: model.speed ?? "") }
+                    }
+                    inferencePicker("速度", options.speedChoices, value: model.speed ?? "") { value in
+                        Task { error = await store.configureInference(model, effort: model.effort ?? "", speed: value) }
+                    }
+                }
+                if !options.note.isEmpty { Text(options.note).font(.caption).foregroundStyle(.secondary) }
+            }
+        }
+    }
+    private func inferencePicker(_ title: String, _ options: [InferenceOption], value: String, change: @escaping (String) -> Void) -> some View {
+        Picker(title, selection: Binding(get: { value }, set: { change($0) })) {
+            ForEach(options) { Text($0.label).tag($0.id) }
+            if !options.contains(where: { $0.id == value }) { Text(value + "（当前不可用）").tag(value) }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .fixedSize()
+        // Only the default is on offer, and nothing else was saved earlier.
+        .disabled(options.count <= 1 && value.isEmpty)
     }
 
     private func apply(_ changes: [String: SettingValue]) { Task { error = await store.update(changes) } }

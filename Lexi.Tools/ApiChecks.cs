@@ -88,6 +88,25 @@ internal static class ApiChecks
             ModelCatalog.JudgeChoices(ModelCatalog.ApiChoices(apiSettings)).Length == ModelCatalog.ApiChoices(apiSettings).Length,
             "the judge follows its model's service and model IDs are checked");
 
+        // The custom text endpoint works where the subscription clients cannot run, beside the API keys.
+        var endpoint = new[] { ModelCatalog.Choice(CompatibleText.Provider, "claude/claude-sonnet-5-5"), ModelCatalog.Choice("codex", "gpt-6-luna") };
+        var mixed = new AppSettings { Provider = CompatibleText.Provider, Model = "claude/claude-sonnet-5-5", SecondaryProvider = "anthropic",
+            SecondaryModel = "claude-haiku-5-5", JudgeProvider = CompatibleText.Provider, JudgeModel = "codex/gpt-6.1-sol", CompatibleBaseUrl = "https://text.example/v1" };
+        ModelCatalog.UseApiDefaults(mixed);
+        Check(ModelCatalog.ApiChoices(mixed, endpoint) is { Length: 5 } offered && offered[^1] is { Provider: CompatibleText.Provider, Label: "claude/claude-sonnet-5-5 · 自定义服务" },
+            "API platforms also offer the custom text endpoint's models, and never a subscription client's");
+        Check(mixed is { Provider: CompatibleText.Provider, Model: "claude/claude-sonnet-5-5", JudgeProvider: CompatibleText.Provider } &&
+            ModelCatalog.Judge(mixed, true) == new LookupModel(CompatibleText.Provider, "codex/gpt-6.1-sol") && ModelCatalog.Validate(mixed, true) == null,
+            "a custom-endpoint lookup model and judge are kept, validated and used on API platforms");
+        Check(ModelCatalog.Validate(new AppSettings { Provider = CompatibleText.Provider, Model = "claude/claude-sonnet-5-5", JudgeModel = "gpt-6-luna" }, true) is { Length: > 0 } &&
+            ModelCatalog.Validate(new AppSettings { Provider = "openai", Model = "gpt-6-luna", JudgeProvider = "openai", JudgeModel = "claude/x" }, true) == "请填写有效的模型 ID。",
+            "a custom-endpoint model needs the endpoint, and API models keep API model IDs");
+        var copied = new AppSettings { Provider = "claude", Model = "sonnet", SecondaryProvider = CompatibleText.Provider, SecondaryModel = "codex/gpt-6.1-sol",
+            JudgeProvider = "codex", JudgeModel = "gpt-6.1-sol", CompatibleBaseUrl = "https://text.example/v1" };
+        ModelCatalog.UseApiDefaults(copied);
+        Check(copied is { Provider: "openai", Model: "gpt-6-luna", SecondaryProvider: CompatibleText.Provider } && ModelCatalog.Judge(copied, true) == new LookupModel("openai", "gpt-6.1-sol"),
+            "desktop settings drop subscription clients, keep the custom endpoint, and an old Codex judge follows its model id");
+
         // A whole lookup through the session: each model goes to its own API with its own key.
         var user = Path.Combine(work, "session");
         Directory.CreateDirectory(user);
