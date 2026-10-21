@@ -244,6 +244,13 @@ public final class LexiStore {
     public func refreshDictionaries() async {
         if let list = try? await client?.call("dictionaries.list") as DictionaryList? { dictionaries = list }
     }
+    // Core checks the downloaded archive against the pack it pins before installing it.
+    public func installDictionary(_ id: String, archive: String) async throws {
+        dictionaries = try await requireClient().call("dictionaries.install", ["id": id, "path": archive])
+    }
+    public func removeDictionary(_ id: String) async throws {
+        dictionaries = try await requireClient().call("dictionaries.remove", ["id": id])
+    }
     public func connectionStatus(_ provider: String) async -> LoginStatus? {
         try? await client?.call("connection.status", ["provider": provider]) as LoginStatus?
     }

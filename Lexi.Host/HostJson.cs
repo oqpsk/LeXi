@@ -22,7 +22,9 @@ internal sealed record RemoveHistoryResult(bool Removed, HistoryResult History);
 internal sealed record ControlTexts(string OnlineLabel, string OnlineTooltip, string RegenerateTooltip);
 internal sealed record SettingsResult(AppSettings Settings, ModelChoice[] Models, ModelChoice[] JudgeModels, ControlTexts Controls);
 internal sealed record ModelsResult(ModelChoice[] Models);
-internal sealed record DictionariesResult(InstalledDictionary[] Dictionaries, string Folder);
+internal sealed record DictionariesResult(InstalledDictionary[] Dictionaries, string Folder, DictionaryPackItem[] Packs);
+// A dictionary the app can download, with whether it is installed now.
+internal sealed record DictionaryPackItem(string Id, string Name, string Languages, string Url, long Bytes, long InstalledBytes, string License, bool Installed);
 internal sealed record LoginCommand(string FileName, string[] Arguments, string Path, string[] ClearEnvironment);
 internal sealed record SpeechModelItem(string Provider, string Id, string Name, bool Local);
 internal sealed record SpeechModelsResult(SpeechModelItem[] Models);

@@ -147,6 +147,16 @@ else if (args[0] == "live")
     Console.WriteLine($"Total: {sw.ElapsedMilliseconds} ms");
 }
 
+else if (args[0] == "pack-data")
+{
+    // pack-data <built folder> <licence file> <pack id> <zip>: the archive DictionaryPacks pins.
+    var pack = DictionaryPacks.Find(args[3]) ?? throw new ArgumentException("Unknown dictionary pack: " + args[3]);
+    if (File.Exists(args[4])) File.Delete(args[4]);
+    DictionaryPacks.Write(args[1], args[2], pack, args[4]);
+    using var zip = System.IO.Compression.ZipFile.OpenRead(args[4]);
+    var sha = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(args[4])));
+    Console.WriteLine($"{args[4]}: {new FileInfo(args[4]).Length} bytes, SHA-256 {sha}, {zip.Entries.Sum(e => e.Length)} bytes unpacked");
+}
 else if (args[0] == "extended-check") ExtendedChecks.Run(args[1]);
 else if (args[0] == "platform-check") PlatformChecks.Run(args[1]);
 else if (args[0] == "session-check") await SessionChecks.Run(args[1], args[2]);

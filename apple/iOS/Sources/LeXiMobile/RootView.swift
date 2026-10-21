@@ -45,6 +45,9 @@ struct RootView: View {
     // A lookup asked for by a link before the lookup service had started.
     @State private var linked: String?
     @State private var lookupTime = LookupTime()
+    // The welcome sheet, shown once on a device without an offline dictionary or a model service.
+    @AppStorage("welcome.done") private var welcomeDone = false
+    @State private var welcoming = false
     @Environment(\.scenePhase) private var scenePhase
     private static let edge: CGFloat = 20
 
@@ -82,6 +85,7 @@ struct RootView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .sheet(isPresented: $showSettings) { SettingsView(store: store, speech: speech) }
+            .sheet(isPresented: $welcoming, onDismiss: closeWelcome) { WelcomeView(store: store) }
         }
         .onChange(of: store.view.request) { _, _ in pageChanged() }
         .onChange(of: store.view.revision) { _, _ in pageDrawn() }
@@ -112,6 +116,7 @@ struct RootView: View {
     private func launch() {
         guard !launched else { return }
         launched = true
+        Task { await welcome() }
         if let linked { self.linked = nil; setText(linked); submit(linked); return }
         // For UI checks and screenshots: `-LexiLookup <text>` looks something up instead (LeXiMobileApp).
         guard UserDefaults.standard.string(forKey: "LexiLookup")?.isEmpty != false, reopens, store.view.kind == .home else { return }
@@ -119,6 +124,25 @@ struct RootView: View {
         searching = false
         let query = savedQuery
         Task { await store.submit(query, restore: true) }
+    }
+
+    // For UI checks and screenshots: `-LexiWelcome YES` shows the welcome sheet again.
+    private func welcome() async {
+        let again = UserDefaults.standard.bool(forKey: "LexiWelcome")
+        guard !welcomeDone || again else { return }
+        await store.refreshDictionaries()
+        let ready = store.dictionaries?.dictionaries.contains(where: \.available) == true && !ModelKeys.services(store.settings?.settings).isEmpty
+        if ready && !again { welcomeDone = true } else { searching = false; welcoming = true }
+    }
+
+    // Without a model service a lookup would only report missing keys, so models are not called until
+    // one is set up; 设置 → 模型服务 then offers to call them again.
+    private func closeWelcome() {
+        welcomeDone = true
+        if ModelKeys.services(store.settings?.settings).isEmpty, store.settings?.settings.autoAi == true {
+            Task { await store.update(["autoAi": .bool(false)]) }
+        }
+        if store.view.kind == .home { searching = true }
     }
 
     private func savePage() {

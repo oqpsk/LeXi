@@ -211,12 +211,11 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
                     throw new HostException("invalid_params", "online must be true or false.");
                 session.SetOnline(online.GetBoolean());
                 return Settings();
-            case "dictionaries.list":
-            {
-                var library = session.Library;
-                return new DictionariesResult(library.IsCompletedSuccessfully ? library.Result.Dictionaries : DictionaryCatalog.InspectAll(session.Paths.DataRoot),
-                    session.Paths.DataRoot);
-            }
+            case "dictionaries.list": return Dictionaries();
+            case "dictionaries.install":
+                await DictionaryChange(() => session.InstallDictionaryAsync(Text(p, "id"), Text(p, "path"), token)); return Dictionaries();
+            case "dictionaries.remove":
+                await DictionaryChange(() => session.RemoveDictionaryAsync(Text(p, "id"))); return Dictionaries();
             case "connection.status": return await ProviderConnection.CheckAsync(Provider(p), Text(p, "codexPath", session.Settings.CodexPath), token);
             case "connection.loginCommand":
             {
@@ -283,6 +282,24 @@ public sealed class HostServer(QuerySession session, TextReader input, TextWrite
             : InferenceOptions.Available(session.Paths.UserRoot, settings);
         return new(settings, models, ModelCatalog.JudgeChoices(models), new(ControlText.OnlineLabel(settings.Online),
             ControlText.OnlineTooltip(settings.Online), ControlText.RegenerateTooltip(settings.Online)));
+    }
+
+    private DictionariesResult Dictionaries()
+    {
+        var library = session.Library;
+        var installed = library.IsCompletedSuccessfully ? library.Result.Dictionaries : DictionaryCatalog.InspectAll(session.Paths.DataRoot);
+        return new(installed, session.Paths.DataRoot, DictionaryPacks.All.Select(p => new DictionaryPackItem(p.Id, p.Name, p.Languages, p.Url, p.Bytes,
+            p.InstalledBytes, p.License, installed.Any(d => d.Id == p.Id && d.Available))).ToArray());
+    }
+    // Installing and removing dictionaries: Core's refusals are worded for the reader; file system
+    // messages can be English or name local paths, so they get one fixed sentence.
+    private static async Task DictionaryChange(Func<Task> run)
+    {
+        try { await run(); }
+        catch (DictionaryInstallException e) { throw new HostException("invalid_dictionary", e.Message); }
+        catch (DataBusyException e) { throw new HostException("busy", e.Message); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        { throw new HostException("file_failed", "无法写入词典文件夹，请检查剩余空间。"); }
     }
 
     private static CompatibleCredentials TextCredentials(JsonElement p) => new(Text(p, "clientId", ""), Text(p, "clientSecret", ""), Text(p, "apiKey", ""));

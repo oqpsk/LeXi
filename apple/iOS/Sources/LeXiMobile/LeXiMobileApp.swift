@@ -6,12 +6,14 @@ import SwiftUI
 struct LeXiMobileApp: App {
     @State private var store = LexiStore()
     @State private var speech = SpeechController()
+    @State private var download = DictionaryDownload()
     @AppStorage(Appearance.key) private var appearance = Appearance.system.rawValue
 
     var body: some Scene {
         WindowGroup {
             RootView(store: store, speech: speech)
                 .environment(speech)
+                .environment(download)
                 .preferredColorScheme(Appearance(rawValue: appearance)?.scheme)
                 .task { await start() }
         }
@@ -37,6 +39,12 @@ enum ModelKeys {
     static let providers = ["openai", "anthropic"]
     @MainActor static func sendAll(to store: LexiStore, keys: any SpeechKeys = KeychainSpeechKeys()) async {
         for provider in providers { await store.setKey(provider, (try? keys.read(provider)) ?? "") }
+    }
+    // The model services set up on this device, by name: saved API keys and the custom text service.
+    static func services(_ settings: AppSettings?, keys: any SpeechKeys = KeychainSpeechKeys()) -> [String] {
+        var names = providers.filter { keys.hasSaved($0) }.map { $0 == "openai" ? "OpenAI" : "Anthropic" }
+        if !(settings?.compatibleBaseUrl ?? "").isEmpty { names.append("自定义服务") }
+        return names
     }
 }
 

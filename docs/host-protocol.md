@@ -73,7 +73,9 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `inference.catalog` | — | 等本次启动的后台 OAuth 模型读取结束（在线时 Host 启动后自动读取一次官方 Codex/Claude 客户端的模型列表；离线或已结束时立即返回），然后返回 `settings.get` 的内容 |
 | `inference.configure` | `provider`、`model`、`effort`、`speed` | 按当前模型能力校验并保存两个配置项，返回 `settings.get`；空字符串使用服务默认；不自动降低档位 |
 | `settings.setOnline` | `online` | 切换在线补充并返回设置 |
-| `dictionaries.list` | — | `{dictionaries, folder}` |
+| `dictionaries.list` | — | `{dictionaries, folder, packs}`；`packs` 是可在应用内下载的词典包（`id`、`name`、`languages`、`url`、`bytes`、`installedBytes`、`license`、`installed`），目前只有 ECDICT |
+| `dictionaries.install` | `id`、`path`（前端下载好的词典包） | 核对大小和 SHA-256 与 `DictionaryPacks` 固定的一致，解压到数据目录下的临时文件夹并确认能打开，再替换到位、重新加载词库；返回 `dictionaries.list` 的内容。查询进行中返回 `busy`，文件不符返回 `invalid_dictionary` |
+| `dictionaries.remove` | `id` | 删除这部词典的文件并重新加载词库，返回 `dictionaries.list` 的内容 |
 | `connection.status` | `provider`（`codex` 或 `claude`），可选 `codexPath` | `{installed, signedIn, message}`，只含经过清理的摘要 |
 | `connection.loginCommand` | `provider`，可选 `codexPath` | `{fileName, arguments, path, clearEnvironment}` 或 `null`。前端仅在用户点击后在终端中运行，并清除 `clearEnvironment` 中的变量 |
 | `text.models` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{models: [{provider, id, label, options}]}`；鉴权后读取列表，API Key 可留空；不保存凭据、不自动选择模型；离线时不发请求 |
