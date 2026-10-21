@@ -25,6 +25,9 @@ fi
 out=${1:-$root/artifacts/ios${${target:#simulator}:+-device}}
 work=$root/.cache/ios-build
 version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$root/Directory.Build.props")
+# Each build gets its own number, shown in 设置 → 关于 beside the version: yymmdd.HHMM (UTC), which
+# only grows, as App Store Connect requires.
+build=${LEXI_BUILD:-$(date -u +%y%m%d.%H%M)}
 rm -rf "$work/embed" && mkdir -p "$work" "$out"
 dotnet=${DOTNET:-$(command -v dotnet || true)}
 for candidate in $HOME/.dotnet/dotnet /usr/local/share/dotnet/dotnet /opt/homebrew/bin/dotnet; do
@@ -46,7 +49,7 @@ cp "$binary" "$app/LeXi"
 cp "$work/embed/LexiEmbed.dylib" "$app/Frameworks/LexiEmbed.dylib"
 cp -R "$work/embed/assets" "$app/assets"
 sed "s/__VERSION__/$version/g" "$root/apple/iOS/Resources/Info.plist" > "$app/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleSupportedPlatforms:0 $platform" "$app/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleSupportedPlatforms:0 $platform" -c "Set :CFBundleVersion $build" "$app/Info.plist"
 # iOS takes the app icon from a compiled asset catalog: one full-bleed 1024-pixel image of the brand mark.
 icons=$work/Assets.xcassets/AppIcon.appiconset
 rm -rf "$work/Assets.xcassets" && mkdir -p "$icons"
@@ -69,7 +72,7 @@ if [[ $target == device ]]; then
   device=${signing[1]}
   codesign --force --sign "${signing[2]}" "$app/Frameworks/LexiEmbed.dylib"
   codesign --force --sign "${signing[2]}" --entitlements "$work/device.entitlements" "$app"
-  echo "Built $app ($version, iOS device)"
+  echo "Built $app ($version build $build, iOS device)"
   xcrun devicectl device install app --device "$device" "$app"
   # The offline dictionaries this Mac has installed, so suggestions and local definitions work on the
   # device too; unchanged files are skipped. LEXI_DICTIONARIES names another folder, or "" skips this.
@@ -89,7 +92,7 @@ fi
 codesign --force --sign - "$app/Frameworks/LexiEmbed.dylib"
 # The entitlements are linked into the binary (apple/iOS/Package.swift), as Xcode does for the Simulator.
 codesign --force --sign - "$app"
-echo "Built $app ($version, iOS Simulator)"
+echo "Built $app ($version build $build, iOS Simulator)"
 
 if $run; then
   # Boot the named simulator if it is not running yet, and show it.

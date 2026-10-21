@@ -7,6 +7,7 @@
   - **Back and forward return to where you were.** Each page remembers how far it was scrolled; the page beneath a slide is drawn there too, and a new page starts at the top.
   - **Reopen after iOS closes LeXi.** If iOS closes LeXi while you are in another app, opening it within 30 minutes reopens the page you left, from saved results and at the same place, without adding it to history again. Later, LeXi opens ready to type as before. `query.submit` takes `restore` for this.
   - **Links wait for LeXi to start.** A `lexi://lookup?q=` link that opens LeXi now looks the word up once the lookup service is ready, instead of being lost.
+  - **Build numbers.** Each iOS build carries its own number (`yymmdd.HHMM`, UTC), shown in 设置 → 关于 beside the version, so two builds of one version can be told apart.
 - iOS lookup layout and navigation.
   - **Query box at the top.** The query box moves to the top, where the typing hand never covers it, with suggestions below it and the typing preview under them. The status line becomes the footer, as on the Mac.
   - **No history search.** The home page drops the history search field, which people kept taking for the query box.
