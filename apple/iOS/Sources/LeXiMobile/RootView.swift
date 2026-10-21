@@ -21,6 +21,8 @@ struct RootView: View {
     @State private var width: CGFloat = 400
     // The page a finished slide moved to, drawn from memory until Core's view for it arrives.
     @State private var arriving: Int64?
+    // The request and page of the last view taken as a page's own.
+    @State private var shown: (request: Int64, page: Int64) = (-1, -1)
     // The system's side margin, which the toolbar's glass buttons keep: 16 pt, 20 on the larger iPhones.
     @State private var margin: CGFloat = 16
     private static let edge: CGFloat = 20
@@ -55,17 +57,13 @@ struct RootView: View {
             .overlay(alignment: .top) { suggestions }
             .safeAreaBar(edge: .top) { searchBar }
             .safeAreaBar(edge: .bottom) { statusBar }
-            .navigationTitle((arriving.flatMap { drawn[$0] } ?? store.view).kind == .home ? "LeXi" : "")
+            .navigationTitle(page.kind == .home ? "LeXi" : "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .sheet(isPresented: $showSettings) { SettingsView(store: store, speech: speech) }
         }
         .onChange(of: store.view.request) { _, _ in pageChanged() }
-        .onChange(of: store.view.revision) { _, _ in
-            guard let id = store.view.navigation.pageId else { return }
-            drawn[id] = store.view
-            if arriving == id { arriving = nil }
-        }
+        .onChange(of: store.view.revision) { _, _ in pageDrawn() }
         .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
         .onChange(of: searching) { _, active in if !active { store.clearInputPreview() } }
         // The lookup is ready the moment LeXi opens, as on the desktop. The field may join the
@@ -80,7 +78,7 @@ struct RootView: View {
 
     // The live page, or, right after a slide, the page it moved to as drawn until Core shows it.
     @ViewBuilder private var currentPage: some View {
-        if let arriving, let page = drawn[arriving], store.view.navigation.pageId != arriving {
+        if let arriving, let page = drawn[arriving] {
             snapshot(page)
         } else {
             ScrollView {
@@ -100,8 +98,21 @@ struct RootView: View {
     // The page a slide would go to, when it has been drawn (a host without page ids slides nothing).
     private func target(back: Bool) -> Int64? {
         let navigation = store.view.navigation
-        guard let id = back ? navigation.backId : navigation.forwardId, id >= 0, back ? navigation.canBack : navigation.canForward else { return nil }
+        guard let id = back ? navigation.backId : navigation.forwardId, id >= 0, back ? navigation.canBack : navigation.canForward, drawn[id] != nil else { return nil }
         return id
+    }
+
+    // Keeps each page's latest view. Core moves to a page a moment before drawing it, so a view with
+    // another page's id but the same request still shows the page being left; taking it as the new
+    // page's would flash the old page and keep it as that page's snapshot.
+    private func pageDrawn() {
+        let view = store.view
+        guard let id = view.navigation.pageId, view.request != shown.request || id == shown.page else { return }
+        shown = (view.request, id)
+        drawn[id] = view
+        // Core keeps 100 pages; the oldest snapshots go first.
+        while drawn.count > 100, let oldest = drawn.keys.min() { drawn[oldest] = nil }
+        if arriving == id { arriving = nil }
     }
 
     @ViewBuilder private var content: some View {
@@ -121,13 +132,16 @@ struct RootView: View {
 
     private var online: Bool { store.settings?.settings.online ?? true }
     private var canRegenerate: Bool { store.view.kind != .home && store.view.canRegenerate && online }
-    private var status: String { speech.status.isEmpty ? store.view.status : speech.status }
+    private var status: String { speech.status.isEmpty ? page.status : speech.status }
+    // The page on screen: right after a slide, the one it landed on, so the title and the status line
+    // change with the page rather than when Core answers.
+    private var page: QueryView { arriving.flatMap { drawn[$0] } ?? store.view }
 
     // The Mac footer: the soft matrix beside the status; nothing spins in the query capsule.
     @ViewBuilder private var statusBar: some View {
-        if store.view.kind != .home && !status.isEmpty {
+        if page.kind != .home && !status.isEmpty {
             HStack(spacing: 8) {
-                QueryActivityMark(activity: store.view.progress?.activity ?? .idle, size: 14).foregroundStyle(.secondary)
+                QueryActivityMark(activity: page.progress?.activity ?? .idle, size: 14).foregroundStyle(.secondary)
                 Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
