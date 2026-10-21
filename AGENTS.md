@@ -4,7 +4,7 @@ Rules are grouped by where they apply. Shared behavior belongs to `Lexi.Core` an
 
 ## Scope and workflow
 
-- Keep the product focused on quick dictionary lookup and user-requested text translation. Windows (`Lexi.App`, WPF) and macOS (`apple/`, SwiftUI) are maintained together in this repository; iOS is out of scope.
+- Keep the product focused on quick dictionary lookup and user-requested text translation. Windows (`Lexi.App`, WPF), macOS (`apple/`, SwiftUI), and iOS (`apple/iOS`, SwiftUI with the embedded Core) are maintained in this repository.
 - Use this repository as the canonical source. Work in a topic branch and record changes in CHANGELOG.md.
 - Every PR states its affected platforms. A user-visible feature or behavior change updates [FEATURES.md](FEATURES.md) in the same PR, naming the other platform's equivalent or recording an explicit, temporary gap.
 - Run scripts/Test.ps1 and scripts/Check-Privacy.ps1 before committing. On macOS without PowerShell, run the `dotnet` commands from scripts/Test.ps1 directly; the Windows CI job validates WPF. Live provider checks require the user's authorized local subscription and stay out of CI.
@@ -45,6 +45,10 @@ Rules are grouped by where they apply. Shared behavior belongs to `Lexi.Core` an
 - Restore completed query views without network or automatic age/settings refresh. Only explicit regeneration replaces saved results. Preserve original model/source provenance across setting changes, separate translation identities, and never replace a good saved view with failed regeneration or streaming previews.
 - Use one pale-pink base color (#FFADD2) for all pink UI states, with opacity variants for backgrounds and dark text on solid pink fills.
 
+- Cross-platform backups validate recognized settings independently of platform availability. History/results remain importable with settings excluded; restoring unsupported model services retains the current complete model/endpoint/profile configuration. Keep secret storage and machine-specific paths local.
+- Core's JSON is generated at build time (`CoreJson` in Lexi.Core/JsonContext.cs, `HostJson` in the host) so Core also runs under NativeAOT on iOS. Serialize named types only, register each new one, and keep anonymous objects out of Core and the host; `Json.Options` resolves only generated types, so the shared checks fail on a missing one. Front-end files and tools use `Json.Flexible`. Cache keys, hashes and prompts must stay byte-for-byte stable.
+- Where the subscription clients cannot run (iOS, `ModelCatalog.ApiOnly`), models are reached with the user's own OpenAI or Anthropic API keys (`ApiDictionary`) using the same instructions, schemas and validation. Keys arrive through `keys.set`, live only in memory, and never appear in output, files or error text.
+
 ## Windows interface (Lexi.App, WPF)
 
 - Preserve existing executable, IPC, AppUserModelID and userdata identities for upgrade compatibility. Windows keeps the portable `userdata` and `data` folders beside the program.
@@ -62,7 +66,7 @@ Rules are grouped by where they apply. Shared behavior belongs to `Lexi.Core` an
 
 - SwiftUI with Liquid Glass, minimum macOS 26. Follow the macOS Human Interface Guidelines for menus, shortcuts, settings, windows and accessibility; do not imitate WPF layouts.
 - Use Apple's design language, not the Windows look: the same features and information, laid out with macOS 26 conventions. Toolbar glass items for back/forward, history and settings; a floating Liquid Glass query capsule; grouped glass controls at the bottom for regeneration and the online mode; results as content scrolling beneath them on grouped surfaces with continuous corners.
-- System colors throughout, adapting to light, dark and the user's accent, on windows that are a single pane of Liquid Glass over the desktop, as in Control Center (`glassWindow()`); the glass takes on the wallpaper's color by design. Light glass carries a near-white wash so it stays frosted white over a dark desktop, results sit on white groups, and the query capsule gets a hairline edge; dark glass is untouched. Settings → 通用 offers system, light or dark appearance for all LeXi windows. Pink appears only as the brand TL;DR mark and card; parts of speech use the Windows pale gold (deeper on light glass) and etymology uses the Windows Rosetta Stone icon; controls, links, sense numbers and state symbols use system styles. Settings follow System Settings: grouped forms, short labels with secondary explanations.
+- System colors throughout, adapting to light, dark and the user's accent, on windows that are a single pane of Liquid Glass over the desktop, as in Control Center (`glassWindow()`); the glass takes on the wallpaper's color by design. Light glass carries a near-white wash so it stays frosted white over a dark desktop, results sit on white groups, and the query capsule gets a hairline edge; dark glass is untouched. Settings → 通用 offers system, light or dark appearance for all LeXi windows. Pink appears only as the brand TL;DR mark and card; parts of speech use the Windows pale gold (deeper on light glass) and etymology uses the Windows Rosetta Stone icon; controls, links, sense numbers and state symbols use system styles. Settings follow System Settings: grouped forms, short labels with secondary explanations. Connections come before what chooses among them: the OAuth and API pages precede 查询与模型, and 发音 runs service, key, voices, preview.
 - The app bundles a self-contained `Lexi.Host` and talks to it over JSON lines. Render Host views as received and reject stale revisions. Incompatible protocol changes raise `HostServer.Protocol` and update docs/host-protocol.md and host-check in the same PR.
 - User data lives in `~/Library/Application Support/LeXi`. Local speech uses system voices; speech keys use the Keychain.
 - Keep window state with the system's restoration. The app is a regular windowed app; closing the window does not quit it (`applicationShouldTerminateAfterLastWindowClosed` is false, which a lone SwiftUI `Window` scene would otherwise default to).
@@ -71,3 +75,11 @@ Rules are grouped by where they apply. Shared behavior belongs to `Lexi.Core` an
 - Results work from the keyboard: ↓ or Tab in the query field moves into the senses, ↑ ↓ move between them, Space reads the focused sense, Return toggles its examples, ⌘C copies it and Escape returns to the query. ⌘D reads the headword and ⇧⌘C copies the TL;DR or translation. Do not add `defaultFocus` to the query window: it pulls focus back to the query field and keeps the senses from taking the keyboard.
 - Keys belong to the input method while it is composing text. Text that Core marks as accent stays readable: pale pink is a fill or outline in light appearance, never body text.
 - Build with apple/scripts/build-app.sh and check with `swift test --package-path apple`. Regenerate the protocol fixture with host-check when QueryView changes.
+
+## iOS interface (apple/iOS, SwiftUI, simulator preview)
+
+- A simulator preview until an Apple developer account exists. Build with apple/scripts/build-ios.sh (`--run` installs and opens it). The app depends on `LeXiKit` from the macOS package and never reimplements query logic.
+- Core runs in the app's process through `Lexi.Embed` (NativeAOT with `PublishAotUsingRuntimePack`; no .NET iOS workload), speaking the same host protocol through `EmbeddedTransport`. The library runs one host per process.
+- Follow the iOS Human Interface Guidelines: a floating Liquid Glass search capsule at the bottom with suggestions above it, toolbar items for back/forward, more actions and settings, results on grouped surfaces. Pink only for TL;DR, pale gold parts of speech, the Rosetta Stone for etymology, and the appearance choice, as on macOS.
+- Touch has no hover: definitions and examples offer 朗读 in their long-press menu and are tinted gold while read.
+- Settings start with the OpenAI and Anthropic API keys (Keychain, sent with `keys.set` at launch and on change); the OpenAI key also serves OpenAI speech.

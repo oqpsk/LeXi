@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 
+// Connections come before the pages that choose among what they offer.
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case general = "通用", query = "查询与模型", oauth = "OAuth 连接", api = "API 连接", speech = "发音", dictionary = "离线词典", data = "数据与迁移"
+    case general = "通用", oauth = "OAuth 连接", api = "API 连接", query = "查询与模型", speech = "发音", dictionary = "离线词典", data = "数据与迁移"
     var id: String { rawValue }
     var symbol: String {
         switch self {

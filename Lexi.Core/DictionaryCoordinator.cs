@@ -108,7 +108,7 @@ public sealed class DictionaryCoordinator(Cache cache,
             }
             if (plan == null)
             {
-                plan = await judge(request, settings.ForModel(new(settings.JudgeProvider, settings.JudgeModel)), token);
+                plan = await judge(request, settings.ForModel(ModelCatalog.Judge(settings)), token);
                 plan = SenseMerging.Parse(JsonSerializer.Serialize(plan, Json.Options), request);
                 token.ThrowIfCancellationRequested();
                 await Write(SenseMerging.CacheKind, mergeKey, plan, token);
@@ -124,9 +124,13 @@ public sealed class DictionaryCoordinator(Cache cache,
         }
     }
 
-    private static string MergeKey(SenseMergeRequest request, AppSettings settings) => settings.JudgeProvider == CompatibleText.Provider
-        ? request.InputHash + ":compatible:" + CompatibleText.Scope(settings) + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, new(settings.JudgeProvider, settings.JudgeModel))
-        : request.InputHash + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, new(settings.JudgeProvider, settings.JudgeModel));
+    private static string MergeKey(SenseMergeRequest request, AppSettings settings)
+    {
+        var judge = ModelCatalog.Judge(settings);
+        return judge.Provider == CompatibleText.Provider
+            ? request.InputHash + ":compatible:" + CompatibleText.Scope(settings) + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, judge)
+            : request.InputHash + ":" + settings.JudgeModel + InferenceOptions.Identity(settings, judge);
+    }
 
     private async Task Write<T>(string kind, string key, T value, CancellationToken token)
     {

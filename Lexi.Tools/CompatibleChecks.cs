@@ -20,7 +20,7 @@ internal static class CompatibleChecks
             try { CompatibleText.NormalizeBase(invalid); Check(false, "unsafe endpoint"); }
             catch (CompatibleException e) { Check(e.Code == "invalid_endpoint" && !e.Message.Contains(invalid), "endpoint validation rejects plaintext transport and credentials in URLs without echoing them"); }
         }
-        Check(JsonSerializer.Serialize(credentials, Lexi.Core.Json.Options) == "{}" && !credentials.ToString().Contains("synthetic"),
+        Check(JsonSerializer.Serialize(credentials, Lexi.Core.Json.Flexible) == "{}" && !credentials.ToString().Contains("synthetic"),
             "credential objects redact descriptions and serialize no values through normal settings JSON");
         int requests = 0;
         using (var client = new CompatibleTextClient(new Handler(async (request, token) =>
@@ -134,7 +134,7 @@ internal static class CompatibleChecks
     private static async Task CheckDictionary(string assets, string root, AppSettings settings, CompatibleCredentials credentials, Action<bool, string> check)
     {
         var entry = new AiEntry("synthetic", true, [new("noun", "A synthetic concept.", "合成概念", "", "A synthetic example.", "一个合成例句。", [], ChineseTerm: "合成概念", CoreMeaning: true)], "", "unverified", WordForms: [], Etymology: "这是测试词条的语源说明。");
-        var json = JsonSerializer.Serialize(entry, Lexi.Core.Json.Options);
+        var json = JsonSerializer.Serialize(entry, Lexi.Core.Json.Flexible);
         using var client = new CompatibleTextClient(new Handler((_, _) => Task.FromResult(Json(JsonSerializer.Serialize(new { choices = new[] { new { message = new { content = json }, finish_reason = "stop" } } })))));
         var dictionary = new CompatibleDictionary(assets, client, _ => credentials, root);
         var previews = new List<AiEntry>();

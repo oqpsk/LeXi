@@ -9,6 +9,12 @@ public sealed record QueryProviders(
     // Which sense a word has in the sentence it was selected in; absent in checks that do not need it.
     Func<ContextRequest, AppSettings, CancellationToken, Task<ContextPick>>? Context = null);
 
+// Settings that change query results; hashed into retry checkpoints, so names and order stay fixed.
+internal sealed record QuerySettingsKey(bool Online, bool AutoAi, bool OfflineEnabled, string[]? DisabledDictionaries, string CodexPath,
+    string Provider, string Model, string SecondaryProvider, string SecondaryModel, bool ParallelLookup,
+    bool MergeSenses, string JudgeProvider, string JudgeModel, string CompatibleBaseUrl,
+    bool CompatibleStreaming, InferenceProfile[]? InferenceProfiles, string ReasoningEffort, string ServiceTier);
+
 // The query lifecycle shared by every front end: routing, sources, caches, models, saved views,
 // history and navigation. Each step publishes a complete QueryView; front ends only render it.
 public sealed partial class QuerySession : IDisposable
@@ -18,6 +24,7 @@ public sealed partial class QuerySession : IDisposable
     private readonly Pronunciation pronunciations;
     private readonly CodexDictionary codex;
     private readonly ClaudeDictionary claude, secondaryClaude;
+    private readonly ApiDictionary api;
     private readonly QueryProviders providers;
     private readonly CompatibleTextClient compatibleClient;
     private readonly bool ownsCompatibleClient;
@@ -71,15 +78,29 @@ public sealed partial class QuerySession : IDisposable
         var compatible = new CompatibleDictionary(paths.AssetRoot, compatibleClient, textCredentials ?? (url =>
             compatibleCredentials.GetValueOrDefault(CompatibleText.NormalizeBase(url)) ?? new()), paths.UserRoot);
         warmClients = providers == null;
-        this.providers = providers ?? new((model, query, evidence, options, token, preview) => model.Provider == CompatibleText.Provider
-                ? compatible.LookupAsync(query, evidence, options, token, preview) : model.Provider == "claude"
-                ? (model == LookupModel.Primary(Settings) ? claude : secondaryClaude).LookupAsync(query, evidence, options, token, preview)
-                : codex.LookupAsync(query, evidence, options, token),
-            (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.JudgeAsync(request, options, token) : codex.JudgeSensesAsync(request, options, token),
-            (text, target, options, token, preview) => options.Provider == CompatibleText.Provider
-                ? compatible.TranslateAsync(text, target, options, token, preview) : options.Provider == "claude"
-                ? claude.TranslateAsync(text, target, options, token, preview) : codex.TranslateAsync(text, target, options, token),
-            (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.ContextAsync(request, options, token) : codex.ContextAsync(request, options, token));
+        api = new(paths.AssetRoot, network);
+        // Each model goes to its own service: the Codex or Claude Code subscription, the configured
+        // text endpoint, or an API with the user's key.
+        this.providers = providers ?? new((model, query, evidence, options, token, preview) => model.Provider switch
+            {
+                CompatibleText.Provider => compatible.LookupAsync(query, evidence, options, token, preview),
+                "claude" => (model == LookupModel.Primary(Settings) ? claude : secondaryClaude).LookupAsync(query, evidence, options, token, preview),
+                "openai" or "anthropic" => api.LookupAsync(model, query, evidence, Keys.For(model.Provider), token),
+                _ => codex.LookupAsync(query, evidence, options, token)
+            },
+            (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.JudgeAsync(request, options, token)
+                : ModelCatalog.IsApi(options.Provider) ? api.JudgeSensesAsync(LookupModel.Primary(options), request, Keys.For(options.Provider), token)
+                : codex.JudgeSensesAsync(request, options, token),
+            (text, target, options, token, preview) => options.Provider switch
+            {
+                CompatibleText.Provider => compatible.TranslateAsync(text, target, options, token, preview),
+                "claude" => claude.TranslateAsync(text, target, options, token, preview),
+                "openai" or "anthropic" => api.TranslateAsync(LookupModel.Primary(options), text, target, Keys.For(options.Provider), token),
+                _ => codex.TranslateAsync(text, target, options, token)
+            },
+            (request, options, token) => options.Provider == CompatibleText.Provider ? compatible.ContextAsync(request, options, token)
+                : ModelCatalog.IsApi(options.Provider) ? api.ContextAsync(LookupModel.Primary(options), request, Keys.For(options.Provider), token)
+                : codex.ContextAsync(request, options, token));
         this.clock = clock ?? TimeProvider.System;
         View = Build();
     }
@@ -87,6 +108,8 @@ public sealed partial class QuerySession : IDisposable
     public LexiPaths Paths { get; }
     public AppSettings Settings { get; }
     public Cache Cache { get; }
+    // API keys for this session only, from the front end's secure storage; never saved by Core.
+    public ApiKeys Keys { get; } = new();
     public SavedQueries Saved => new(Cache);
     public QueryHistory History { get; }
     public QueryNavigation Navigation { get; } = new();
@@ -98,7 +121,8 @@ public sealed partial class QuerySession : IDisposable
     public event Action<QueryView>? Changed;
 
     public void SetTextCredentials(string baseUrl, CompatibleCredentials credentials) => compatibleCredentials[CompatibleText.NormalizeBase(baseUrl)] = credentials;
-    private string ProviderName => Settings.Provider == CompatibleText.Provider ? "自定义文本服务" : Settings.Provider == "claude" ? "Claude" : "Codex";
+    private string ProviderName => Settings.Provider switch
+    { CompatibleText.Provider => "自定义文本服务", "claude" or "anthropic" => "Claude", "openai" => "OpenAI", _ => "Codex" };
 
     // Completes when this start's background read of the OAuth model catalog ends (or was skipped).
     public Task SubscriptionCatalog { get; private set; } = Task.CompletedTask;
@@ -135,13 +159,11 @@ public sealed partial class QuerySession : IDisposable
     }
     // Window-closing preferences do not invalidate dictionary or model results.
     public string QuerySettingsIdentity() => QueryIdentity(Settings);
-    private static string QueryIdentity(AppSettings settings) => JsonSerializer.Serialize(new
-    {
+    private static string QueryIdentity(AppSettings settings) => JsonSerializer.Serialize(new QuerySettingsKey(
         settings.Online, settings.AutoAi, settings.OfflineEnabled, settings.DisabledDictionaries, settings.CodexPath,
         settings.Provider, settings.Model, settings.SecondaryProvider, settings.SecondaryModel, settings.ParallelLookup,
         settings.MergeSenses, settings.JudgeProvider, settings.JudgeModel, settings.CompatibleBaseUrl,
-        settings.CompatibleStreaming, settings.InferenceProfiles, settings.ReasoningEffort, settings.ServiceTier
-    }, Json.Options);
+        settings.CompatibleStreaming, settings.InferenceProfiles, settings.ReasoningEffort, settings.ServiceTier), Json.Options);
     public void SettingsSaved(string previousIdentity)
     {
         SaveSettings(); UpdateReadyStatus();
@@ -160,7 +182,8 @@ public sealed partial class QuerySession : IDisposable
     // A failure keeps the cached catalog and the saved choices; nothing is selected for the user.
     private void RefreshSubscriptionCatalog()
     {
-        if (!warmClients || !Settings.Online || Interlocked.Exchange(ref catalogStarted, 1) == 1) return;
+        // Where the subscription clients cannot run there is no OAuth catalog to read.
+        if (!warmClients || ModelCatalog.ApiOnly || !Settings.Online || Interlocked.Exchange(ref catalogStarted, 1) == 1) return;
         var (path, root, token) = (Settings.CodexPath, Paths.UserRoot, catalogStop.Token);
         SubscriptionCatalog = Task.Run(async () =>
         {
@@ -719,7 +742,7 @@ public sealed partial class QuerySession : IDisposable
         ContextRequest? contextRequest;
         lock (gate) { if (id != request) return; contextRequest = LookupContext.Request(query, sentence, Presentation.Snapshot); }
         if (contextRequest == null) return;
-        var judge = new LookupModel(Settings.JudgeProvider, Settings.JudgeModel);
+        var judge = ModelCatalog.Judge(Settings);
         var options = Settings.ForModel(judge);
         var key = contextRequest.InputHash + ":" + judge.CacheKey("", options);
         if (Cache.Read<ContextPick>(LookupContext.CacheKind, key) is { } saved)

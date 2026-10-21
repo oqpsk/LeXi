@@ -1,5 +1,6 @@
 import AppKit
 import LeXiKit
+import LeXiShared
 import SwiftUI
 
 extension EnvironmentValues {

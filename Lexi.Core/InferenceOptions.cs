@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Lexi.Core;
 
@@ -13,6 +14,16 @@ public sealed record InferenceCapabilities(string[] Efforts, InferenceOption[] S
 }
 public sealed record InferenceProfile(string Provider, string Model, string Endpoint, string Effort, string Speed);
 public sealed record InferenceSelection(string Effort, string Speed);
+internal sealed record InferenceIdentity(string Effort, string Speed);
+// Requests to the official clients while reading their model catalogs.
+internal sealed record ClaudeControlRequest(string Type, [property: JsonPropertyName("request_id")] string RequestId, ClaudeControlSubtype Request);
+internal sealed record ClaudeControlSubtype(string Subtype);
+internal sealed record CodexClientInfo(string Name, string Version);
+internal sealed record CodexInitializeParams(CodexClientInfo ClientInfo);
+internal sealed record CodexInitialize(int Id, string Method, CodexInitializeParams Params);
+internal sealed record CodexNotification(string Method);
+internal sealed record CodexModelListParams(string? Cursor, bool IncludeHidden);
+internal sealed record CodexModelList(int Id, string Method, CodexModelListParams Params);
 
 // Capability parsing, selections and endpoint scoping are shared by both native settings screens.
 public static class InferenceOptions
@@ -58,7 +69,7 @@ public static class InferenceOptions
             new(model.Provider, model.Id, scope, effort, CanonicalSpeed(speed))];
     }
     public static string Identity(AppSettings settings, LookupModel model) => Profile(settings, model) is { } p
-        ? JsonSerializer.Serialize(new { p.Effort, speed = CanonicalSpeed(p.Speed) }, Json.Options) : "";
+        ? JsonSerializer.Serialize(new InferenceIdentity(p.Effort, CanonicalSpeed(p.Speed)), Json.Options) : "";
     public static string EnvelopeEffort(AppSettings settings, LookupModel model) => Profile(settings, model)?.Effort ?? settings.ReasoningEffort;
     public static void ValidateRequest(AppSettings settings, LookupModel model, InferenceCapabilities capabilities)
     {
@@ -148,7 +159,7 @@ public static class InferenceOptions
         var errors = Task.Run(async () => { try { while (await process.StandardError.ReadLineAsync(timeout.Token) != null) { } } catch (OperationCanceledException) { } });
         try
         {
-            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { type = "control_request", request_id = "lexi-models", request = new { subtype = "initialize" } }, Json.Options).AsMemory(), timeout.Token);
+            await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new ClaudeControlRequest("control_request", "lexi-models", new("initialize")), Json.Options).AsMemory(), timeout.Token);
             await process.StandardInput.FlushAsync(timeout.Token);
             for (int count = 0; count < 100; count++)
             {
@@ -179,7 +190,7 @@ public static class InferenceOptions
         token.ThrowIfCancellationRequested(); process.Start();
         using var stopped = timeout.Token.Register(() => { try { if (!process.HasExited) process.Kill(true); } catch (InvalidOperationException) { } });
         var errors = Task.Run(async () => { try { while (await process.StandardError.ReadLineAsync(timeout.Token) != null) { } } catch (OperationCanceledException) { } });
-        async Task Send(object value) { await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(value, Json.Options).AsMemory(), timeout.Token); await process.StandardInput.FlushAsync(timeout.Token); }
+        async Task Send<T>(T value) { await process.StandardInput.WriteLineAsync(JsonSerializer.Serialize(value, Json.Options).AsMemory(), timeout.Token); await process.StandardInput.FlushAsync(timeout.Token); }
         async Task<JsonDocument> Response(int expected)
         {
             for (int count = 0; count < 100; count++)
@@ -194,13 +205,13 @@ public static class InferenceOptions
         }
         try
         {
-            await Send(new { id = 1, method = "initialize", @params = new { clientInfo = new { name = "LeXi", version = "1" } } });
+            await Send(new CodexInitialize(1, "initialize", new(new("LeXi", "1"))));
             using var ready = await Response(1);
-            await Send(new { method = "initialized" });
+            await Send(new CodexNotification("initialized"));
             var models = new List<ModelChoice>(); string? cursor = null;
             for (int page = 0; page < 20; page++)
             {
-                await Send(new { id = 2, method = "model/list", @params = new { cursor, includeHidden = true } });
+                await Send(new CodexModelList(2, "model/list", new(cursor, true)));
                 using var data = await Response(2);
                 if (!data.RootElement.TryGetProperty("result", out var result) || !result.TryGetProperty("data", out var list) || list.ValueKind != JsonValueKind.Array)
                     throw new InvalidOperationException("无法读取订阅模型列表，请检查 Codex 客户端版本与登录状态。");

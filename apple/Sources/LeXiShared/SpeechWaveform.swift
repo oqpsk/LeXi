@@ -2,15 +2,16 @@ import SwiftUI
 
 // Same five-bar geometry and spline rhythm as the approved soft waveform on Windows.
 // A preparation state is static; only actual audio playback advances the timeline.
-struct SpeechWaveform: View {
+public struct SpeechWaveform: View {
     var animate = true
     var size: CGFloat = 18
+    public init(animate: Bool = true, size: CGFloat = 18) { self.animate = animate; self.size = size }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var origin = Date()
     @State private var visible = false
 
-    var body: some View {
+    public var body: some View {
         let moving = animate && !reduceMotion && visible && scenePhase != .background
         TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !moving)) { context in
             SpeechWaveformShape(time: moving ? context.date.timeIntervalSince(origin) : nil)

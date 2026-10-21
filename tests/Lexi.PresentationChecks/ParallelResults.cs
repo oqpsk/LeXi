@@ -11,7 +11,7 @@ internal static partial class Program
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
         var tabs = Contents(settings).OfType<TabControl>().Single();
-        tabs.SelectedIndex = 0;
+        tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(t => (string)t.Header == "查询与模型");
         Measure((FrameworkElement)settings.Content, 538, 478);
         var models = Descendants((DependencyObject)settings.Content).OfType<ComboBox>().Where(p => p.ItemsSource is System.Collections.Generic.IEnumerable<ModelChoice>).ToArray();
         Check(models.Length == 3 && models[0].SelectedItem.ToString()!.Contains("Sol") &&

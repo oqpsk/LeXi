@@ -127,7 +127,7 @@ internal static class MajorWorkflowChecks
         Check(new QueryHistory(historyRoot).Entries.Count > 30 && history.Search("history-", 50).Length == 25 && history.Suggest("ABS")[0] == "ABS" && !history.Suggest("A").Contains("A long sentence."),
             "history persists beyond 30, paginates and ranks exact case and repeated dictionary submissions");
         var dataCache = new Cache(historyRoot);
-        await dataCache.WriteAsync("ai-v6", "sample", new { value = "intermediate" });
+        await dataCache.WriteAsync("ai-v6", "sample", "intermediate");
         await dataCache.WriteAsync(SavedQueries.TranslationKind, "sample", new SavedTranslation(new("fixture", "zh", ["测试。"], ""), first, DateTimeOffset.UtcNow));
         Directory.CreateDirectory(Path.Combine(historyRoot,"speech-cache")); File.WriteAllText(Path.Combine(historyRoot,"speech-cache","sample.mp3"),"synthetic audio");
         Directory.CreateDirectory(Path.Combine(historyRoot,"text-provider-keys")); File.WriteAllText(Path.Combine(historyRoot,"text-provider-keys","synthetic.bin"),"must stay private");

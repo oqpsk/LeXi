@@ -11,6 +11,10 @@ internal static partial class Program
     private static void CheckInstantLookup(MainWindow main)
     {
         void Check(bool ok, string label) { if (!ok) throw new Exception("FAIL: " + label); Console.WriteLine("PASS: " + label); }
+        var captured = new CapturedLookup("bank", "The river bank is steep.", 10);
+        Check(CapturedLookup.FromJson(CapturedLookup.ToJson(captured)) == captured &&
+            CapturedLookup.FromJson(CapturedLookup.ToJson(null)) == null,
+            "Windows capture IPC preserves text and context with Core's NativeAOT resolver enabled, including empty captures");
         var clock = new CopyClock(); var copy = new RecentCopy(clock);
         copy.Observe(1, true); Check(copy.Take() == null, "preexisting clipboard contents are not treated as a fresh copy");
         copy.Observe(2, false); Check(copy.Take() == 2 && copy.Take() == null, "an external copy is consumed once");

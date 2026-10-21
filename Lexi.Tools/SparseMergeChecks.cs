@@ -15,7 +15,7 @@ internal static class SparseMergeChecks
         var positives = Enumerable.Range(0, 10).Select(i => new SenseVerdict($"m0s{i * 2}", $"m0s{i * 2 + 1}", "equivalent", 0.99)).ToArray();
         var compact = new SenseMergePlan(request.InputHash, positives, ["m0s0"], request.Pairs.Length);
         var full = new SenseMergePlan(request.InputHash, request.Pairs.Select(p => positives.FirstOrDefault(v => v.A == p.A && v.B == p.B) ?? new(p.A, p.B, "different", 0.99)).ToArray(), ["m0s0"]);
-        string Encode(SenseMergePlan plan) => JsonSerializer.Serialize(plan, Json.Options);
+        string Encode(SenseMergePlan plan) => JsonSerializer.Serialize(plan, Json.Flexible);
         var parsed = SenseMerging.Parse(Encode(compact), request);
         string[][] Groups(SenseMergePlan plan) => SenseMerging.Group(answers, plan).Select(g => g.Variants.Select(v => v.Id).ToArray()).ToArray();
         check(request.Pairs.Length == 190 && JsonSerializer.Serialize(Groups(parsed)) == JsonSerializer.Serialize(Groups(full)) && parsed.Pairs.Length == 190,
@@ -65,7 +65,7 @@ internal static class SparseMergeChecks
         var answers = new[] { new ModelAnswer(new("codex", "synthetic"), ModelPhase.Complete, new("synthetic", true, [first, second], "", "unverified")) };
         var request = SenseMerging.Request("synthetic", answers);
         var plan = new SenseMergePlan(request.InputHash, [new(request.Pairs[0].A, request.Pairs[0].B, "equivalent", 0.99)], ["m0s0"], request.Pairs.Length);
-        var encoded = JsonSerializer.Serialize(plan, Json.Options);
+        var encoded = JsonSerializer.Serialize(plan, Json.Flexible);
         using var client = new CompatibleTextClient(new Handler(async (http, token) =>
         {
             using var body = JsonDocument.Parse(await http.Content!.ReadAsStringAsync(token));

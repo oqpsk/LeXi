@@ -1,5 +1,6 @@
 import Testing
 @testable import LeXiUI
+@testable import LeXiShared
 
 @Suite struct ResultProgressChecks {
     @Test func crtClosesVerticallyThenHorizontallyThenFadesTheDot() {

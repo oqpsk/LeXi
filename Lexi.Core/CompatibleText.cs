@@ -7,6 +7,11 @@ using System.Text.Json.Serialization;
 
 namespace Lexi.Core;
 
+internal sealed record ChatMessage(string Role, string Content);
+internal sealed record ChatRequest(string Model, ChatMessage[] Messages, bool Stream,
+    [property: JsonPropertyName("reasoning_effort"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReasoningEffort,
+    [property: JsonPropertyName("service_tier"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ServiceTier);
+
 // Only non-secret connection settings belong in AppSettings. Credentials are supplied by the
 // front end's protected store and never serialized as settings, provenance or diagnostic data.
 public sealed class CompatibleCredentials(string clientId = "", string clientSecret = "", string apiKey = "")
@@ -96,10 +101,9 @@ public sealed class CompatibleTextClient : IDisposable
         using var request = Request(HttpMethod.Post, baseUrl, "chat/completions", credentials);
         request.Headers.Accept.Add(new(streaming ? "text/event-stream" : "application/json"));
         if (!InferenceOptions.ValidEffort(effort) || !InferenceOptions.ValidSpeed(speed)) throw new CompatibleException("invalid_options", "模型 effort 或速度配置无效，请重新选择。");
-        var body = new Dictionary<string, object> { ["model"] = model,
-            ["messages"] = new[] { new { role = "system", content = instructions }, new { role = "user", content = prompt } }, ["stream"] = streaming };
-        if (effort.Length > 0) body["reasoning_effort"] = effort;
-        if (speed.Length > 0) body["service_tier"] = speed;
+        // Effort and speed are sent only when chosen, as the service's own defaults otherwise apply.
+        var body = new ChatRequest(model, [new("system", instructions), new("user", prompt)], streaming,
+            effort.Length > 0 ? effort : null, speed.Length > 0 ? speed : null);
         request.Content = new StringContent(JsonSerializer.Serialize(body, Json.Options), Encoding.UTF8, "application/json");
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancel);
         CheckStatus(response);

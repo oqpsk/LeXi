@@ -122,7 +122,7 @@ public sealed class QueryPresentation
     }
     private void RefreshEtymology()
     {
-        var identity = JsonSerializer.Serialize(new { sourceEtymologies = SourceEtymologies, Models = modelEtymologies.ToArray() }, Json.Options);
+        var identity = JsonSerializer.Serialize(new EtymologyIdentity(SourceEtymologies, modelEtymologies.Select(p => new ModelEtymology(p.Key, p.Value)).ToArray()), Json.Options);
         if (identity == etymologyIdentity) return;
         etymologyIdentity = identity;
         Etymology = modelEtymologies.OrderBy(p => p.Key.Provider == "codex" ? 0 : 1)
@@ -285,8 +285,8 @@ public sealed class QueryPresentation
     }
 
     // Content identity survives streaming, reordered senses and the final merge.
-    public static string SenseKey(SenseCandidate candidate) => Cache.Hash(JsonSerializer.Serialize(new
-    { candidate.Model, candidate.Sense.Chinese, candidate.Sense.English }, Json.Options));
+    public static string SenseKey(SenseCandidate candidate) => Cache.Hash(JsonSerializer.Serialize(
+        new SenseIdentity(candidate.Model, candidate.Sense.Chinese, candidate.Sense.English), Json.Options));
 
     private static string Provenance(SenseCandidate candidate) => candidate.Provisional ? "释义仍在生成，来源信息尚未完整。" :
         candidate.EvidenceStatus == "source_based" ? "模型参考下列资料整理；释义与例句由模型生成。" :
@@ -324,3 +324,7 @@ public sealed class QueryPresentation
             entry.Paragraphs, entry.Note ?? "", !streaming);
     public void ShowTranslationError(string message) => Translation = new("", "", [], "", false, message);
 }
+
+internal sealed record EtymologyIdentity(EtymologyExcerpt[] SourceEtymologies, ModelEtymology[] Models);
+internal sealed record ModelEtymology(LookupModel Key, string Value);
+internal sealed record SenseIdentity(LookupModel Model, string Chinese, string English);

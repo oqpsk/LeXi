@@ -37,7 +37,8 @@ public sealed partial class SettingsWindow : Window
         var tabs = new TabControl { TabStripPlacement = Dock.Left, Style = (Style)FindResource("SettingsNavigation") };
         root.Children.Add(tabs);
         var general = new StackPanel { Margin = new(2,4,8,10) };
-        tabs.Items.Add(new TabItem { Header = "查询与模型", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = general } });
+        var queryTab = new TabItem { Header = "查询与模型", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = general } };
+        tabs.Items.Add(queryTab);
         var online = new CheckBox { Content = "在线补充", IsChecked = settings.Online, Margin = new(0,0,0,14) };
         var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
         general.Children.Add(online); general.Children.Add(ai);
@@ -192,13 +193,18 @@ public sealed partial class SettingsWindow : Window
         windowOptions.Children.Add(Text("Alt+← 后退 · Alt+→ 前进\n顶部中间的 LeXi 区域可拖动窗口。", 14, Muted));
         AddDataTab(tabs, settings, textRoot ?? App.UserRoot, session);
         Group(general, "查询方式", online, connections, "查询模型", merge, "义项整理");
+        var pages = tabs.Items.Cast<TabItem>().ToDictionary(t => (string)t.Header);
+        tabs.Items.Clear();
+        foreach (var name in new[] { "OAuth 连接", "API 连接", "查询与模型", "发音", "离线词典", "窗口", "数据与迁移" })
+            tabs.Items.Add(pages[name]);
+        tabs.SelectedItem = queryTab;
         save.Click += (_, _) =>
         {
             if (model.SelectedItem is not ModelChoice primaryValue || secondary.SelectedItem is not ModelChoice secondaryValue || judge.SelectedItem is not ModelChoice judgeValue)
-            { modelError.Text = "请先读取模型列表并选择模型。"; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
+            { modelError.Text = "请先读取模型列表并选择模型。"; modelError.Visibility = Visibility.Visible; tabs.SelectedItem = queryTab; return; }
             var candidate = settings.ForModel(new(primaryValue.Provider, primaryValue.Id));
             try { candidate.CompatibleBaseUrl = custom.BaseUrl(); }
-            catch (CompatibleException ex) { modelError.Text = ex.Message; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
+            catch (CompatibleException ex) { modelError.Text = ex.Message; modelError.Visibility = Visibility.Visible; tabs.SelectedItem = queryTab; return; }
             candidate.JudgeProvider = judgeValue.Provider; candidate.JudgeModel = judgeValue.Id;
             candidate.InferenceProfiles = [.. draft.InferenceProfiles];
             candidate.ParallelLookup = parallel.IsChecked == true;
@@ -206,7 +212,7 @@ public sealed partial class SettingsWindow : Window
             {
                 var options = InferenceOptions.Selected(candidate, new(selected.Provider, selected.Id));
                 if (InferenceOptions.ValidateSelection(selected.Capabilities, options.Effort, options.Speed) is { } error)
-                { modelError.Text = error; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
+                { modelError.Text = error; modelError.Visibility = Visibility.Visible; tabs.SelectedItem = queryTab; return; }
             }
             candidate.ParallelLookup = parallel.IsChecked == true; candidate.SecondaryProvider = secondaryValue.Provider; candidate.SecondaryModel = secondaryValue.Id;
             if (ModelCatalog.Validate(candidate) is { } invalid)

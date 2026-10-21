@@ -34,8 +34,14 @@ public final class LexiStore {
 
     public init(textKeys: any TextCredentialStore = KeychainTextCredentials()) { self.textKeys = textKeys }
 
+#if os(macOS)
     public func start(executable: URL, arguments: [String]) async {
-        let client = HostClient(executable: executable, arguments: arguments) { [weak self] event in
+        await start(transport: ProcessTransport(executable: executable, arguments: arguments))
+    }
+#endif
+
+    public func start(transport: any HostTransport) async {
+        let client = HostClient(transport: transport) { [weak self] event in
             Task { @MainActor in self?.handle(event) }
         }
         self.client = client
@@ -55,6 +61,13 @@ public final class LexiStore {
     }
 
     public func stop() async { clearInputPreview(); await client?.stop() }
+
+    // Model API keys for platforms without the subscription clients (iOS), from the Keychain.
+    // The host keeps them in memory only (keys.set); an empty key removes it.
+    @discardableResult public func setKey(_ provider: String, _ key: String) async -> Bool {
+        (try? await client?.call("keys.set", ["provider": provider, "key": key], as: Nothing.self)) != nil
+    }
+    private struct Nothing: Decodable, Sendable {}
     public func failToStart(_ message: String) { phase = .failed(message) }
 
     private func handle(_ event: HostEvent) {
@@ -238,13 +251,15 @@ public final class LexiStore {
     }
 
     // ---- Custom text service ----
-    public var queryModels: [ModelChoice] {
-        let saved = settings?.models ?? []
+    public var queryModels: [ModelChoice] { withReadModels(settings?.models ?? []) }
+    // The host's judges (Codex or the text endpoint on the Mac; the API services or the text endpoint
+    // on iOS), with the endpoint models just read.
+    public var judgeChoices: [ModelChoice] { withReadModels(settings?.judgeModels ?? []) }
+    private func withReadModels(_ saved: [ModelChoice]) -> [ModelChoice] {
         guard let endpoint = settings?.settings.compatibleBaseUrl,
               (try? TextCredentials.endpoint(endpoint)) == compatibleModelsEndpoint else { return saved }
         return saved + compatibleModels.filter { model in !saved.contains(where: { $0.key == model.key }) }
     }
-    public var judgeChoices: [ModelChoice] { queryModels.filter { $0.provider == "codex" || $0.provider == "compatible" } }
     public func clearCompatibleModels() { compatibleModels = []; compatibleModelsEndpoint = "" }
     public func textModels(_ baseUrl: String, credentials: TextCredentials) async throws -> [ModelChoice] {
         guard let client else { throw HostError.exited }

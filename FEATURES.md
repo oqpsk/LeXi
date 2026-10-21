@@ -41,14 +41,14 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 
 | 功能 | 共享行为（Lexi.Core） | Windows | macOS |
 |---|---|---|---|
-| 查询与模型设置 | `AppSettings`、`ModelCatalog`（模型选项与校验）、`QuerySession.SettingsSaved` | 已实现 | 已实现：系统设置风格的分组表单，修改即生效，校验与提示同 Windows |
+| 查询与模型设置 | `AppSettings`、`ModelCatalog`（模型选项与校验）、`QuerySession.SettingsSaved` | 已实现：OAuth、API 位于查询与模型之前；打开仍显示查询模型页 | 已实现：系统设置风格的分组表单，修改即生效，校验与提示同 Windows |
 | OAuth / API 连接入口与禁用状态 | `ModelCatalog` 统一 `OAuth \|` / `API \|` 前缀 | 已实现：模型选择上方并排入口；不支持的控件与标签置灰 | 已实现：查询设置顶部并排入口，打开对应连接表单；使用系统禁用样式 |
 | 模型 effort / 速度与接入模式标注 | `InferenceOptions`、模型能力缓存、Chat Completions 参数和官方 CLI 参数；档位显示名（Low … Extra High … Ultra），发送值不变 | 已实现：各模型下共用两个配置项；OAuth/API 分开保存；读取列表更新能力 | 已实现：每个模型下方一行“思考深度 · 速度”，两个菜单，能力说明作副标题；无可选档位的菜单置灰，悬停说明原因；使用 Host 同一能力和校验 |
 | 离线词典启停与信息 | `DictionaryCatalog` | 已实现：设置 → 离线词典 | 已实现：设置 → 离线词典；安装词库需 PowerShell 7 运行同一安装脚本 |
 | 自定义 OpenAI 兼容文本服务 | `CompatibleTextClient` / `CompatibleDictionary`：直接请求 HTTPS `/models`、`/chat/completions`；每次携带 CF Access 鉴权与 LeXi/版本号，API Key 可留空；JSON/SSE、取消、错误清理及端点隔离的缓存；用于查词、翻译和义项整理 | 已实现：设置 → API 连接；读取列表后在“查询与模型”明确选择，凭据按地址由 Windows 当前用户加密 | 已实现：设置 → 查询 → API 连接（也有独立 API 分类）；读取列表并保存连接后在“查询”选择，凭据按地址保存在 Keychain；内置本地 Host 直接请求服务 |
 | 官方客户端登录与状态 | `ProviderConnection`、`ToolLocator`（不依赖 shell PATH） | 已实现：设置 → OAuth 连接 | 已实现：在“终端”中打开官方登录，完成后点击“检查状态” |
 | 本地发音 | `SpeechCatalog.Local`（本机声线模型与校验） | 已实现：Windows SAPI 声线，可选“按文字语言自动选择”；生成 WAV 后按同一规则缓存 | 已实现：系统声线（`AVSpeechSynthesizer`），可选“按文字语言自动选择”；直接朗读，不生成缓存文件 |
-| 在线发音：OpenAI、Grok、ElevenLabs | `SpeechCatalog`（模型、声线、校验与提示）、`SpeechClient`、`ElevenLabsSpeech` | 已实现：设置 → 发音选择模型与声线，可试听 | 已实现：设置 → 发音选择模型与声线，可试听；通过 Host 的 `speech.*` 方法调用同一份 Core |
+| 在线发音：OpenAI、Grok、ElevenLabs | `SpeechCatalog`（模型、声线、校验与提示）、`SpeechClient`、`ElevenLabsSpeech` | 已实现：设置 → 发音按服务、密钥、声线、试听排列 | 已实现：设置 → 发音选择模型与声线，可试听；通过 Host 的 `speech.*` 方法调用同一份 Core |
 | ElevenLabs 账号声线与 Voice ID | `SpeechClient.ElevenVoicesAsync`、`SpeechAudio.ElevenVoicesAsync`（离线时不读取） | 已实现：首次展开声线列表时读取，可刷新；“指定其他声线”填写 Voice ID | 已实现：点击“读取声线列表”读取，可刷新（SwiftUI 选择器没有展开时机）；“指定其他声线”填写 Voice ID |
 | 朗读释义与例句 | `SpeechAudio` 与 `SpeechCatalog.Validate`（同一份缓存与长度规则，每次最多 4096/5000 字） | 已实现：鼠标移到释义、英文释义、例句或其译文上，左侧边距浮现扬声器，播放中变为停止按钮；右键菜单首项“朗读”，有选中文字时为“朗读所选文字”；播放中的段落以淡金色底标出；英文例句斜体，中文译文正体；扬声器与正文首行的字形中心对齐，播放底色按整个可见字形块垂直居中；正文到按钮的悬停区域连续覆盖折叠内容缩进 | 已实现：悬停扬声器、逐段朗读与停止、朗读所选文字；右键菜单在系统的查询、翻译与拷贝之上加入“朗读”；VoiceOver 提供“朗读”操作 |
 | 柔和声纹播放状态 | 不适用：原生视觉动效；准备音频时静态，开始播放后起伏，点击停止 | 已实现：五条圆角声纹；词头 18 DIP 淡粉，释义/例句 14 DIP 淡金；保留悬停与首行对齐；减少动态效果、隐藏或最小化时停动，移除后释放动画时钟；试听同 | 已实现：同一五条声纹与节奏；词头深色用淡粉、浅色用系统前景，释义/例句保留金色；减少动态效果、内容移除或场景进入后台时停动；试听同 |
@@ -83,6 +83,31 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 释义质量评估 | `DefinitionQuality`、24 类用例、离线回放评分与人工审读流程 | 开发检查；未进行在线 A/B 验证 | 共享同一评估 |
 | 设置布局与窗口记忆 | 平台原生窗口服务，独立于查词数据 | 左侧分类、分组卡片、独立 placement 文件 | 原生 NavigationSplitView、分组 Form、NSWindow frame autosave |
 | TTS 模型与重播 | `SpeechModels`：显式刷新 ElevenLabs 支持 TTS 的模型，保存目录和模型声线；音频缓存按文本/模型/声线区分 | 发音页刷新；文本右键再次播放上一段 | 发音页刷新；释义与例句右键“再次播放上一段”，未朗读过时置灰 |
-| 备份迁移 | `UserData`：预览、白名单、读取上限、校验后事务导入；合并历史，已有查询保留，设置可选 | 数据与迁移 | 原生文件面板与确认 |
+| 备份迁移 | `UserData`：预览、白名单、读取上限、校验后事务导入；支持桌面/iOS 备份互通，合并历史并保留已有查询，设置可选；本机不支持的模型服务保留当前整套模型、地址与档位配置 | 数据与迁移 | 原生文件面板与确认 |
 | 缓存管理 | `UserData`：中间缓存（含本句语境判断与查询耗时记录）、语音、已保存查询分别统计/清理；与查询互斥 | 数据与迁移 | 数据与迁移 |
 | 干净分发 | 干净源码默认值；平台安全存储不进入程序 | ZIP 脚本已准备，未生成发布包 | 现有 bundle 构建；正式签名/公证仍待发布时完成 |
+
+## iOS
+
+iOS 应用（`apple/iOS`）可在模拟器中运行；有 Apple 开发者账号时，`build-ios.sh --device` 以开发签名装到连接的 iPhone 或 iPad。iOS 不能启动进程，`Lexi.Core` 以 NativeAOT 库（`Lexi.Embed`）运行在应用内，收发与 macOS 相同的 Host 协议。界面遵循 iOS 的设计规范，功能与两个桌面版对齐；下表只列出 iOS 的状态与差别。
+
+| 功能 | iOS | 说明 |
+|---|---|---|
+| 查词、翻译、输入建议、历史、后退 / 前进、重新生成、在线补充 | 已实现 | 共用 Core；搜索框在屏幕底部，Return 查询，粘贴的换行保留给翻译；`lexi://lookup?q=…` 直接查词 |
+| 模型访问 | 已实现：OpenAI 与 Anthropic API Key、自定义文本服务 | 没有官方客户端，不能使用 ChatGPT / Claude 订阅；密钥与凭据存入本机钥匙串，只在内存中交给 Core（`keys.set`、`text.credentials`），不从 Mac 同步 |
+| 双模型、义项合并、TL;DR、来源与原文、词形、音标、词源 | 已实现 | 同一份 Core 规则；查询模型与义项判断可用任一 API 服务或自定义文本服务 |
+| 模型流式预览 | 计划 | API 路径一次返回完整结果 |
+| 朗读释义与例句 | 已实现：长按选择“朗读”，播放中的段落以淡金色底标出 | 触屏没有悬停，因此不显示边距扬声器 |
+| 发音 | 已实现：本机声线、OpenAI、Grok、ElevenLabs | 与 macOS 相同的模型与声线规则：ElevenLabs 读取账号声线或填写 Voice ID，可刷新语音模型；Grok 与 ElevenLabs 密钥在“发音”中保存到本机钥匙串 |
+| 离线词库 | 已实现：读取数据目录中已安装的词库 | `build-ios.sh --device` 安装时复制 Mac 已安装的词库；应用内下载计划 |
+| 外观 | 已实现：跟随系统、浅色、深色 | |
+| 订阅模型目录（OAuth） | 不适用 | 需要官方客户端 |
+| 自定义文本服务 | 已实现：设置 → 自定义文本服务 | 与 macOS 的 API 连接相同：Base URL、CF Access 凭据、可选 API Key、读取模型列表、逐片显示；模型列表标“自定义服务” |
+| 每个模型的 effort 与速度 | 已实现：自定义文本服务的模型 | 每个模型选择器下一行，按服务端能力提供选项，同一模型共用一套；OpenAI 与 Anthropic API Key 的模型使用服务默认档位 |
+| 重试未完成 | 已实现：进度行中失败的模型、“更多操作”菜单 | 共用 Core 重试检查点，只重试未完成步骤 |
+| 输入时预览本地 TL;DR | 已实现：停顿 300 ms 后显示在建议列表上方 | 共用 `query.preview`；点按打开完整释义，列表位置不因预览移动 |
+| 历史搜索与分页 | 已实现：历史上方搜索框，滚到底部继续加载 | 保存上限同为 10,000 条 |
+| 底栏与查询行的 soft matrix 动画、朗读声纹 | 已实现：查询进度行与状态行的 soft matrix，词头、朗读中的段落和试听的声纹（`LeXiShared`，与 macOS 同一份） | TL;DR 在进度行与词形之前，成功后 CRT 收束；词头播放时扬声器保留原位，声纹叠在上面 |
+| 备份迁移与缓存管理 | 已实现：设置 → 数据与迁移 | 共用 `UserData`；备份写到应用内后由“文件”保存到用户选择的位置，导入时先复制进应用再读取；与 macOS 备份互通 |
+| 设置结构 | 已实现：系统设置式列表，每项一页 | 先连接、再选择：模型服务 → 查询与模型 → 发音（服务 → 密钥 → 声线 → 试听）→ 离线词典 → 数据与迁移，外观与关于在下方 |
+| 设备安装与分发 | 已实现：开发签名装机（`build-ios.sh --device`） | TestFlight 与上架计划 |

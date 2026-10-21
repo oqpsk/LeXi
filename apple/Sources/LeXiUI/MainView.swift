@@ -1,5 +1,6 @@
 import AppKit
 import LeXiKit
+import LeXiShared
 import SwiftUI
 
 // Menu commands act on the focused window's query page.

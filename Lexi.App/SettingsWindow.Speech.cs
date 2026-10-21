@@ -16,7 +16,7 @@ public sealed partial class SettingsWindow
         tabs.Items.Add(tab);
         panel.Children.Add(Text("发声模型", 18));
         var model = new ComboBox { ItemsSource = SpeechModels.Load(App.UserRoot, settings), Margin = new(0,0,0,16) };
-        panel.Children.Add(model); panel.Children.Add(Text("声线"));
+        panel.Children.Add(model); var voiceLabel = Text("声线"); panel.Children.Add(voiceLabel);
         var voice = new SpeechVoicePicker { Style = (Style)FindResource(typeof(ComboBox)), Margin = new(0,0,0,8) }; panel.Children.Add(voice);
         var voiceStatus = Text("", 13, Muted); panel.Children.Add(voiceStatus);
         AutomationProperties.SetName(voiceStatus, "声线连接状态");
@@ -25,7 +25,9 @@ public sealed partial class SettingsWindow
         var buttons = new WrapPanel();
         var load = ConnectionButton("刷新声线列表");
         AutomationProperties.SetName(load, "刷新 ElevenLabs 可用声线列表");
-        var refreshModels = ConnectionButton("刷新语音模型"); buttons.Children.Add(refreshModels);
+        var refreshModels = ConnectionButton("刷新语音模型");
+        refreshModels.HorizontalAlignment = HorizontalAlignment.Left;
+        panel.Children.Insert(panel.Children.IndexOf(voiceLabel), refreshModels);
         var apiPage = ConnectionButton("获取 API Key ↗");
         apiPage.Click += (_, _) => Open("https://elevenlabs.io/app/developers/api-keys");
         buttons.Children.Add(load); buttons.Children.Add(apiPage); eleven.Children.Add(buttons);
@@ -51,7 +53,8 @@ public sealed partial class SettingsWindow
             var remove = new CheckBox { Content = "清除已保存的密钥", Margin = new(0,0,0,18) }; group.Children.Add(remove);
             fields.Add(provider, (input, remove));
         }
-        var online = new Expander { Header = "在线语音连接", Content = credentials, Margin = new(0,3,0,12) }; panel.Children.Add(online);
+        var online = new Expander { Header = "在线语音连接", Content = credentials, Margin = new(0,3,0,12) };
+        panel.Children.Insert(panel.Children.IndexOf(voiceLabel), online);
         panel.Children.Add(Text("发音仅在点击时生成，重复播放使用缓存。密钥在保存设置后留存于本机。这里播放的是合成语音。", 14, Muted));
         var testRow = new StackPanel { Orientation = Orientation.Horizontal };
         var sample = new TextBox { Text = "Hello, this is LeXi.", Width = 260, FontSize = 15, Margin = new(0,0,10,0) };
@@ -101,7 +104,8 @@ public sealed partial class SettingsWindow
             eleven.Visibility = selected.Provider == "elevenlabs" ? Visibility.Visible : Visibility.Collapsed;
             online.Visibility = selected.Provider == "windows" ? Visibility.Collapsed : Visibility.Visible;
             foreach (var (provider, group) in credentialPanels) group.Visibility = provider == selected.Provider ? Visibility.Visible : Visibility.Collapsed;
-            if (selected.Provider == "elevenlabs") online.IsExpanded = true;
+            refreshModels.Visibility = selected.Provider == "elevenlabs" ? Visibility.Visible : Visibility.Collapsed;
+            online.IsExpanded = selected.Provider != "windows";
             voiceStatus.Visibility = selected.Provider == "elevenlabs" ? Visibility.Visible : Visibility.Collapsed;
             if (selected.Provider == "elevenlabs") voiceStatus.Text = elevenVoices == null
                 ? "展开列表即可读取账号可用声线；首次使用请先填好 API Key。"

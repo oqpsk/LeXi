@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Text;
@@ -38,7 +37,7 @@ internal static class SelectionReader
         }
         catch (Exception e) when (e is ExternalException or InvalidOperationException or UnauthorizedAccessException) { }
         Console.OutputEncoding = new UTF8Encoding(false);
-        Console.Write(JsonSerializer.Serialize(result, Json.Options));
+        Console.Write(CapturedLookup.ToJson(result));
         return true;
     }
 

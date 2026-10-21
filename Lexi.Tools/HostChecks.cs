@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using System.Threading.Channels;
 using Lexi.Core;
 using Lexi.Host;
@@ -124,7 +125,8 @@ internal static class HostChecks
                 File.WriteAllText(fixtureOutput, JsonSerializer.Serialize(new { dictionary = final, translation = translationViews.Last(),
                     preview = translationViews.First(v => v.GetProperty("translation").ValueKind == JsonValueKind.Object && !v.GetProperty("translation").GetProperty("complete").GetBoolean()),
                     streaming = views.First(v => v.GetProperty("progress") is { ValueKind: JsonValueKind.Object } p && p.GetProperty("busy").GetBoolean() && v.GetProperty("answers").ValueKind == JsonValueKind.Object),
-                    home = ready.GetProperty("view") }, new JsonSerializerOptions(HostServer.Options) { WriteIndented = true }) + "\n");
+                    home = ready.GetProperty("view") }, new JsonSerializerOptions(HostServer.Options)
+                    { WriteIndented = true, TypeInfoResolver = JsonTypeInfoResolver.Combine(HostServer.Options.TypeInfoResolver!, new DefaultJsonTypeInfoResolver()) }) + "\n");
             var history = (await client.Call("history.list")).GetProperty("result").GetProperty("entries");
             Check(history[0].GetProperty("kind").GetString() == "翻译" && history[0].GetProperty("preview").GetString() == "The ship is ready. Keep 42 intact." &&
                 (await client.Call("history.remove", new { query = history[0].GetProperty("query").GetString(), translation = true })).GetProperty("result").GetProperty("removed").GetBoolean(),
@@ -154,6 +156,12 @@ internal static class HostChecks
             var updated = (await client.Call("settings.update", new { settings = new { mergeSenses = false, reasoningEffort = "high" } })).GetProperty("result").GetProperty("settings");
             Check(!updated.GetProperty("mergeSenses").GetBoolean() && updated.GetProperty("reasoningEffort").GetString() == "high" &&
                 !AppSettings.Load(user).MergeSenses, "valid settings preserve the selected reasoning effort instead of forcing Low");
+            const string modelKey = "synthetic-host-model-key";
+            var keySet = await client.Call("keys.set", new { provider = "anthropic", key = modelKey });
+            Check(keySet.GetProperty("result").ValueKind == JsonValueKind.Object && !keySet.GetRawText().Contains(modelKey) &&
+                (await client.Call("keys.set", new { provider = "codex", key = modelKey })).GetProperty("error").GetProperty("code").GetString() == "invalid_params" &&
+                !Directory.EnumerateFiles(user, "*", SearchOption.AllDirectories).Any(f => File.ReadAllText(f).Contains(modelKey)),
+                "model API keys are taken for API services only and never returned or written");
             await CheckSpeech(client, user, speechKey, syntheticAudio, speechRequests, Check);
             var textRequest = new { baseUrl = "https://example.org/v1", clientId = "synthetic-id", clientSecret = "synthetic-secret", apiKey = "" };
             var availableText = await client.Call("text.models", textRequest);

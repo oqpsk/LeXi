@@ -9,7 +9,12 @@ using Lexi.Core;
 
 namespace Lexi;
 
-internal sealed record CapturedLookup(string Text, string? Surrounding = null, int Start = -1);
+internal sealed record CapturedLookup(string Text, string? Surrounding = null, int Start = -1)
+{
+    // This private Windows IPC type is outside Core's NativeAOT serialization catalog.
+    internal static string ToJson(CapturedLookup? value) => JsonSerializer.Serialize(value, Json.Flexible);
+    internal static CapturedLookup? FromJson(string json) => JsonSerializer.Deserialize<CapturedLookup>(json, Json.Flexible);
+}
 
 // No keyboard hook and no background text reading. Watch native clipboard sequence numbers and
 // foreground HWNDs only; read text once, when the reader brings the query window forward.
@@ -110,7 +115,7 @@ internal sealed class InstantLookup : IDisposable
             var output = process.StandardOutput.ReadToEndAsync(timeout.Token);
             await process.WaitForExitAsync(timeout.Token);
             var json = await output;
-            return process.ExitCode == 0 && json.Length < 40000 ? JsonSerializer.Deserialize<CapturedLookup>(json, Json.Options) : null;
+            return process.ExitCode == 0 && json.Length < 40000 ? CapturedLookup.FromJson(json) : null;
         }
         catch (Exception e) when (e is OperationCanceledException or IOException or System.ComponentModel.Win32Exception or JsonException or InvalidOperationException)
         { token.ThrowIfCancellationRequested(); return null; }

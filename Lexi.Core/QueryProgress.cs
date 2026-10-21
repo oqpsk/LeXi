@@ -92,7 +92,7 @@ public sealed record QueryProgressState(QueryStage Stage, string Title, string D
             _ => QueryWorkState.Failed
         })).ToList();
         if (MergeEnabled && includeJudge)
-            items.Add(Item("judge", new LookupModel(settings.JudgeProvider, settings.JudgeModel).Name,
+            items.Add(Item("judge", ModelCatalog.Judge(settings).Name,
                 snapshot?.MergeFailed == true ? QueryWorkState.Failed : snapshot?.Merging == true ? QueryWorkState.Merging :
                 !Busy && !string.IsNullOrEmpty(snapshot?.MergeNote) ? QueryWorkState.Complete : QueryWorkState.Pending,
                 snapshot?.MergeFailed == true ? Detail : !Busy && string.IsNullOrEmpty(snapshot?.MergeNote) ? "无需调用整理模型" : null));

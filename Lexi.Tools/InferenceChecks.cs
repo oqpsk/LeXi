@@ -56,7 +56,7 @@ internal static class InferenceChecks
             "discovered OAuth models persist across restarts alongside saved selections");
         var legacy = new AppSettings();
         check(InferenceOptions.Selected(legacy, LookupModel.Primary(legacy)) == new InferenceSelection("low", "priority") &&
-            LookupModel.Primary(legacy).CacheKey("Word", legacy) == JsonSerializer.Serialize(new { query = "Word", legacy.Provider, legacy.Model, legacy.ReasoningEffort, legacy.ServiceTier }, Lexi.Core.Json.Options),
+            LookupModel.Primary(legacy).CacheKey("Word", legacy) == JsonSerializer.Serialize(new { query = "Word", legacy.Provider, legacy.Model, legacy.ReasoningEffort, legacy.ServiceTier }, Lexi.Core.Json.Flexible),
             "legacy OAuth Low/Fast and cache identities survive the upgrade until explicitly changed");
         var folder = Path.Combine(root, "inference", Guid.NewGuid().ToString("N"));
         await InferenceOptions.Remember(folder, "compatible", endpoint, [model]);
