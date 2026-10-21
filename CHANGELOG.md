@@ -11,6 +11,7 @@
   - **Reopen after iOS closes LeXi.** If iOS closes LeXi while you are in another app, opening it within 30 minutes reopens the page you left, from saved results and at the same place, without adding it to history again. Later, LeXi opens ready to type as before. `query.submit` takes `restore` for this.
   - **Links wait for LeXi to start.** A `lexi://lookup?q=` link that opens LeXi now looks the word up once the lookup service is ready, instead of being lost.
   - **Build numbers.** Each iOS build carries its own number (`yymmdd.HHMM`, UTC), shown in 设置 → 关于 beside the version, so two builds of one version can be told apart.
+- Read offline dictionary indexes in place. The index file is mapped into memory and only where each row starts is kept, instead of an object per row. With ECDICT's 770,000 rows, LeXi holds about 15 MB instead of 159 MB and loads the index in 27 ms instead of 106 ms; lookups and suggestions return the same results. On iOS the idle footprint falls from 123 MB to 55 MB, so the system is less likely to close LeXi in the background. A damaged index is reported as unreadable when it loads.
 - iOS lookup layout and navigation.
   - **Query box at the top.** The query box moves to the top, where the typing hand never covers it, with suggestions below it and the typing preview under them. The status line becomes the footer, as on the Mac.
   - **No history search.** The home page drops the history search field, which people kept taking for the query box.
