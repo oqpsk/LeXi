@@ -2,6 +2,7 @@
 
 ## Unreleased — major-version preparation
 
+- Order macOS settings so that what you connect comes before what you choose. The sidebar runs 通用, OAuth 连接, API 连接, 查询与模型, 发音, 离线词典, 数据与迁移. 发音 runs 发音服务 (with 刷新语音模型 for ElevenLabs), then that service's API key, then 声线, then 试听.
 - macOS light mode no longer turns grey over a dark desktop. Light glass now carries a near-white wash, so it reads as frosted white. The results sit on white groups instead of grey ones, and the TL;DR card is a clearer pale pink. The query capsule has a hairline edge, so it stays visible on near-white glass. Dark mode is unchanged.
 - Keep the TL;DR to one wording while senses merge. Each model marks its own core meaning, so after both answered the TL;DR used to list the same meaning twice ("末日刷屏：沉迷浏览负面消息；末日刷屏：沉迷刷…") until the judge finished. Until the merge ranks meanings, the TL;DR now follows the first model to complete and does not change when the other finishes; with merging off or failed it stays with that model.
 - Reach a useful result sooner, measured rather than guessed.
