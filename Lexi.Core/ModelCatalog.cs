@@ -22,7 +22,7 @@ public static class ModelCatalog
         var options = capabilities ?? (provider == CompatibleText.Provider ? InferenceOptions.Unknown : InferenceOptions.Subscription(provider, id));
         const string hiddenNote = "官方客户端隐藏模型；能否调用取决于订阅权限。";
         if (hidden && !options.Note.Contains(hiddenNote, StringComparison.Ordinal)) options = options with { Note = hiddenNote + options.Note };
-        return new((provider == CompatibleText.Provider ? "API | " : "OAuth | ") + new LookupModel(provider, id).Name + (hidden ? " · 隐藏" : ""), id, provider, options, Hidden: hidden);
+        return new((provider == CompatibleText.Provider ? "API | " + id : "OAuth | " + new LookupModel(provider, id).Name) + (hidden ? " · 隐藏" : ""), id, provider, options, Hidden: hidden);
     }
     public static ModelChoice[] Choices(AppSettings settings, IEnumerable<string>? compatibleModels = null, IEnumerable<ModelChoice>? details = null)
     {

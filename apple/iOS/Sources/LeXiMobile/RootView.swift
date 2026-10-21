@@ -2,8 +2,9 @@ import LeXiKit
 import LeXiShared
 import SwiftUI
 
-// The one screen. Results scroll beneath a floating Liquid Glass search capsule at the bottom,
-// within thumb reach, with suggestions just above it; history fills the page before a query.
+// The one screen. The Liquid Glass query capsule sits at the top, where the hand typing below never
+// covers it, with suggestions under it; history fills the page before a query. The status line is
+// the footer, as on the Mac. Swiping in from an edge goes back or forward, as in Safari.
 struct RootView: View {
     @Bindable var store: LexiStore
     var speech: SpeechController
@@ -12,6 +13,9 @@ struct RootView: View {
     @State private var programmatic = false
     @State private var showSettings = false
     @FocusState private var searching: Bool
+    // An edge swipe in progress: positive from the left edge (back), negative from the right (forward).
+    @State private var swipe: CGFloat = 0
+    private static let edge: CGFloat = 20, threshold: CGFloat = 90
 
     var body: some View {
         NavigationStack {
@@ -22,11 +26,16 @@ struct RootView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color(uiColor: .systemGroupedBackground))
-            // In the safe area, so the list sits just above the search capsule and the keyboard.
-            .overlay(alignment: .bottom) { suggestions }
-            .safeAreaBar(edge: .bottom) { searchBar }
+            // A strip along each edge takes the swipe, so a row under the finger is not tapped as well.
+            .overlay(alignment: .leading) { ZStack(alignment: .leading) { edgeStrip(forward: false); swipeMark(forward: false) } }
+            .overlay(alignment: .trailing) { ZStack(alignment: .trailing) { edgeStrip(forward: true); swipeMark(forward: true) } }
+            .sensoryFeedback(.selection, trigger: abs(swipe) > Self.threshold) { _, armed in armed }
+            // In the safe area, so the list hangs just below the query capsule.
+            .overlay(alignment: .top) { suggestions }
+            .safeAreaBar(edge: .top) { searchBar }
+            .safeAreaBar(edge: .bottom) { statusBar }
             .navigationTitle(store.view.kind == .home ? "LeXi" : "")
-            .navigationBarTitleDisplayMode(store.view.kind == .home ? .large : .inline)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .sheet(isPresented: $showSettings) { SettingsView(store: store, speech: speech) }
         }
@@ -62,18 +71,22 @@ struct RootView: View {
     private var canRegenerate: Bool { store.view.kind != .home && store.view.canRegenerate && online }
     private var status: String { speech.status.isEmpty ? store.view.status : speech.status }
 
+    // The Mac footer: the soft matrix beside the status; nothing spins in the query capsule.
+    @ViewBuilder private var statusBar: some View {
+        if store.view.kind != .home && !status.isEmpty {
+            HStack(spacing: 8) {
+                QueryActivityMark(activity: store.view.progress?.activity ?? .idle, size: 14).foregroundStyle(.secondary)
+                Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 22).padding(.vertical, 6)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("查询状态：" + status)
+        }
+    }
+
     private var searchBar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if store.view.kind != .home && !status.isEmpty {
-                // The Mac footer's soft matrix beside the status; nothing spins in the query capsule.
-                HStack(spacing: 8) {
-                    QueryActivityMark(activity: store.view.progress?.activity ?? .idle, size: 14).foregroundStyle(.secondary)
-                    Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
-                }
-                .padding(.horizontal, 8)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("查询状态：" + status)
-            }
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
                 TextField("查词或翻译", text: $text, axis: .vertical)
@@ -94,21 +107,60 @@ struct RootView: View {
             .padding(.horizontal, 18).padding(.vertical, 13)
             .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 26, style: .continuous))
         }
-        .padding(.horizontal, 14).padding(.bottom, 6)
+        .padding(.horizontal, 14).padding(.top, 2).padding(.bottom, 6)
     }
 
-    // The preview of what is being typed sits above the suggestions, so the list under the thumb
-    // never moves when the preview arrives.
+    // The preview of what is being typed sits below the suggestions, so the list a finger is
+    // heading for never moves when the preview arrives.
     @ViewBuilder private var suggestions: some View {
         if searching && (!store.suggestions.isEmpty || store.inputPreview != nil) {
             VStack(spacing: 8) {
+                if !store.suggestions.isEmpty { suggestionList }
                 if let preview = store.inputPreview {
                     Button { setText(preview.query); submit(preview.query) } label: { InputPreviewCard(preview: preview) }
                         .buttonStyle(.plain)
                 }
-                if !store.suggestions.isEmpty { suggestionList }
             }
-            .padding(.horizontal, 14).padding(.bottom, 10)
+            .padding(.horizontal, 14).padding(.top, 6)
+        }
+    }
+
+    // Back from the left edge and forward from the right, once the drag is mostly sideways and
+    // only when there is a page that way. Past the threshold a light tap confirms it.
+    @ViewBuilder private func edgeStrip(forward: Bool) -> some View {
+        let navigation = store.view.navigation
+        if forward ? navigation.canForward : navigation.canBack {
+            Color.clear.frame(width: Self.edge).contentShape(.rect)
+                .gesture(DragGesture(minimumDistance: 8)
+                    .onChanged { value in
+                        let dx = value.translation.width
+                        guard abs(dx) > abs(value.translation.height) * 1.5 else { return }
+                        swipe = forward ? min(dx, 0) : max(dx, 0)
+                    }
+                    .onEnded { _ in
+                        let travelled = swipe
+                        withAnimation(.snappy(duration: 0.25)) { swipe = 0 }
+                        if travelled > Self.threshold { navigate(-1) } else if travelled < -Self.threshold { navigate(1) }
+                    })
+                .accessibilityHidden(true)
+        }
+    }
+
+    // A glass chevron that follows the finger in from the edge and fills once releasing would turn the page.
+    @ViewBuilder private func swipeMark(forward: Bool) -> some View {
+        let distance = forward ? -swipe : swipe
+        if distance > 0 {
+            let progress = min(distance / Self.threshold, 1)
+            Image(systemName: forward ? "chevron.forward" : "chevron.backward")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(progress >= 1 ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .frame(width: 44, height: 44)
+                .glassEffect(.regular, in: .circle)
+                .scaleEffect(0.7 + 0.3 * progress)
+                .opacity(Double(progress))
+                .offset(x: (forward ? -1 : 1) * (min(distance, Self.threshold + 24) * 0.6 - 28))
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 
@@ -208,65 +260,38 @@ struct RootView: View {
 
 // Recent explicit submissions, searchable and loaded a page at a time, as on the Mac. Deleting a row
 // never deletes cached definitions.
+// Recent explicit submissions, loaded a page at a time. On a phone the list needs no search field of
+// its own: people took one for the lookup field. Deleting a row never deletes cached definitions.
 struct HistoryView: View {
     @Bindable var store: LexiStore
     let open: (HistoryEntry) -> Void
-    @State private var filter: String
-
-    init(store: LexiStore, open: @escaping (HistoryEntry) -> Void) {
-        self.store = store; self.open = open
-        // Coming back home keeps the search that is still applied to the list.
-        _filter = State(initialValue: store.historyFilter)
-    }
 
     var body: some View {
-        let searching = !filter.isEmpty || !store.historyFilter.isEmpty
         Group {
-            if !store.history.error.isEmpty || store.history.entries.isEmpty && !searching {
+            if !store.history.error.isEmpty || store.history.entries.isEmpty {
                 ContentUnavailableView {
                     Label("查一个词", systemImage: "character.book.closed")
                 } description: {
-                    Text(store.history.error.isEmpty ? "在下方输入单词、短语或一段文字。查过的内容会留在这里。" : store.history.error)
+                    Text(store.history.error.isEmpty ? "在上方输入单词、短语或一段文字。查过的内容会留在这里。" : store.history.error)
                 }
                 .padding(.top, 40)
             } else {
                 VStack(alignment: .leading, spacing: 10) {
-                    // The query capsule below looks words up; this field only filters the list.
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                        TextField("搜索历史", text: $filter)
-                            .textInputAutocapitalization(.never).autocorrectionDisabled().submitLabel(.search)
-                        if !filter.isEmpty {
-                            Button { filter = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
-                                .buttonStyle(.plain).accessibilityLabel("清除搜索")
-                        }
-                    }
-                    .font(.callout)
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(.quaternary.opacity(0.6), in: .capsule)
-                    .accessibilityElement(children: .contain).accessibilityLabel("搜索查询历史")
                     Text("最近查询").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary).padding(.horizontal, 4)
-                    if store.history.entries.isEmpty {
-                        Text("没有匹配的历史。").foregroundStyle(.secondary).padding(.vertical, 8).padding(.horizontal, 4)
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(Array(store.history.entries.enumerated()), id: \.element.id) { index, entry in
-                                if index > 0 { Divider().padding(.leading, 18) }
-                                row(entry)
-                                    // The next page loads as the last row comes into view.
-                                    .onAppear { if index == store.history.entries.count - 1 && hasMore { Task { await store.moreHistory() } } }
-                            }
+                    VStack(spacing: 0) {
+                        ForEach(Array(store.history.entries.enumerated()), id: \.element.id) { index, entry in
+                            if index > 0 { Divider().padding(.leading, 18) }
+                            row(entry)
+                                // The next page loads as the last row comes into view.
+                                .onAppear { if index == store.history.entries.count - 1 && hasMore { Task { await store.moreHistory() } } }
                         }
-                        .contentGroup()
                     }
+                    .contentGroup()
                 }
             }
         }
-        .task(id: filter) {
-            guard filter != store.historyFilter else { return }
-            try? await Task.sleep(for: .milliseconds(200)); guard !Task.isCancelled else { return }
-            await store.searchHistory(filter)
-        }
+        // A filter left from an earlier version would otherwise hide entries with no way to clear it.
+        .task { if !store.historyFilter.isEmpty { await store.searchHistory("") } }
     }
 
     private var hasMore: Bool { store.history.entries.count < (store.history.total ?? store.history.entries.count) }
