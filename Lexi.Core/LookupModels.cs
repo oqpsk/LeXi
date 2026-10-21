@@ -4,23 +4,39 @@ namespace Lexi.Core;
 
 public sealed record LookupModel(string Provider, string Model)
 {
-    public string Name => Provider == CompatibleText.Provider ? Model : Provider == "claude" ? Model switch
-    { "haiku" => "Claude Haiku", "sonnet" => "Claude Sonnet", "opus" => "Claude Opus", "default" => "Claude 默认", _ => "Claude " + Model } : Model switch
-    { "gpt-6-luna" => "GPT-6 Luna", "gpt-6.1-sol" => "GPT-6.1 Sol", "" => "Codex 默认", _ => Model };
+    public string Name => Provider switch
+    {
+        CompatibleText.Provider => Model,
+        "claude" => Model switch { "haiku" => "Claude Haiku", "sonnet" => "Claude Sonnet", "opus" => "Claude Opus", "default" => "Claude 默认", _ => "Claude " + Model },
+        "anthropic" => Model switch { "claude-haiku-5-5" => "Claude Haiku 5.5", "claude-sonnet-5-5" => "Claude Sonnet 5.5", "claude-opus-5-5" => "Claude Opus 5.5", _ => Model },
+        _ => Model switch { "gpt-6-luna" => "GPT-6 Luna", "gpt-6.1-sol" => "GPT-6.1 Sol", "" => "Codex 默认", _ => Model }
+    };
     public static LookupModel Primary(AppSettings settings) => new(settings.Provider, settings.Model);
     public static LookupModel Secondary(AppSettings settings) => string.IsNullOrWhiteSpace(settings.SecondaryProvider)
-        ? settings.Provider == "claude" ? new("codex", "gpt-6-luna") : new("claude", "haiku")
+        ? settings.Provider switch
+        {
+            "claude" => new("codex", "gpt-6-luna"), "openai" => new("anthropic", "claude-haiku-5-5"),
+            "anthropic" => new("openai", "gpt-6-luna"), _ => new("claude", "haiku")
+        }
         : new(settings.SecondaryProvider, settings.SecondaryModel);
     public static LookupModel[] Selected(AppSettings settings) =>
         (settings.ParallelLookup ? new[] { Primary(settings), Secondary(settings) } : [Primary(settings)]).Distinct().ToArray();
     public string CacheKey(string query, AppSettings settings)
     {
-        if (InferenceOptions.Profile(settings, this) is { } profile) return JsonSerializer.Serialize(new { query, Provider, Model, endpoint = Provider == CompatibleText.Provider ? CompatibleText.Scope(settings) : "", profile.Effort, speed = InferenceOptions.CanonicalSpeed(profile.Speed) }, Json.Options);
+        if (InferenceOptions.Profile(settings, this) is { } profile)
+            return JsonSerializer.Serialize(new ModelProfileCacheKey(query, Provider, Model, Provider == CompatibleText.Provider ? CompatibleText.Scope(settings) : "",
+                profile.Effort, InferenceOptions.CanonicalSpeed(profile.Speed)), Json.Options);
         return Provider == CompatibleText.Provider
-        ? JsonSerializer.Serialize(new { query, Provider, Model, endpoint = CompatibleText.Scope(settings), settings.ReasoningEffort, settings.ServiceTier }, Json.Options)
-        : JsonSerializer.Serialize(new { query, Provider, Model, settings.ReasoningEffort, settings.ServiceTier }, Json.Options);
+            ? JsonSerializer.Serialize(new ModelEndpointCacheKey(query, Provider, Model, CompatibleText.Scope(settings), settings.ReasoningEffort, settings.ServiceTier), Json.Options)
+            : JsonSerializer.Serialize(new ModelCacheKey(query, Provider, Model, settings.ReasoningEffort, settings.ServiceTier), Json.Options);
     }
 }
+
+// The named shapes below replace anonymous objects so JSON can be generated ahead of time; their
+// property order and names keep existing cache keys and hashes byte-for-byte unchanged.
+internal sealed record ModelCacheKey(string Query, string Provider, string Model, string ReasoningEffort, string ServiceTier);
+internal sealed record ModelEndpointCacheKey(string Query, string Provider, string Model, string Endpoint, string ReasoningEffort, string ServiceTier);
+internal sealed record ModelProfileCacheKey(string Query, string Provider, string Model, string Endpoint, string Effort, string Speed);
 
 public enum ModelPhase { Pending, Streaming, Complete, Failed, Offline }
 public sealed record ModelAnswer(LookupModel Model, ModelPhase Phase, AiEntry? Entry = null, bool Cached = false, string Error = "");

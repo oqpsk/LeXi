@@ -7,6 +7,7 @@ public sealed record CacheUsage(string Id, string Name, long Bytes, int Files);
 // A refusal worded for the user. Front ends show its message; it never contains a path or file content.
 public sealed class UserDataException(string message) : InvalidOperationException(message);
 public sealed record BackupPreview(int Version, int History, int Results, bool HasSettings);
+internal sealed record BackupManifest(string Product, int Version);
 
 // Only named application-owned categories are addressable. Keys, OAuth clients, raw dictionaries,
 // audio and machine-specific window placements never enter a migration archive.
@@ -51,7 +52,7 @@ public sealed class UserData(string root)
             {
                 async Task Add(string name, byte[] data)
                 { await using var entry = zip.CreateEntry(name, CompressionLevel.Optimal).Open(); await entry.WriteAsync(data, token); }
-                await Add("manifest.json", JsonSerializer.SerializeToUtf8Bytes(new { product = "LeXi", version = 1 }, Json.Options));
+                await Add("manifest.json", JsonSerializer.SerializeToUtf8Bytes(new BackupManifest("LeXi", 1), Json.Options));
                 var portable = settings.ForModel(LookupModel.Primary(settings)); portable.CodexPath = "";
                 await Add("settings.json", JsonSerializer.SerializeToUtf8Bytes(portable, Json.Options));
                 await Add("history.json", JsonSerializer.SerializeToUtf8Bytes(history.Entries, Json.Options));

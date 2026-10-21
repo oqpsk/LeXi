@@ -2,15 +2,16 @@ import LeXiKit
 import SwiftUI
 
 // Core chooses the activity; the native front end only draws its soft matrix.
-struct QueryActivityMark: View {
+public struct QueryActivityMark: View {
     var activity: QueryActivity
     var size: CGFloat = 18
+    public init(activity: QueryActivity, size: CGFloat = 18) { self.activity = activity; self.size = size }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @State private var visible = false
     @State private var origin = Date()
 
-    var body: some View {
+    public var body: some View {
         Group {
             if activity == .idle {
                 Text("ξ").font(.custom("Georgia", size: size * 0.85))

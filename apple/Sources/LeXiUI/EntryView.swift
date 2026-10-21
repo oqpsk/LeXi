@@ -1,4 +1,5 @@
 import LeXiKit
+import LeXiShared
 import SwiftUI
 
 // One dictionary or translation page, drawn exactly from the QueryView Lexi.Core published.

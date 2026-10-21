@@ -5,6 +5,9 @@ using System.Threading.Channels;
 
 namespace Lexi.Core;
 
+// Claude Code's --settings argument.
+internal sealed record ClaudeCliSettings(bool DisableAllHooks, bool FastMode);
+
 public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDisposable
 {
     private readonly object sync = new();
@@ -47,7 +50,7 @@ public sealed class ClaudeDictionary(string assetFolder, string userRoot) : IDis
         var schema = File.ReadAllText(Path.Combine(assetFolder, "dictionary.schema.json"));
         var translationSchema = File.ReadAllText(Path.Combine(assetFolder, "translation.schema.json"));
         foreach (var arg in new[] { "-p", "--model", settings.Model, "--tools", "", "--strict-mcp-config", "--mcp-config", "{\"mcpServers\":{}}",
-            "--setting-sources", "", "--settings", JsonSerializer.Serialize(new { disableAllHooks = true, fastMode = selected.Speed is "fast" or "priority" }, Json.Options),
+            "--setting-sources", "", "--settings", JsonSerializer.Serialize(new ClaudeCliSettings(true, selected.Speed is "fast" or "priority"), Json.Options),
             "--no-chrome", "--no-session-persistence", "--output-format", "stream-json", "--verbose", "--include-partial-messages",
             "--system-prompt", instructions + "\nFor define, use this JSON schema:\n" + schema + "\nFor translate, use this JSON schema:\n" + translationSchema }) info.ArgumentList.Add(arg);
         // Only the official CLI handles subscription credentials. Lexi never reads or copies tokens.

@@ -1,5 +1,6 @@
 import AppKit
 import LeXiKit
+import LeXiShared
 import SwiftUI
 
 // macOS settings in the System Settings style. Changes apply immediately; Lexi.Core validates each
