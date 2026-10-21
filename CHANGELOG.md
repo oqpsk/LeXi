@@ -2,6 +2,9 @@
 
 ## Unreleased — major-version preparation
 
+- Upload the iOS app to TestFlight.
+  - **Upload.** `apple/scripts/build-ios.sh --testflight` archives the app the way Xcode does, with Core's dSYM. `xcodebuild -exportArchive` then signs it with the Apple-managed distribution certificate and an App Store profile, both created through the Xcode account, and uploads it to App Store Connect. `--testflight export` stops at the `.ipa`.
+  - **Packaging.** Core now ships as `LexiEmbed.framework`, because iOS loads dynamic code only from frameworks. Bundles carry the SDK keys Xcode writes and a privacy manifest that declares no tracking and no collected data.
 - iOS sets itself up without a Mac.
   - **Download the offline dictionary.** 设置 → 离线词典 and the welcome sheet download ECDICT (34 MB, 171 MB installed) from this repository's release `dictionary-ecdict-bc015ed`, with progress and cancel. Core installs it only if the size and SHA-256 match the pack it pins, unpacks it beside the dictionaries, checks that it opens, then swaps it in and reloads without a restart. Installed dictionaries can be deleted. Host methods `dictionaries.install` and `dictionaries.remove`; `dictionaries.list` lists the packs. `Lexi.Tools pack-data` rebuilds the pack byte for byte.
   - **Welcome sheet.** A device without an offline dictionary or a model service opens LeXi with a welcome sheet: download the dictionary, connect a model service, or start without them. Closing it with no model service turns off 自动补充双语释义, so lookups show the dictionaries and Wiktionary instead of two missing-key warnings; 设置 → 模型服务 offers to turn it back on once a service is set up.
