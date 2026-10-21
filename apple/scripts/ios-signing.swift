@@ -3,7 +3,8 @@
 // device, the keychain identity whose certificate the profile lists, and the profile's team. Copies the
 // profile into the app and writes the entitlements; prints the device and the identity's SHA-1, one per
 // line. Account details come from Xcode's own files and never enter the repository.
-// usage: swift ios-signing.swift <bundle id> <device udid | -> <embedded.mobileprovision> <entitlements.plist>
+// usage: swift ios-signing.swift <bundle id> <device udid | - | none> <embedded.mobileprovision> <entitlements.plist>
+// "none" signs an archive: any valid development profile of the team that covers the bundle.
 import CryptoKit
 import Foundation
 
@@ -55,7 +56,7 @@ for folder in ["Library/Developer/Xcode/UserData/Provisioning Profiles", "Librar
     for path in paths where path.pathExtension == "mobileprovision" {
         guard let profile = try? PropertyListSerialization.propertyList(from: run("/usr/bin/security", ["cms", "-D", "-i", path.path]), format: nil) as? [String: Any],
               let expiry = profile["ExpirationDate"] as? Date, expiry > .now,
-              (profile["ProvisionedDevices"] as? [String])?.contains(device) == true,
+              device == "none" || (profile["ProvisionedDevices"] as? [String])?.contains(device) == true,
               let team = (profile["TeamIdentifier"] as? [String])?.first,
               let entitlements = profile["Entitlements"] as? [String: Any], entitlements["get-task-allow"] as? Bool == true,
               let appID = entitlements["application-identifier"] as? String, appID == "\(team).\(bundle)" || appID == "\(team).*",

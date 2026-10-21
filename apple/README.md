@@ -68,6 +68,17 @@ apple/scripts/build-ios.sh --device            # 生成 artifacts/ios-device/LeX
 
 之后 `build-ios.sh --device [UDID]` 会自动挑选：连接中的设备（未指定时）、Xcode 文件夹中仍有效且包含这台设备与 `io.github.oqpsk.lexi`（或通配符）的开发描述文件、该文件列出且钥匙串中有私钥的证书，以及其中的团队（`apple/scripts/ios-signing.swift`）。权限按团队写进签名，描述文件放进应用；仓库中不保存任何账号信息。安装后，脚本把这台 Mac 已安装的离线词库（`~/Library/Application Support/LeXi/data`，未改动的文件跳过）复制到设备上的应用数据目录，输入建议与本地释义随之可用；`LEXI_DICTIONARIES` 可指定其他文件夹，设为空则跳过。装好的版本在描述文件到期（通常一年）前都能打开。
 
+### TestFlight
+
+```
+apple/scripts/build-ios.sh --testflight          # 归档、签名并上传到 App Store Connect
+apple/scripts/build-ios.sh --testflight export   # 只导出 artifacts/ios-testflight/export/LeXi.ipa
+```
+
+脚本按 Xcode 的方式生成归档（`LeXi.xcarchive`，含 Core 的 dSYM），再由 `xcodebuild -exportArchive -allowProvisioningUpdates` 用 Xcode 登录的账号自动签名：分发证书由 Apple 托管，App Store 描述文件与 App ID 按需创建，无需本地证书或 API 密钥。每次构建使用新的构建号（`yymmdd.HHMM`，UTC，可用 `LEXI_BUILD` 指定），版本号取自 `Directory.Build.props`。Core 以 `LexiEmbed.framework` 放在 Frameworks 中（iOS 只允许从框架加载动态代码），应用与框架写入 Xcode 平时生成的 SDK 信息，并带隐私清单（`PrivacyInfo.xcprivacy`）。
+
+第一次上传前，在 App Store Connect 的 Apps 中新建 iOS App 并选择 Bundle ID `io.github.oqpsk.lexi`。上传后构建经苹果处理即可在 TestFlight 的内部测试中分发；内部测试员须是 App Store Connect 的用户（Users and Access），在 iPhone 的 TestFlight 应用中用自己的 Apple ID 接受邀请即可，无需在设备上登录开发者账号。
+
 如果 `xcrun simctl boot` 一直没有结果，或 xcodebuild 提示 “CoreSimulator is out of date”，说明系统中的模拟器组件比 Xcode 旧：打开一次 Xcode 并按提示安装附加组件，或运行 `xcodebuild -runFirstLaunch`（需要管理员密码），然后重新启动模拟器。
 
 首次打开时，欢迎页提供下载 ECDICT 离线词典（约 34 MB），并引导到“设置 → 模型服务”填写 OpenAI 或 Anthropic 的 API Key 或自定义文本服务；密钥只保存在本机钥匙串中。没有连接模型服务时，关闭欢迎页会关掉“自动补充双语释义”，查词只显示词典和 Wiktionary 的释义。开发时也可以把 Mac 的离线词库直接复制进模拟器中的应用数据目录：

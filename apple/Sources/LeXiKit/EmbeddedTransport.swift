@@ -25,13 +25,13 @@ public final class EmbeddedTransport: HostTransport, @unchecked Sendable {
         self.library = library; self.assets = assets; self.data = data; self.user = user
     }
 
-    // The app bundle carries LexiEmbed.dylib in Frameworks and the model files in assets; user data
-    // and dictionaries live in Application Support/LeXi, as on macOS.
+    // The app bundle carries LexiEmbed.framework in Frameworks and the model files in assets; user
+    // data and dictionaries live in Application Support/LeXi, as on macOS.
     public static func app(bundle: Bundle = .main) -> EmbeddedTransport? {
         guard let frameworks = bundle.privateFrameworksURL, let resources = bundle.resourceURL,
               let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
         let root = support.appending(path: "LeXi")
-        return EmbeddedTransport(library: frameworks.appending(path: "LexiEmbed.dylib"), assets: resources.appending(path: "assets"),
+        return EmbeddedTransport(library: frameworks.appending(path: "LexiEmbed.framework/LexiEmbed"), assets: resources.appending(path: "assets"),
                                  data: root.appending(path: "data"), user: root)
     }
 
