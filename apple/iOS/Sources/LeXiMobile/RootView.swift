@@ -21,6 +21,8 @@ struct RootView: View {
     @State private var width: CGFloat = 400
     // The page a finished slide moved to, drawn from memory until Core's view for it arrives.
     @State private var arriving: Int64?
+    // The system's side margin, which the toolbar's glass buttons keep: 16 pt, 20 on the larger iPhones.
+    @State private var margin: CGFloat = 16
     private static let edge: CGFloat = 20
 
     var body: some View {
@@ -28,21 +30,24 @@ struct RootView: View {
             ZStack {
                 if slide > 0, let id = target(back: true) {
                     // The page behind waits a little to the left and dimmed, as under a navigation pop.
-                    pageView(drawn[id]).offset(x: (slide - width) * 0.3)
+                    snapshot(drawn[id])
                         .overlay { Color.black.opacity(0.08 * (1 - slide / max(width, 1))).allowsHitTesting(false) }
+                        .offset(x: (slide - width) * 0.3)
                         .allowsHitTesting(false)
                 }
                 currentPage
                     .overlay { Color.black.opacity(slide < 0 ? 0.08 * -slide / max(width, 1) : 0).allowsHitTesting(false) }
+                    .overlay(alignment: .leading) { if slide > 0 { PageEdge() } }
                     .offset(x: slide > 0 ? slide : slide * 0.3)
-                    .shadow(color: .black.opacity(slide > 0 ? 0.18 : 0), radius: 12)
                 if slide < 0, let id = target(back: false) {
-                    pageView(drawn[id]).offset(x: width + slide)
-                        .shadow(color: .black.opacity(0.18), radius: 12)
+                    snapshot(drawn[id])
+                        .overlay(alignment: .leading) { PageEdge() }
+                        .offset(x: width + slide)
                         .allowsHitTesting(false)
                 }
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .background(SystemMargin { margin = $0 })
             // A strip along each edge takes the swipe, so a row under the finger is not tapped as well.
             .overlay(alignment: .leading) { edgeStrip(forward: false) }
             .overlay(alignment: .trailing) { edgeStrip(forward: true) }
@@ -50,7 +55,7 @@ struct RootView: View {
             .overlay(alignment: .top) { suggestions }
             .safeAreaBar(edge: .top) { searchBar }
             .safeAreaBar(edge: .bottom) { statusBar }
-            .navigationTitle(store.view.kind == .home ? "LeXi" : "")
+            .navigationTitle((arriving.flatMap { drawn[$0] } ?? store.view).kind == .home ? "LeXi" : "")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .sheet(isPresented: $showSettings) { SettingsView(store: store, speech: speech) }
@@ -76,11 +81,11 @@ struct RootView: View {
     // The live page, or, right after a slide, the page it moved to as drawn until Core shows it.
     @ViewBuilder private var currentPage: some View {
         if let arriving, let page = drawn[arriving], store.view.navigation.pageId != arriving {
-            pageView(page)
+            snapshot(page)
         } else {
             ScrollView {
                 content
-                    .padding(.horizontal).padding(.top, 4).padding(.bottom, 24)
+                    .padding(.horizontal, margin).padding(.top, 4).padding(.bottom, 24)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollDismissesKeyboard(.interactively)
@@ -88,17 +93,8 @@ struct RootView: View {
         }
     }
 
-    private func pageView(_ page: QueryView?) -> some View {
-        ScrollView {
-            Group {
-                if let page, page.kind != .home { EntryView(store: store, speech: speech, shown: page) }
-                else { HistoryView(store: store) { _ in } }
-            }
-            .padding(.horizontal).padding(.top, 4).padding(.bottom, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .scrollDisabled(true)
-        .background(Color(uiColor: .systemGroupedBackground))
+    private func snapshot(_ page: QueryView?) -> some View {
+        PageSnapshot(store: store, speech: speech, page: page, margin: margin).equatable()
     }
 
     // The page a slide would go to, when it has been drawn (a host without page ids slides nothing).
@@ -135,7 +131,7 @@ struct RootView: View {
                 Text(status).font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20).padding(.vertical, 6)
+            .padding(.horizontal, margin + 4).padding(.vertical, 6)
             .accessibilityElement(children: .combine)
             .accessibilityLabel("查询状态：" + status)
         }
@@ -163,7 +159,7 @@ struct RootView: View {
             .padding(.horizontal, 18).padding(.vertical, 13)
             .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 26, style: .continuous))
         }
-        .padding(.horizontal).padding(.top, 2).padding(.bottom, 6)
+        .padding(.horizontal, margin).padding(.top, 2).padding(.bottom, 6)
     }
 
     // The preview of what is being typed sits below the suggestions, so the list a finger is
@@ -177,7 +173,7 @@ struct RootView: View {
                         .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal).padding(.top, 6)
+            .padding(.horizontal, margin).padding(.top, 6)
         }
     }
 
@@ -186,7 +182,7 @@ struct RootView: View {
     // width, or with a flick, finishes the move, otherwise it springs back.
     @ViewBuilder private func edgeStrip(forward: Bool) -> some View {
         let navigation = store.view.navigation
-        if forward ? navigation.canForward : navigation.canBack {
+        if arriving == nil && (forward ? navigation.canForward : navigation.canBack) {
             Color.clear.frame(width: Self.edge).contentShape(.rect)
                 .gesture(DragGesture(minimumDistance: 8)
                     .onChanged { value in
@@ -195,23 +191,38 @@ struct RootView: View {
                         slide = forward ? max(min(dx, 0), -width) : min(max(dx, 0), width)
                     }
                     .onEnded { value in
-                        let done = abs(slide) > width / 3 || abs(value.predictedEndTranslation.width) > width / 2
-                        if done && slide != 0 { finish(back: slide > 0) } else { withAnimation(.snappy(duration: 0.3)) { slide = 0 } }
+                        // Speed towards the page being revealed; a flick back cancels even past a third.
+                        let speed = forward ? -value.velocity.width : value.velocity.width
+                        let done = slide != 0 && (speed > 400 || abs(slide) > width / 3 && speed > -400)
+                        if done { finish(back: !forward, velocity: value.velocity.width) }
+                        else { withAnimation(Self.carry(value.velocity.width, from: slide, to: 0)) { slide = 0 } }
                     })
                 .accessibilityHidden(true)
         }
     }
 
     // Completes a move with the slide: the page leaves (or arrives) and the one revealed is drawn
-    // in place until Core's view for it arrives, so nothing jumps.
-    private func finish(back: Bool) {
-        guard let destination = target(back: back), drawn[destination] != nil else { navigate(back ? -1 : 1); slide = 0; return }
-        withAnimation(.smooth(duration: 0.32)) { slide = back ? width : -width } completion: {
+    // in place until Core's view for it arrives, so nothing jumps. The query capsule changes as the
+    // slide sets off and the title as it lands, not when Core answers.
+    private func finish(back: Bool, velocity: CGFloat = 0) {
+        guard arriving == nil else { return }
+        guard let destination = target(back: back), let page = drawn[destination] else { navigate(back ? -1 : 1); slide = 0; return }
+        let end = back ? width : -width
+        setText(page.kind == .home ? "" : page.input)
+        withAnimation(Self.carry(velocity, from: slide, to: end)) { slide = end } completion: {
             arriving = destination
             var instant = Transaction(); instant.disablesAnimations = true
             withTransaction(instant) { slide = 0 }
             navigate(back ? -1 : 1)
         }
+    }
+
+    // A spring that leaves at the finger's speed, as UIKit's navigation does, and settles without a
+    // bounce; starting from rest instead made the page pause where the finger let go.
+    private static func carry(_ velocity: CGFloat, from start: CGFloat, to end: CGFloat) -> Animation {
+        let distance = end - start
+        let relative = abs(distance) < 1 ? 0 : min(max(velocity / distance, 0), 30)
+        return .interpolatingSpring(duration: 0.35, bounce: 0, initialVelocity: relative)
     }
 
     private var suggestionList: some View {
@@ -296,7 +307,8 @@ struct RootView: View {
 
     private func navigate(_ direction: Int) {
         Task {
-            guard let page = await store.navigate(direction) else { return }
+            // Without an answer no view will replace the page a slide arrived at.
+            guard let page = await store.navigate(direction) else { arriving = nil; return }
             if page.query.isEmpty { setText("") }
         }
     }
@@ -308,8 +320,6 @@ struct RootView: View {
     }
 }
 
-// Recent explicit submissions, searchable and loaded a page at a time, as on the Mac. Deleting a row
-// never deletes cached definitions.
 // Recent explicit submissions, loaded a page at a time. On a phone the list needs no search field of
 // its own: people took one for the lookup field. Deleting a row never deletes cached definitions.
 struct HistoryView: View {
@@ -383,5 +393,61 @@ struct InputPreviewCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(verbatim: "TL;DR · \(message)"))
         .accessibilityHint(Text(preview.source))
+    }
+}
+
+// Reports the system's minimum side margin; SwiftUI's default padding is 16 pt on every iPhone.
+private struct SystemMargin: UIViewRepresentable {
+    let changed: (CGFloat) -> Void
+    func makeUIView(context: Context) -> Probe { Probe(changed: changed) }
+    func updateUIView(_ probe: Probe, context: Context) {}
+
+    final class Probe: UIView {
+        let changed: (CGFloat) -> Void
+        private var last: CGFloat?
+        init(changed: @escaping (CGFloat) -> Void) { self.changed = changed; super.init(frame: .zero); isUserInteractionEnabled = false }
+        required init?(coder: NSCoder) { nil }
+        override func didMoveToWindow() { super.didMoveToWindow(); report() }
+        override func layoutSubviews() { super.layoutSubviews(); report() }
+        private func report() {
+            guard let margin = window?.rootViewController?.systemMinimumLayoutMargins.leading, margin > 0, margin != last else { return }
+            last = margin
+            DispatchQueue.main.async { [changed] in changed(margin) }
+        }
+    }
+}
+
+// A page as last drawn, beneath or ahead of a slide. It is redrawn when that page changes, not on
+// every step of the finger.
+private struct PageSnapshot: View, Equatable {
+    let store: LexiStore
+    let speech: SpeechController
+    let page: QueryView?
+    let margin: CGFloat
+
+    nonisolated static func == (a: Self, b: Self) -> Bool {
+        a.page?.navigation.pageId == b.page?.navigation.pageId && a.page?.revision == b.page?.revision && a.margin == b.margin
+    }
+
+    var body: some View {
+        ScrollView {
+            Group {
+                if let page, page.kind != .home { EntryView(store: store, speech: speech, shown: page) }
+                else { HistoryView(store: store) { _ in } }
+            }
+            .padding(.horizontal, margin).padding(.top, 4).padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollDisabled(true)
+        .background(Color(uiColor: .systemGroupedBackground))
+    }
+}
+
+// The soft shade along a sliding page's leading edge. A gradient, because a shadow would be worked
+// out from the whole page on every frame.
+private struct PageEdge: View {
+    var body: some View {
+        LinearGradient(colors: [.black.opacity(0), .black.opacity(0.16)], startPoint: .leading, endPoint: .trailing)
+            .frame(width: 12).offset(x: -12).allowsHitTesting(false)
     }
 }
