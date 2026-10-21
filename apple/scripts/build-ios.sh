@@ -137,6 +137,8 @@ if [[ $target == testflight ]]; then
   archive=$out/LeXi.xcarchive
   rm -rf "$archive" "$out/export" && mkdir -p "$archive/Products/Applications" "$archive/dSYMs"
   cp -R "$app" "$archive/Products/Applications/"
+  # Symbols for both binaries, so App Store Connect can symbolicate crashes in Swift and in Core.
+  [[ -d $work/derived/Build/Products/$products/LeXiMobile.dSYM ]] && cp -R "$work/derived/Build/Products/$products/LeXiMobile.dSYM" "$archive/dSYMs/LeXi.app.dSYM"
   [[ -d $work/embed/LexiEmbed.dylib.dSYM ]] && cp -R "$work/embed/LexiEmbed.dylib.dSYM" "$archive/dSYMs/LexiEmbed.framework.dSYM"
   plist=$archive/Info.plist
   /usr/libexec/PlistBuddy -c "Add :ArchiveVersion integer 2" -c "Add :Name string LeXi" -c "Add :SchemeName string LeXi" \
