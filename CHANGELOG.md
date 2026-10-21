@@ -2,6 +2,7 @@
 
 ## Unreleased — major-version preparation
 
+- Read offline dictionary indexes in place. The index file is mapped into memory and only where each row starts is kept, instead of an object per row. With ECDICT's 770,000 rows, LeXi holds about 15 MB instead of 159 MB and loads the index in 27 ms instead of 106 ms; lookups and suggestions return the same results. On iOS the idle footprint falls from 123 MB to 55 MB, so the system is less likely to close LeXi in the background. A damaged index is reported as unreadable when it loads.
 - iOS lookup layout and navigation.
   - **Query box at the top.** The query box moves to the top, where the typing hand never covers it, with suggestions below it and the typing preview under them. The status line becomes the footer, as on the Mac.
   - **No history search.** The home page drops the history search field, which people kept taking for the query box.
