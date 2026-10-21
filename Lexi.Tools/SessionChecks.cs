@@ -73,6 +73,10 @@ internal static class SessionChecks
             offline.ShowHome();
             Check(offline.View is { Kind: QueryViewKind.Home, Progress: null, Status: "准备就绪", QuickRead.Visible: false } && offline.Current == "",
                 "returning home clears the query lifecycle and lexical overview");
+            await offline.SubmitAsync("walked", recordHistory: false);
+            Check(offline.View is { Query: "walked", Navigation: { CanBack: true, BackLabel: "查询历史" } } &&
+                offline.History.Entries.Select(e => e.Query).SequenceEqual(["Hello", "walked"]),
+                "a reopened page becomes the current page without moving up the history");
         }
 
         using (var online = new QuerySession(Paths("online"), providers: providers, network: network))

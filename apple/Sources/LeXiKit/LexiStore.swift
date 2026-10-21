@@ -111,10 +111,12 @@ public final class LexiStore {
     }
 
     // ---- Queries ----
-    public func submit(_ text: String, force: Bool = false, scroll: Double = 0, context: String? = nil) async {
+    // restore: reopen a page the reader had open (iOS after the system closed the app), without
+    // recording it in history again.
+    public func submit(_ text: String, force: Bool = false, scroll: Double = 0, context: String? = nil, restore: Bool = false) async {
         clearSuggestions()
         await provideTextCredentials()
-        _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll, context: context)) as SubmitResult?
+        _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll, context: context, restore: restore ? true : nil)) as SubmitResult?
         // Core has recorded the query by now; the list is current before anyone goes back to it.
         await refreshHistory()
     }
@@ -319,7 +321,7 @@ public final class LexiStore {
         return try await client.call("speech.synthesize", SpeechRequest(text: text, selection, key: key), as: SpeechFile.self).path
     }
 
-    private struct Submit: Encodable, Sendable { let text: String; let force: Bool; let scroll: Double; let context: String? }
+    private struct Submit: Encodable, Sendable { let text: String; let force: Bool; let scroll: Double; let context: String?; let restore: Bool? }
     private struct Navigate: Encodable, Sendable { let direction: Int; let scroll: Double }
     private struct Scroll: Encodable, Sendable { let scroll: Double }
     private struct RemoveHistory: Encodable, Sendable { let query: String; let translation: Bool }

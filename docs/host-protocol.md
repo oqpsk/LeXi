@@ -56,7 +56,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | 方法 | 参数 | 结果 |
 |---|---|---|
 | `initialize` | — | `protocol`、`version`、`platform`、`paths`、当前 `view`、`settings`（同 `settings.get`）。等待离线词库加载 |
-| `query.submit` | `text`，可选 `force`、`scroll`、`context`（查询词所在的句子，见 `query.candidate`） | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送 |
+| `query.submit` | `text`，可选 `force`、`scroll`、`context`（查询词所在的句子，见 `query.candidate`）、`restore` | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送。`restore` 为 `true` 时重新打开读者原本停留的页面（如 iOS 被系统关闭后重新启动）：页面照常进入前进后退，但不再写入查询历史 |
 | `query.regenerate` | — | 跳过已保存结果重新查询当前页面 |
 | `query.navigate` | `direction`（-1 或 1），可选 `scroll` | `{page, view}`；`page` 为 `null` 表示已到边界 |
 | `query.home` | 可选 `scroll` | 返回查询历史页面 |
