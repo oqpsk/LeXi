@@ -6,6 +6,10 @@ import UIKit
 // parts of speech are pale gold, as on Windows and macOS.
 enum LexiTheme {
     static let pink = Color(red: 1, green: 0xAD / 255, blue: 0xD2 / 255)
+    // Active speech: pink on dark, the label color on light, as on the Mac.
+    static let speechAccent = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(red: 1, green: 0xAD / 255, blue: 0xD2 / 255, alpha: 1) : .label
+    })
     // #DDBD82 on dark surfaces, a deeper gold of the same hue (#7D5A1A) on light ones.
     static let gold = Color(UIColor { traits in
         traits.userInterfaceStyle == .dark

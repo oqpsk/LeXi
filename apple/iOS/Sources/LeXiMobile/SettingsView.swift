@@ -1,22 +1,31 @@
 import LeXiKit
+import LeXiShared
 import SwiftUI
 
 // iOS has no official subscription clients, so models are reached with the user's own API keys or
 // custom text service. Keys stay in the Keychain on this device and reach Lexi.Core in memory only.
+// One list like the system Settings, each item a page of its own. Connections come before what
+// chooses among them: model services, then the query models; in speech, the key before the voices.
+enum SettingsPage: String, Hashable { case services, query, speech, dictionary, data }
+
 struct SettingsView: View {
     @Bindable var store: LexiStore
     var speech: SpeechController
     @Environment(\.dismiss) private var dismiss
     @AppStorage(Appearance.key) private var appearance = Appearance.system.rawValue
+    // For UI checks and screenshots: `-LexiSettingsPage speech` opens that page.
+    @State private var path: [SettingsPage] = UserDefaults.standard.string(forKey: "LexiSettingsPage").flatMap(SettingsPage.init(rawValue:)).map { [$0] } ?? []
 
     var body: some View {
-        NavigationStack {
-            Form {
-                KeysSection(store: store)
-                CustomServiceSection(store: store)
-                if let payload = store.settings { ModelSection(store: store, payload: payload) }
-                SpeechSection(store: store, speech: speech)
-                DictionarySection(store: store)
+        NavigationStack(path: $path) {
+            List {
+                Section {
+                    row(.services, "模型服务", "key", servicesSummary)
+                    row(.query, "查询与模型", "text.magnifyingglass", querySummary)
+                    row(.speech, "发音", "speaker.wave.2", speechSummary)
+                    row(.dictionary, "离线词典", "books.vertical", dictionarySummary)
+                    row(.data, "数据与迁移", "externaldrive", "")
+                }
                 Section("外观") {
                     Picker("外观", selection: $appearance) {
                         ForEach(Appearance.allCases) { Text($0.title).tag($0.rawValue) }
@@ -33,9 +42,55 @@ struct SettingsView: View {
             }
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: SettingsPage.self) { page in
+                Group {
+                    switch page {
+                    case .services: Form { KeysSection(store: store); CustomServiceSection(store: store) }
+                    case .query: Form { if let payload = store.settings { ModelSection(store: store, payload: payload) } }
+                    case .speech: Form { SpeechSection(store: store, speech: speech) }
+                    case .dictionary: Form { DictionarySection(store: store) }
+                    case .data: DataSection(store: store)
+                    }
+                }
+                .navigationTitle(title(page))
+                .navigationBarTitleDisplayMode(.inline)
+            }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
             .task { await store.refreshSettings(); await store.refreshDictionaries() }
         }
+    }
+
+    private func row(_ page: SettingsPage, _ title: String, _ symbol: String, _ detail: String) -> some View {
+        NavigationLink(value: page) {
+            LabeledContent { Text(detail).lineLimit(1) } label: { Label(title, systemImage: symbol) }
+        }
+    }
+    private func title(_ page: SettingsPage) -> String {
+        switch page { case .services: "模型服务"; case .query: "查询与模型"; case .speech: "发音"; case .dictionary: "离线词典"; case .data: "数据与迁移" }
+    }
+
+    private var servicesSummary: String {
+        let keys = KeychainSpeechKeys()
+        var names = ModelKeys.providers.filter { keys.hasSaved($0) }.map { $0 == "openai" ? "OpenAI" : "Anthropic" }
+        if !(store.settings?.settings.compatibleBaseUrl ?? "").isEmpty { names.append("自定义服务") }
+        return names.isEmpty ? "未设置" : names.joined(separator: " · ")
+    }
+    private var querySummary: String {
+        guard let payload = store.settings else { return "" }
+        let key = payload.settings.provider + ":" + payload.settings.model
+        return store.queryModels.first { $0.key == key }?.label ?? payload.settings.model
+    }
+    private var speechSummary: String {
+        switch store.settings?.settings.speechProvider ?? "" {
+        case "openai": "OpenAI"
+        case "xai": "Grok"
+        case "elevenlabs": "ElevenLabs"
+        default: "本机声线"
+        }
+    }
+    private var dictionarySummary: String {
+        let count = store.dictionaries?.dictionaries.count ?? 0
+        return count == 0 ? "未安装" : "\(count) 部"
     }
 }
 
@@ -321,28 +376,47 @@ struct SpeechSection: View {
     var body: some View {
         Group {
             if let settings = store.settings?.settings, let model = selected(settings) {
+                // The service, then its key, then the voices it offers, then a preview.
                 Section {
                     Picker("发音模型", selection: Binding(get: { model.key }, set: { key in
                         if let next = models.first(where: { $0.key == key }) { choose(next, settings) }
                     })) { ForEach(models, id: \.key) { Text($0.name).tag($0.key) } }
+                    if model.provider == "elevenlabs" {
+                        Button("刷新语音模型") {
+                            Task {
+                                loadingModels = true; defer { loadingModels = false }
+                                do { try await store.refreshSpeechModels(key: typedKey ?? keys.read("elevenlabs") ?? ""); await load() }
+                                catch { message = SpeechController.message(error) }
+                            }
+                        }.disabled(loadingModels)
+                    }
+                } header: {
+                    Text("发音服务")
+                } footer: {
+                    Text(info(model))
+                }
+                if model.provider == "xai" || model.provider == "elevenlabs" { keySection(model.provider) }
+                Section("声线") {
                     let voices = voices(model, settings)
                     Picker("声线", selection: Binding(get: { settings.speechVoice }, set: { id in
                         if let voice = voices.first(where: { $0.id == id }) { manualVoice = ""; apply(model, voice) }
                     })) { ForEach(voices) { Text($0.name).tag($0.id) } }
                     if model.provider == "elevenlabs" { elevenControls(model) }
+                }
+                Section("试听") {
                     Button { preview(model, settings) } label: {
-                        Label(speech.speakingID == "preview" ? "停止" : "试听", systemImage: speech.speakingID == "preview" ? "stop.fill" : "play.fill")
+                        Label {
+                            Text(speech.speakingID == "preview" ? "停止" : "试听")
+                        } icon: {
+                            if speech.speakingID == "preview" { SpeechWaveform(animate: speech.audioPlaying, size: 16).foregroundStyle(LexiTheme.speechAccent) }
+                            else { Image(systemName: "play.fill") }
+                        }
                     }
                     if speech.speakingID == "preview" || !speech.status.isEmpty, !speech.status.isEmpty {
                         Text(speech.status).font(.callout).foregroundStyle(.secondary)
                     }
                     if !message.isEmpty { Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.callout) }
-                } header: {
-                    Text("发音")
-                } footer: {
-                    Text(info(model))
                 }
-                if model.provider == "xai" || model.provider == "elevenlabs" { keySection(model.provider) }
             } else {
                 Section("发音") { ProgressView() }
             }
@@ -356,16 +430,7 @@ struct SpeechSection: View {
         HStack {
             Button(accountVoices == nil ? "读取声线列表" : "刷新声线列表") { loadVoices() }.disabled(loadingVoices)
             if loadingVoices { ProgressView().padding(.leading, 6) }
-            Spacer()
-            Button("刷新语音模型") {
-                Task {
-                    loadingModels = true; defer { loadingModels = false }
-                    do { try await store.refreshSpeechModels(key: typedKey ?? keys.read("elevenlabs") ?? ""); await load() }
-                    catch { message = SpeechController.message(error) }
-                }
-            }.disabled(loadingModels)
         }
-        .buttonStyle(.borderless)
         Text(voiceStatusText).font(.caption).foregroundStyle(.secondary)
         TextField("Voice ID", text: $manualVoice, prompt: Text("指定其他声线：粘贴 Voice ID"))
             .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -387,7 +452,7 @@ struct SpeechSection: View {
             }
             .buttonStyle(.borderless)
         } header: {
-            Text(provider == "xai" ? "Grok 发音密钥" : "ElevenLabs 发音密钥")
+            Text("API Key")
         } footer: {
             Text(provider == "elevenlabs" ? "粘贴创建时复制的完整 Secret Key；API Key ID 无法用于连接。密钥只保存在本机钥匙串，不会从 Mac 同步。" : "密钥只保存在本机钥匙串，不会从 Mac 同步。")
         }
@@ -404,7 +469,7 @@ struct SpeechSection: View {
         switch model.provider {
         case "xai": return "Grok TTS 的模型由服务管理，可选择声线；使用单独的 API Key 与 API 额度。"
         case "elevenlabs": return "使用 ElevenLabs 账号额度。ElevenReader 套餐与此分开。"
-        default: return "使用 OpenAI 官方语音接口和上方的 OpenAI API Key，声线随模型切换。"
+        default: return "使用 OpenAI 官方语音接口和“模型服务”中的 OpenAI API Key，声线随模型切换。"
         }
     }
 
@@ -543,7 +608,7 @@ struct DictionarySection: View {
         } header: {
             Text("离线词库")
         } footer: {
-            Text("没有离线词库时，LeXi 仍可查 Wiktionary 与模型释义。iOS 版暂不能下载词库。")
+            Text("离线词库提供输入建议、本地释义和输入时的 TL;DR。用 Mac 装机（build-ios.sh --device）时会复制 Mac 已安装的词库；应用内暂不能下载。没有词库时仍可查 Wiktionary 与模型释义。")
         }
     }
 }

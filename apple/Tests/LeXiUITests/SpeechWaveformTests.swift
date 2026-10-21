@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Testing
 @testable import LeXiUI
+@testable import LeXiShared
 
 @MainActor @Suite struct SpeechWaveformChecks {
     @Test(arguments: [14.0, 18.0]) func fiveBarsKeepTheirCenters(_ size: Double) {

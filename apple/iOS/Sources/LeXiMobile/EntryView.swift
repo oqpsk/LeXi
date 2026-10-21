@@ -60,7 +60,9 @@ struct HeadingRow: View {
                     if !view.speechText.isEmpty {
                         let playing = speech.speakingID == "heading"
                         Button { speech.toggle(view.speechText, using: store) } label: {
-                            Image(systemName: playing ? "stop.fill" : "speaker.wave.2.fill").font(.system(size: 19))
+                            // The speaker keeps its place while the waveform plays over it, so nothing beside it moves.
+                            Image(systemName: "speaker.wave.2.fill").font(.system(size: 19)).opacity(playing ? 0 : 1)
+                                .overlay { if playing { SpeechWaveform(animate: speech.audioPlaying, size: 20).foregroundStyle(LexiTheme.speechAccent) } }
                         }
                         .accessibilityLabel(playing ? "停止合成发音" : "播放合成发音")
                     }
@@ -198,6 +200,9 @@ struct SpeakableText: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 6).padding(.vertical, 3)
             .background(LexiTheme.gold.opacity(playing ? 0.18 : 0), in: .rect(cornerRadius: 8, style: .continuous))
+            .overlay(alignment: .topTrailing) {
+                if playing { SpeechWaveform(animate: speech?.audioPlaying == true, size: 12).foregroundStyle(LexiTheme.gold).padding(4) }
+            }
             .padding(.horizontal, -6).padding(.vertical, -3)
             .contentShape(.rect)
             .contextMenu {

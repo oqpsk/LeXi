@@ -2,6 +2,10 @@
 
 ## Unreleased — major-version preparation
 
+- Finish the iOS settings, data and speech details.
+  - **Settings.** Settings are now a list like the system Settings, with each item on its own page. Connections come first: 模型服务, 查询与模型, then 发音 (service, then its key, then voices, then preview), 离线词典 and 数据与迁移, with 外观 and 关于 below.
+  - **数据与迁移.** Exports a backup that the Files app saves wherever you choose. Imports one picked from Files after showing what will be merged. Shows and clears the caches, as on the Mac. Backups move between the Mac and iOS.
+  - **Speech waveform.** The Mac's waveform, now shared through `LeXiShared`, plays over the headword's speaker without moving it, marks the passage being read, and replaces the preview's icon while it plays.
 - Bring the iOS app closer to the Mac.
   - **Progress.** The TL;DR comes first, then the query progress row, then the word forms. The progress row, with its soft-matrix marks and CRT retirement, is now the Mac's own view, shared through `LeXiShared`. A failed model retries from the row or from 更多操作, and the status line shows the soft matrix instead of a spinner.
   - **Typing preview.** Pausing while typing shows the TL;DR from saved results and local dictionaries above the suggestions, so the list never moves.
@@ -27,7 +31,7 @@
 - Add `Lexi.Embed`: the host server compiled with NativeAOT into a library the iOS app loads, speaking the same protocol through `lexi_start`, `lexi_send` and `lexi_close`. It uses the NativeAOT runtime pack from NuGet, so no .NET iOS workload is needed. `LeXiKit` gains `HostTransport` with a process transport (macOS) and `EmbeddedTransport`; `SpeechController` moves to `LeXiKit` for both apps. A Swift test drives a macOS build of the library through the same path.
 - Reach models with API keys where the subscription clients cannot run (iOS): OpenAI Responses API with strict structured output and Anthropic Messages API with a forced tool, using the same instructions, schemas and validation. Keys stay in memory through the host's new `keys.set`. `api-check` covers requests, parsing, retry, errors, keys, model rules and a routed session.
 - Generate Core's and the host's JSON serializers at build time instead of by reflection, so Core runs under NativeAOT. Cache keys, hashes and prompts are unchanged byte for byte, and a NativeAOT `lexi-host` passes host-check. The shapes added since — cache keys with a custom endpoint or per-model effort and speed, the version 2 translation key, the sense-merge prompt's pair count, the retry checkpoints' settings identity, the backup manifest, the custom endpoint's chat request, the OAuth catalog requests and the host's data, history, model and speech replies — are named types as well, and the new `json-check` compares each with the anonymous object it replaced.
-- On iOS the OAuth model catalog and backup are not offered yet (FEATURES.md); Core skips the OAuth catalog read where the subscription clients cannot run, and the sense judge on API keys follows its model id.
+- On iOS the OAuth model catalog is not offered (FEATURES.md); Core skips the OAuth catalog read where the subscription clients cannot run, and the sense judge on API keys follows its model id.
 
 - Replace the query-row loading spinner with the same soft-matrix activity used in the footer on Windows and macOS. Share stage changes and motion preferences, keep the query-row mark unframed, and retain terminal check/warning symbols, keyboard/click stage details and stable control alignment.
 
