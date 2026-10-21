@@ -25,6 +25,23 @@ internal static class PlatformChecks
         using (var library = new OfflineLibrary(work))
             Check(library.Lookup("车钟", new AppSettings()).SingleOrDefault()?.Entry.Chinese == "車鐘",
                 "older traditional-only indexes still answer simplified queries through every candidate spelling");
+        // The index is read in place, so a damaged file must fail when loaded, not on a later lookup.
+        var damaged = Path.Combine(work, "damaged");
+        foreach (var name in new[] { "truncated", "oversized" })
+        {
+            WriteIndex(Path.Combine(damaged, name), ("alpha", new LocalEntry("alpha", "", "the first letter", "阿尔法", "", 0)),
+                ("beta", new LocalEntry("beta", "", "the second letter", "贝塔", "", 0)));
+            File.WriteAllText(Path.Combine(damaged, name, "dictionary.json"), "{\"id\":\"" + name + "\",\"name\":\"" + name + "\",\"languages\":\"en\",\"sourceUrl\":\"https://example.org\",\"license\":\"test\",\"version\":\"1\",\"attribution\":\"test\"}");
+        }
+        var truncated = Path.Combine(damaged, "truncated", "lexicon.idx");
+        File.WriteAllBytes(truncated, File.ReadAllBytes(truncated)[..^12]);
+        var oversized = Path.Combine(damaged, "oversized", "lexicon.idx");
+        var header = File.ReadAllBytes(oversized);
+        BitConverter.TryWriteBytes(header.AsSpan(6), int.MaxValue);
+        File.WriteAllBytes(oversized, header);
+        using (var library = new OfflineLibrary(damaged))
+            Check(library.Count == 0 && library.Dictionaries.Length == 2 && library.Dictionaries.All(d => !d.Available && d.Status == "词库无法读取"),
+                "a truncated index or one claiming more rows than it holds is reported as unreadable");
 
         var windows = LexiPaths.For(true, false, Path.Combine(work, "LeXi"), Path.Combine(work, "home"));
         Check(windows.UserRoot == Path.Combine(work, "LeXi", "userdata") && windows.DataRoot == Path.Combine(work, "LeXi", "data") &&
