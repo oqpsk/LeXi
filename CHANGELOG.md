@@ -3,7 +3,7 @@
 ## Unreleased — major-version preparation
 
 - Bring the shared offline index mapping and compact API model names to Windows. Keep context-work progress together with the new navigation page IDs when integrating the iOS restore and dictionary-management changes.
-- Match read-aloud glyph measurement to the TextBox's display formatting mode and invalidate it after font or language changes. Keep the existing one-DIP rendered alignment checks, text layout and hover targets.
+- Match read-aloud glyph measurement to the TextBox's display formatting mode and invalidate it after font or language changes. Keep the existing one-DIP rendered alignment checks, text layout and hover targets. The pixel check samples only the target tint's empty padding, excluding unrelated text/DPI repaints elsewhere in the column.
 
 - Integrate the iOS NativeAOT/shared Core work into Windows without breaking summon lookup: Windows capture IPC uses the front-end JSON resolver, with a context/null round-trip check. Core's generated JSON metadata and stable cache identities remain in use.
 - Backups validate supported cross-platform configurations independently of the current device. History and saved results import from iOS to desktop even with settings excluded. Restoring settings retains the current complete model/endpoint/profile configuration when the imported services are unavailable here; other preferences and local speech still migrate. Unknown providers, invalid model IDs, malformed options and unsafe archives remain rejected. Both desktop-to-iOS and iOS-to-desktop rules are checked without real services.

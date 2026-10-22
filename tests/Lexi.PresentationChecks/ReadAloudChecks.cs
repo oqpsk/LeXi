@@ -137,8 +137,11 @@ internal static partial class Program
                         highlighted.Render(root);
                         var painted = new byte[pixels.Length]; highlighted.CopyPixels(painted,image.PixelWidth*4,0);
                         int top = image.PixelHeight, bottom = -1;
-                        for (int y = 0; y < image.PixelHeight; y++)
-                        for (int x = Math.Max(0,(int)Math.Ceiling((origin.X+1)*scale)); x < Math.Min(image.PixelWidth,(int)Math.Floor((origin.X+surface.ActualWidth-1)*scale)); x++)
+                        // Measure only this surface's empty left padding. Other rows and
+                        // text rasterization can repaint between bitmaps at another target DPI;
+                        // neither belongs to the highlighted background being checked here.
+                        for (int y = Math.Max(0,(int)Math.Floor((origin.Y-8)*scale)); y < Math.Min(image.PixelHeight,(int)Math.Ceiling((origin.Y+surface.ActualHeight+8)*scale)); y++)
+                        for (int x = Math.Max(0,(int)Math.Ceiling((origin.X+2)*scale)); x < Math.Min(image.PixelWidth,(int)Math.Floor((origin.X+4)*scale)); x++)
                         {
                             int at = (y*image.PixelWidth+x)*4;
                             if (Math.Abs(painted[at]-pixels[at]) > 3 || Math.Abs(painted[at+1]-pixels[at+1]) > 3 || Math.Abs(painted[at+2]-pixels[at+2]) > 3)
