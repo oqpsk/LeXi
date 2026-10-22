@@ -13,6 +13,8 @@
 
 - Windows read-aloud tint now centers on the visible text glyphs rather than the line box, matching Chinese definitions, English definitions, serif italic examples and wrapped paragraphs. Keep text position, highlight height and the speaker hover path unchanged; this is a WPF-only correction.
 
+- macOS settings open in a window that can be resized, 900 × 760 at first, and remember their size. The traffic lights sit inside the sidebar on one row with the sidebar button, as in System Settings, and the toolbar names the page shown. ⌘, and 设置… in the app menu open it as before.
+- macOS summons LeXi with ⌥2 instead of ⌘2. Option sits where the Win key of Win+2 does, and ⌘2 goes back to the app in front. 设置 → 通用 → 快捷键 records another combination (with ⌘, ⌥ or ⌃, or a function key alone; Esc cancels, 恢复默认 returns to ⌥2), and every hint names the shortcut in use. On US layouts ⌥2 no longer types ™ while LeXi holds it.
 - Upload the iOS app to TestFlight.
   - **Upload.** `apple/scripts/build-ios.sh --testflight` archives the app the way Xcode does, with Core's dSYM. `xcodebuild -exportArchive` then signs it with the Apple-managed distribution certificate and an App Store profile, both created through the Xcode account, and uploads it to App Store Connect. `--testflight export` stops at the `.ipa`.
   - **Packaging.** Core now ships as `LexiEmbed.framework`, because iOS loads dynamic code only from frameworks. Bundles carry the SDK keys Xcode writes and a privacy manifest that declares no tracking and no collected data.

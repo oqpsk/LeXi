@@ -26,8 +26,9 @@ struct SettingsWindowMemory: NSViewRepresentable {
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             guard let window, !restored else { return }; restored = true
-            window.setFrameAutosaveName("LeXi.Settings")
-            window.setFrameUsingName("LeXi.Settings")
+            // A new name since the window became resizable: frames saved before were too short.
+            window.setFrameAutosaveName("LeXi.SettingsWindow")
+            window.setFrameUsingName("LeXi.SettingsWindow")
         }
     }
 }

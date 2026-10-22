@@ -4,7 +4,7 @@ import Testing
 @testable import LeXiKit
 @testable import LeXiUI
 
-// The text ⌘2 picks up from a copy in another app. A private pasteboard stands in for the reader's.
+// The text the global shortcut picks up from a copy in another app. A private pasteboard stands in for the reader's.
 @MainActor @Suite(.serialized) struct InstantLookupChecks {
     final class Clock { var date = Date(timeIntervalSince1970: 1_000_000); var active = false }
 
@@ -23,7 +23,7 @@ import Testing
         #expect(lookup.take() == CapturedText(text: "serendipity"))
         #expect(lookup.take() == nil, "the window takes it once")
         lookup.capture()
-        #expect(lookup.take() == nil, "the same copy is not looked up again on the next ⌘2")
+        #expect(lookup.take() == nil, "the same copy is not looked up again on the next press")
         board.releaseGlobally()
     }
 
@@ -33,7 +33,7 @@ import Testing
         lookup.poll()
         clock.date += InstantLookup.freshness + 1
         lookup.capture()
-        #expect(lookup.take() == nil, "a copy from a while ago is not what ⌘2 means")
+        #expect(lookup.take() == nil, "a copy from a while ago is not what the shortcut means")
 
         clock.active = true
         copy("TL;DR text", to: board)

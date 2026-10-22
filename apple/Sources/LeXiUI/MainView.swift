@@ -62,7 +62,7 @@ public struct MainView: View {
         }
         .safeAreaBar(edge: .bottom) { bottomBar }
         .glassWindow()
-        // The global ⌘2 brings this window back, reopening it if it was closed.
+        // The global shortcut brings this window back, reopening it if it was closed.
         .background(ShortcutWindow { openWindow(id: "main") })
         .toolbar { toolbar }
         .navigationTitle("LeXi")
@@ -151,7 +151,7 @@ public struct MainView: View {
         }
         ToolbarItemGroup(placement: .primaryAction) {
             Button(action: goHome) { Label("查询历史", systemImage: "clock") }.help("查询历史 · ⌘Y")
-            SettingsLink { Label("设置", systemImage: "gearshape") }.help("设置 · ⌘,")
+            Button { openWindow(id: SettingsView.windowID) } label: { Label("设置", systemImage: "gearshape") }.help("设置 · ⌘,")
         }
     }
 
@@ -181,7 +181,7 @@ public struct MainView: View {
         return true
     }
 
-    // Text selected or copied in another app before ⌘2 (InstantLookup), handled as Core decides:
+    // Text selected or copied in another app before the global shortcut (InstantLookup), handled as Core decides:
     // looked up at once, or left in the query field, selected, to edit or confirm with Return.
     private func lookUpSummoned() {
         guard let raw = InstantLookup.shared.take() else { return }
