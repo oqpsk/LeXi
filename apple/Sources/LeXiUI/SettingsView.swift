@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import LeXiKit
 import LeXiShared
 import SwiftUI
@@ -172,6 +173,8 @@ struct QuerySettings: View {
 struct GeneralSettings: View {
     @AppStorage(AppearanceChoice.key) private var appearance = AppearanceChoice.system.rawValue
     @AppStorage(GlobalShortcut.key) private var shortcut = true
+    @AppStorage(GlobalShortcut.keyCodeKey) private var keyCode = GlobalShortcut.defaultKeyCode
+    @AppStorage(GlobalShortcut.modifiersKey) private var modifiers = GlobalShortcut.defaultModifiers
     @AppStorage(InstantLookup.clipboardKey) private var copiedText = true
     @AppStorage(InstantLookup.selectionKey) private var selectedText = false
     @State private var loginItem = LoginItem.enabled
@@ -190,24 +193,30 @@ struct GeneralSettings: View {
                 Toggle(isOn: Binding(get: { shortcut }, set: { on in
                     shortcut = on
                     GlobalShortcut.shared.apply()
-                    message = GlobalShortcut.shared.unavailable ? "⌘2 已被其他应用注册为全局快捷键，暂时无法使用。" : nil
-                })) { SettingLabel("用 \(GlobalShortcut.keys) 呼出 LeXi", "在任何应用中按 \(GlobalShortcut.keys) 呼出 LeXi，再按一次隐藏；优先于其他应用自己的 \(GlobalShortcut.keys)") }
+                    message = GlobalShortcut.shared.unavailable ? taken : nil
+                })) { SettingLabel("用快捷键呼出 LeXi", "在任何应用中按 \(keys) 呼出 LeXi，再按一次隐藏；优先于前台应用自己的 \(keys)") }
+                LabeledContent {
+                    ShortcutRecorder { message = GlobalShortcut.shared.unavailable ? taken : nil }
+                } label: {
+                    SettingLabel("快捷键", "点击后按下新的组合键：要含 ⌘、⌥ 或 ⌃，或单独一个 F 键；Esc 取消")
+                }
+                .disabled(!shortcut)
                 Toggle(isOn: Binding(get: { loginItem }, set: { on in
                     message = LoginItem.set(on)
                     loginItem = LoginItem.enabled
-                })) { SettingLabel("登录时打开 LeXi", "登录 Mac 后即可用 \(GlobalShortcut.keys) 呼出") }
+                })) { SettingLabel("登录时打开 LeXi", "登录 Mac 后即可用 \(keys) 呼出") }
                 if let message {
                     Label(message, systemImage: "exclamationmark.triangle.fill").font(.callout).foregroundStyle(.orange)
                 }
             }
             .onAppear {
                 loginItem = LoginItem.enabled
-                if GlobalShortcut.shared.unavailable { message = "⌘2 已被其他应用注册为全局快捷键，暂时无法使用。" }
+                if GlobalShortcut.shared.unavailable { message = taken }
                 else if LoginItem.needsApproval { message = "请在“系统设置 → 通用 → 登录项”中允许 LeXi。" }
             }
             Section {
                 Toggle(isOn: $selectedText) {
-                    SettingLabel("查询选中的文字", "在其他应用中选中文字后按 \(GlobalShortcut.keys)，不用复制")
+                    SettingLabel("查询选中的文字", "在其他应用中选中文字后按 \(keys)，不用复制")
                 }
                 if selectedText && !trusted {
                     LabeledContent {
@@ -217,10 +226,10 @@ struct GeneralSettings: View {
                     }
                 }
                 Toggle(isOn: $copiedText) {
-                    SettingLabel("查询刚复制的文字", "\(GlobalShortcut.keys) 前几秒内复制的文字直接查询。首次读取时 macOS 会询问是否允许粘贴，可在“隐私与安全性”中设为始终允许")
+                    SettingLabel("查询刚复制的文字", "\(keys) 前几秒内复制的文字直接查询。首次读取时 macOS 会询问是否允许粘贴，可在“隐私与安全性”中设为始终允许")
                 }
             } header: {
-                Text("\(GlobalShortcut.keys) 呼出时")
+                Text("\(keys) 呼出时")
             } footer: {
                 Note("单词和短语直接查询；较长或多行的文字只填入输入框，按 Return 再翻译。链接与文件路径不会查询。")
             }
@@ -228,7 +237,7 @@ struct GeneralSettings: View {
             // Accessibility is granted in System Settings; check again whenever the pane comes back.
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in trusted = SelectedText.trusted }
             Section("键盘快捷键") {
-                ForEach(Self.shortcuts, id: \.0) { action, keys in
+                ForEach([("呼出 / 隐藏 LeXi（任何应用中）", keys)] + Self.shortcuts, id: \.0) { action, keys in
                     LabeledContent(action) { Text(keys).foregroundStyle(.secondary).monospaced() }
                 }
             }
@@ -236,10 +245,61 @@ struct GeneralSettings: View {
         .formStyle(.grouped)
     }
 
-    private static let shortcuts = [("呼出 / 隐藏 LeXi（任何应用中）", GlobalShortcut.keys), ("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
+    private var keys: String { GlobalShortcut.describe(keyCode, modifiers) }
+    private var taken: String { keys + " 已被其他应用注册为全局快捷键，暂时无法使用。" }
+    private static let shortcuts = [("查询", "Return"), ("换行", "⇧Return"), ("收起建议", "Esc"), ("再查一个", "⌘L"),
         ("朗读词头", "⌘D"), ("复制 TL;DR / 译文", "⇧⌘C"), ("进入释义", "↓  Tab"), ("切换释义", "↑  ↓"), ("朗读释义 / 停止", "Space"),
         ("展开例句", "Return"), ("复制释义", "⌘C"), ("回到输入框", "Esc"),
         ("重新生成", "⌘R"), ("后退 / 前进", "⌘[  ⌘]"), ("查询历史", "⌘Y"), ("设置", "⌘,")]
+}
+
+// Shows the global shortcut; clicked, it records the next combination pressed. LeXi lets go of the
+// current one meanwhile, so that it too can be pressed; Esc cancels.
+struct ShortcutRecorder: View {
+    @AppStorage(GlobalShortcut.keyCodeKey) private var keyCode = GlobalShortcut.defaultKeyCode
+    @AppStorage(GlobalShortcut.modifiersKey) private var modifiers = GlobalShortcut.defaultModifiers
+    @State private var recording = false
+    @State private var monitor: Any?
+    // Called once the shortcut is held again, to report whether another app has it.
+    let applied: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if keyCode != GlobalShortcut.defaultKeyCode || modifiers != GlobalShortcut.defaultModifiers {
+                Button("恢复默认") {
+                    keyCode = GlobalShortcut.defaultKeyCode
+                    modifiers = GlobalShortcut.defaultModifiers
+                    GlobalShortcut.shared.apply()
+                    applied()
+                }
+                .buttonStyle(.link)
+            }
+            Button(recording ? "按下新的快捷键…" : GlobalShortcut.describe(keyCode, modifiers)) { recording ? finish() : start() }
+                .monospaced()
+        }
+        .onDisappear { if recording { finish() } }
+    }
+
+    private func start() {
+        recording = true
+        GlobalShortcut.shared.suspend()
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == UInt16(kVK_Escape) { finish(); return nil }
+            guard let shortcut = GlobalShortcut.shortcut(event) else { NSSound.beep(); return nil }
+            keyCode = shortcut.keyCode
+            modifiers = shortcut.modifiers
+            finish()
+            return nil
+        }
+    }
+
+    private func finish() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        recording = false
+        GlobalShortcut.shared.apply()
+        applied()
+    }
 }
 
 struct DictionarySettings: View {
