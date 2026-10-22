@@ -31,11 +31,15 @@ struct LeXiApp: App {
         .windowBackgroundDragBehavior(.enabled)
         .commands { LexiCommands() }
 
-        // Settings follow the system accent color; pink stays a brand accent in the query window.
-        Settings {
+        // Settings follow the system accent color; pink stays a brand accent in the query window. A
+        // window of its own rather than SwiftUI's Settings scene, whose window cannot be resized;
+        // ⌘, and the app menu open it (LexiCommands).
+        Window("设置", id: SettingsView.windowID) {
             SettingsView(store: store)
         }
+        .defaultSize(width: 900, height: SettingsView.height)
         .windowResizability(.contentMinSize)
+        .windowToolbarStyle(.unified)
     }
 
     private func start() async {
@@ -50,8 +54,12 @@ struct LeXiApp: App {
 
 struct LexiCommands: Commands {
     @FocusedValue(\.lexiActions) private var actions
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button("设置…") { openWindow(id: SettingsView.windowID) }.keyboardShortcut(",")
+        }
         CommandGroup(replacing: .newItem) {}
         CommandMenu("查询") {
             Button("查一个新词") { actions?.focusSearch() }.keyboardShortcut("l")

@@ -151,7 +151,7 @@ public struct MainView: View {
         }
         ToolbarItemGroup(placement: .primaryAction) {
             Button(action: goHome) { Label("查询历史", systemImage: "clock") }.help("查询历史 · ⌘Y")
-            SettingsLink { Label("设置", systemImage: "gearshape") }.help("设置 · ⌘,")
+            Button { openWindow(id: SettingsView.windowID) } label: { Label("设置", systemImage: "gearshape") }.help("设置 · ⌘,")
         }
     }
 

@@ -10,6 +10,9 @@ import SwiftUI
 public struct SettingsView: View {
     @Bindable var store: LexiStore
     @State private var selection: SettingsPage? = .general
+    public static let windowID = "settings"
+    // The window's first height: most pages fit without scrolling. It can be resized.
+    public static let height: CGFloat = 760
     public init(store: LexiStore) { self.store = store }
 
     public var body: some View {
@@ -28,7 +31,9 @@ public struct SettingsView: View {
             case .data: DataSettings(store: store)
             }
         }
-        .frame(minWidth: 720, idealWidth: 860, minHeight: 520, idealHeight: 660)
+        // The page's name in the toolbar, as System Settings shows it.
+        .navigationTitle((selection ?? .general).rawValue)
+        .frame(minWidth: 720, minHeight: 600)
         .background(SettingsWindowMemory())
         // A glass pane like the query window; the grouped rows and the tab bar sit directly on it.
         .scrollContentBackground(.hidden)
