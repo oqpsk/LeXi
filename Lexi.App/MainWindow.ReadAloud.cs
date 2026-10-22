@@ -21,13 +21,31 @@ public partial class MainWindow
 
     private static Brush Freeze(Brush brush) { brush.Freeze(); return brush; }
 
-    private sealed class ReadAloudBlock(string key, Border surface, Button speaker)
+    // Paint relative to visible glyphs while leaving the TextBox's layout and hit targets intact.
+    // WPF line boxes have asymmetric leading, particularly with CJK fallback and serif italics.
+    private sealed class ReadingSurface : Border
+    {
+        private double center = double.NaN;
+        private bool reading;
+        internal void Reading(bool value) { if (reading == value) return; reading = value; InvalidateVisual(); }
+        internal void CenterOn(double value) { if (center == value) return; center = value; InvalidateVisual(); }
+        protected override void OnRender(DrawingContext drawing)
+        {
+            base.OnRender(drawing);
+            if (!reading) return;
+            var height = RenderSize.Height;
+            var top = double.IsFinite(center) ? center - height / 2 : 0;
+            drawing.DrawRoundedRectangle(ReadingTint, null, new Rect(0, top, RenderSize.Width, height), 6, 6);
+        }
+    }
+
+    private sealed class ReadAloudBlock(string key, ReadingSurface surface, Button speaker)
     {
         public string Key { get; } = key;
         public bool Hovering { get; set; }
         public void Show(bool playing, bool audioPlaying = false)
         {
-            surface.Background = playing ? ReadingTint : Brushes.Transparent;
+            surface.Reading(playing);
             if (playing)
             {
                 if (speaker.Content is not SpeechWaveform) speaker.Content = new SpeechWaveform("Warning", 14);
@@ -48,7 +66,7 @@ public partial class MainWindow
     {
         var margin = text.Margin; text.Margin = new(0);
         // The tint reaches a little past the text without moving it.
-        var surface = new Border { Child = text, CornerRadius = new(6), Margin = new(-6,-2,-6,-2), Padding = new(6,2,6,2) };
+        var surface = new ReadingSurface { Child = text, CornerRadius = new(6), Margin = new(-6,-2,-6,-2), Padding = new(6,2,6,2) };
         var speakerOffset = new TranslateTransform();
         var speaker = new Button { Style = (Style)FindResource("IconButton"), Width = 22, Height = 22,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
@@ -63,7 +81,7 @@ public partial class MainWindow
         container.ColumnDefinitions.Add(new());
         Grid.SetColumn(surface, 1);
         container.Children.Add(surface); container.Children.Add(speaker);
-        AlignReadAloud(text, container, speakerOffset, speaker.Height);
+        AlignReadAloud(text, surface, container, speakerOffset, speaker.Height);
         container.MouseEnter += (_, _) => { block.Hovering = true; block.Show(speakingKey == key, audioPlaying); };
         container.MouseLeave += (_, _) => { block.Hovering = false; block.Show(speakingKey == key, audioPlaying); };
         speaker.Click += async (_, _) => await ReadAloudAsync(key, text.Text, "");
@@ -73,28 +91,51 @@ public partial class MainWindow
         return container;
     }
 
-    private static void AlignReadAloud(TextBox text, Grid row, TranslateTransform offset, double buttonHeight)
+    private static void AlignReadAloud(TextBox text, ReadingSurface surface, Grid row, TranslateTransform offset, double buttonHeight)
     {
-        var face = new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch);
-        string? previousLine = null;
+        string? previousText = null;
+        var previousSize = Size.Empty;
         var previousCaret = Rect.Empty;
         double previousScale = 0;
+        Typeface? previousFace = null;
+        string? previousLanguage = null;
+        TextFormattingMode? previousMode = null;
         text.LayoutUpdated += (_, _) =>
         {
             if (!text.IsArrangeValid || text.LineCount < 1) return;
-            var caret = text.GetRectFromCharacterIndex(0);
-            if (caret.IsEmpty) return;
-            var firstLine = text.GetLineText(0).TrimEnd('\r', '\n');
+            var firstCaret = text.GetRectFromCharacterIndex(0);
+            if (firstCaret.IsEmpty) return;
             var scale = VisualTreeHelper.GetDpi(text).PixelsPerDip;
-            if (firstLine == previousLine && caret == previousCaret && scale == previousScale) return;
-            previousLine = firstLine; previousCaret = caret; previousScale = scale;
-            // Use the rendered first line's ink, rather than half the paragraph's
-            // line spacing. This also accounts for serif italics and CJK fallback.
-            var formatted = new FormattedText(firstLine, text.Language.GetSpecificCulture(), text.FlowDirection,
-                face, text.FontSize, Brushes.Black, scale);
-            var ink = formatted.BuildGeometry(new Point()).Bounds;
-            var center = caret.Top + (ink.IsEmpty ? caret.Height / 2 : ink.Top + ink.Height / 2);
-            offset.Y = Math.Max(0, text.TranslatePoint(new Point(0, center), row).Y - buttonHeight / 2);
+            var face = new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch);
+            var culture = text.Language.GetSpecificCulture();
+            var mode = TextOptions.GetTextFormattingMode(text);
+            if (text.Text == previousText && text.RenderSize == previousSize && firstCaret == previousCaret && scale == previousScale &&
+                face.Equals(previousFace) && culture.Name == previousLanguage && mode == previousMode) return;
+            previousText = text.Text; previousSize = text.RenderSize; previousCaret = firstCaret; previousScale = scale;
+            previousFace = face; previousLanguage = culture.Name; previousMode = mode;
+            var visible = Rect.Empty;
+            for (var line = 0; line < text.LineCount; line++)
+            {
+                var index = text.GetCharacterIndexFromLineIndex(line);
+                if (index < 0) continue;
+                var caret = text.GetRectFromCharacterIndex(index);
+                if (caret.IsEmpty) continue;
+                var content = text.GetLineText(line).TrimEnd('\r', '\n');
+                // Match the TextBox's display formatter, including CJK fallback and hinted metrics.
+                var formatted = new FormattedText(content, culture, text.FlowDirection,
+                    face, text.FontSize, Brushes.Black, null, mode, scale);
+                var ink = formatted.BuildGeometry(new Point()).Bounds;
+                // The speaker follows the first line; the tint follows the entire visible block,
+                // including wrapped lines. Both use the same actual glyph metrics.
+                if (line == 0)
+                {
+                    var center = caret.Top + (ink.IsEmpty ? caret.Height / 2 : ink.Top + ink.Height / 2);
+                    offset.Y = Math.Max(0, text.TranslatePoint(new Point(0, center), row).Y - buttonHeight / 2);
+                }
+                if (!ink.IsEmpty)
+                    visible.Union(new Rect(text.TranslatePoint(new Point(0, caret.Top + ink.Top), surface), new Size(ink.Width, ink.Height)));
+            }
+            if (!visible.IsEmpty) surface.CenterOn(visible.Top + visible.Height / 2);
         };
     }
 

@@ -37,7 +37,8 @@ public sealed partial class SettingsWindow : Window
         var tabs = new TabControl { TabStripPlacement = Dock.Left, Style = (Style)FindResource("SettingsNavigation") };
         root.Children.Add(tabs);
         var general = new StackPanel { Margin = new(2,4,8,10) };
-        tabs.Items.Add(new TabItem { Header = "查询与模型", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = general } });
+        var queryTab = new TabItem { Header = "查询与模型", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = general } };
+        tabs.Items.Add(queryTab);
         var online = new CheckBox { Content = "在线补充", IsChecked = settings.Online, Margin = new(0,0,0,14) };
         var ai = new CheckBox { Content = "自动补充双语释义", IsChecked = settings.AutoAi, Margin = new(0,0,0,13) };
         general.Children.Add(online); general.Children.Add(ai);
@@ -86,7 +87,9 @@ public sealed partial class SettingsWindow : Window
         model.SelectionChanged += (_, _) => RefreshOptions(); secondary.SelectionChanged += (_, _) => RefreshOptions(); judge.SelectionChanged += (_, _) => RefreshOptions();
         primaryOptions.Changed += RefreshOptions; secondaryOptions.Changed += RefreshOptions; judgeOptions.Changed += RefreshOptions; RefreshOptions();
         general.Children.Add(Text("同一词义的细分用法可归为一组，优先展示涵盖更完整的原文；其他表述保留在“用法细分”中。不同含义和分歧仍分开。", 14, Muted));
-        void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true; }
+        var selectedLookup = new CheckBox { Content = "呼出时查询选中的文字", IsChecked = settings.LookupSelectedText, Margin = new(0,0,0,10) };
+        var copiedLookup = new CheckBox { Content = "呼出时查询刚复制的文字", IsChecked = settings.LookupCopiedText, Margin = new(0,0,0,10) };
+        void UpdateParallelControls() { secondaryPanel.IsEnabled = parallel.IsChecked == true; judgePanel.IsEnabled = merge.IsChecked == true || selectedLookup.IsChecked == true; }
         parallel.Checked += (_, _) => UpdateParallelControls(); parallel.Unchecked += (_, _) => UpdateParallelControls();
         merge.Checked += (_, _) => UpdateParallelControls(); merge.Unchecked += (_, _) => UpdateParallelControls(); UpdateParallelControls();
         var modelError = Text("", 14, Theme.Brush("Warning")); modelError.Visibility = Visibility.Collapsed; general.Children.Add(modelError);
@@ -141,7 +144,7 @@ public sealed partial class SettingsWindow : Window
             _ = Dispatcher.BeginInvoke(() => anchor.BringIntoView());
             await ReadSubscriptions();
         };
-        general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+, 设置 · Ctrl+Q 退出\n固定到任务栏第 2 位后用 Win+2 切换", 14,Muted));
+        general.Children.Add(Text("Enter 查询 · Shift+Enter 换行 · Esc 收起\nCtrl+L 再查一个 · Ctrl+D 朗读词头 · Ctrl+Shift+C 复制 TL;DR / 译文\n输入框 ↓ / Tab 进入释义；↑↓ 切换，空格朗读，Enter 展开例句，Ctrl+C 复制，Esc 回到输入框\nCtrl+, 设置 · Ctrl+Q 退出 · Win+2 切换（固定到任务栏第 2 位）", 14,Muted));
 
         var dictionaries = new StackPanel { Margin = new(2,4,8,10) };
         tabs.Items.Add(new TabItem { Header = "离线词典", Padding = new(18,9,18,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = dictionaries } });
@@ -176,6 +179,11 @@ public sealed partial class SettingsWindow : Window
         var saveSpeech = AddSpeechTab(tabs, settings, speechMetadata);
         var windowOptions = new StackPanel { Margin = new(2,4,8,10) };
         tabs.Items.Add(new TabItem { Header = "窗口", Padding = new(14,9,14,9), Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = windowOptions } });
+        windowOptions.Children.Add(Text("呼出时速查", 18));
+        windowOptions.Children.Add(selectedLookup); windowOptions.Children.Add(copiedLookup);
+        selectedLookup.Checked += (_, _) => UpdateParallelControls(); selectedLookup.Unchecked += (_, _) => UpdateParallelControls();
+        windowOptions.Children.Add(Text("选词后直接呼出，或 Ctrl+C 后在 8 秒内呼出。单词和短语直接查，长文字只填入输入框；链接与路径忽略。LeXi 内复制的文字不会触发。", 14, Muted));
+        windowOptions.Children.Add(Text("选词使用 Windows 辅助功能接口，仅在呼出时读取；应用未提供选区时尝试刚复制的文字。能读到所在句子时，TL;DR 会给出本句意思。", 14, Muted));
         windowOptions.Children.Add(Text("点击窗口的 X 时", 18));
         var closeBehavior = new ComboBox { ItemsSource = new[] { "最小化 · 保持后台运行", "退出 LeXi" }, SelectedIndex = settings.MinimizeOnClose ? 0 : 1, Margin = new(0,0,0,14) };
         System.Windows.Automation.AutomationProperties.SetName(closeBehavior, "窗口关闭行为");
@@ -185,21 +193,26 @@ public sealed partial class SettingsWindow : Window
         windowOptions.Children.Add(Text("Alt+← 后退 · Alt+→ 前进\n顶部中间的 LeXi 区域可拖动窗口。", 14, Muted));
         AddDataTab(tabs, settings, textRoot ?? App.UserRoot, session);
         Group(general, "查询方式", online, connections, "查询模型", merge, "义项整理");
+        var pages = tabs.Items.Cast<TabItem>().ToDictionary(t => (string)t.Header);
+        tabs.Items.Clear();
+        foreach (var name in new[] { "OAuth 连接", "API 连接", "查询与模型", "发音", "离线词典", "窗口", "数据与迁移" })
+            tabs.Items.Add(pages[name]);
+        tabs.SelectedItem = queryTab;
         save.Click += (_, _) =>
         {
             if (model.SelectedItem is not ModelChoice primaryValue || secondary.SelectedItem is not ModelChoice secondaryValue || judge.SelectedItem is not ModelChoice judgeValue)
-            { modelError.Text = "请先读取模型列表并选择模型。"; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
+            { modelError.Text = "请先读取模型列表并选择模型。"; modelError.Visibility = Visibility.Visible; tabs.SelectedItem = queryTab; return; }
             var candidate = settings.ForModel(new(primaryValue.Provider, primaryValue.Id));
             try { candidate.CompatibleBaseUrl = custom.BaseUrl(); }
-            catch (CompatibleException ex) { modelError.Text = ex.Message; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
+            catch (CompatibleException ex) { modelError.Text = ex.Message; modelError.Visibility = Visibility.Visible; tabs.SelectedItem = queryTab; return; }
             candidate.JudgeProvider = judgeValue.Provider; candidate.JudgeModel = judgeValue.Id;
             candidate.InferenceProfiles = [.. draft.InferenceProfiles];
             candidate.ParallelLookup = parallel.IsChecked == true;
-            foreach (var selected in new[] { primaryValue }.Concat(candidate.ParallelLookup ? new[] { secondaryValue } : []).Concat(merge.IsChecked == true ? new[] { judgeValue } : []))
+            foreach (var selected in new[] { primaryValue }.Concat(candidate.ParallelLookup ? new[] { secondaryValue } : []).Concat(merge.IsChecked == true || selectedLookup.IsChecked == true ? new[] { judgeValue } : []))
             {
                 var options = InferenceOptions.Selected(candidate, new(selected.Provider, selected.Id));
                 if (InferenceOptions.ValidateSelection(selected.Capabilities, options.Effort, options.Speed) is { } error)
-                { modelError.Text = error; modelError.Visibility = Visibility.Visible; tabs.SelectedIndex = 0; return; }
+                { modelError.Text = error; modelError.Visibility = Visibility.Visible; tabs.SelectedItem = queryTab; return; }
             }
             candidate.ParallelLookup = parallel.IsChecked == true; candidate.SecondaryProvider = secondaryValue.Provider; candidate.SecondaryModel = secondaryValue.Id;
             if (ModelCatalog.Validate(candidate) is { } invalid)
@@ -209,6 +222,8 @@ public sealed partial class SettingsWindow : Window
             settings.CompatibleBaseUrl = candidate.CompatibleBaseUrl; settings.CompatibleStreaming = custom.Streaming();
             settings.JudgeProvider = judgeValue.Provider;
             settings.MinimizeOnClose = closeBehavior.SelectedIndex == 0;
+            settings.LookupSelectedText = selectedLookup.IsChecked == true;
+            settings.LookupCopiedText = copiedLookup.IsChecked == true;
             settings.Online = online.IsChecked == true; settings.AutoAi = ai.IsChecked == true;
             settings.OfflineEnabled = master.IsChecked == true;
             settings.DisabledDictionaries = toggles.Where(t => t.Toggle.IsChecked != true).Select(t => t.Dictionary.Id).ToArray();

@@ -57,7 +57,6 @@
             <TextBlock Text="词语看释义，文本看翻译。" Foreground="{StaticResource Muted}" FontSize="16" Margin="4,0,0,30"/>
             <TextBlock Text="查询历史" Foreground="{StaticResource Muted}" FontSize="14" Margin="4,0,0,10"/>
             <TextBlock x:Name="HistoryMessage" Text="暂无查询历史。查过的词语和文本会显示在这里。" Foreground="{StaticResource Muted}" FontSize="15" Margin="4,4,0,12"/>
-              <TextBox x:Name="HistoryFilter" TextChanged="HistoryFilter_Changed" FontSize="14" Margin="4,0,4,10" ToolTip="搜索全部查询历史" AutomationProperties.Name="搜索查询历史"/>
             <StackPanel x:Name="HistoryList"/>
               <Button x:Name="MoreHistory" Content="更多历史" Click="MoreHistory_Click" HorizontalAlignment="Left" Margin="4,8,0,0" Visibility="Collapsed"/>
           </StackPanel>

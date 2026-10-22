@@ -43,6 +43,13 @@ public partial class MainWindow
         if (heading.Usage.Length > 0) label.Inlines.Add(new Run("  " + heading.Usage));
         if (heading.Abbreviation) label.Inlines.Add(new Run("  缩写"));
         if (heading.Provisional) label.Inlines.Add(new Run(" · 生成中"));
+        if (heading.InContext)
+        {
+            var badge = new Border { Background = Theme.Brush("Accent"), CornerRadius = new(5), Padding = new(5,1,5,1), Margin = new(8,0,0,0),
+                Child = new TextBlock { Text = "本句", FontSize = 11, Foreground = Theme.Brush("Canvas"), FontWeight = FontWeights.SemiBold } };
+            AutomationProperties.SetName(badge, "本句语境中的义项");
+            label.Inlines.Add(new InlineUIContainer(badge) { BaselineAlignment = BaselineAlignment.Center });
+        }
         return label;
     }
 
@@ -51,7 +58,9 @@ public partial class MainWindow
         var content = new StackPanel();
         content.Children.Add(SenseHeading(sense.Heading));
         RenderSenseContent(content, sense);
-        return new Border { Child = content, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(0,index == 0 ? 0 : 1,0,0), Padding = new(0,index == 0 ? 0 : 10,0,8) };
+        var row = new Border { Child = content, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(0,index == 0 ? 0 : 1,0,0), Padding = new(0,index == 0 ? 0 : 10,0,8) };
+        AttachSenseKeyboard(row, sense);
+        return row;
     }
 
     // indent: how far disclosure bodies indent this sense, for the read-aloud speaker column.
@@ -120,6 +129,7 @@ public partial class MainWindow
         var body = new Border { Child = content, BorderBrush = Theme.Brush("Stroke"), BorderThickness = new(2,0,0,0),
             Padding = new(10,4,0,2), Margin = new(0,5,0,3), Visibility = open ? Visibility.Visible : Visibility.Collapsed };
         var toggle = new ToggleButton { Content = label, Tag = key, IsChecked = open, Style = (Style)FindResource("DisclosureButton"), ToolTip = "展开或收起" + label };
+        disclosureToggles[key] = toggle;
         AutomationProperties.SetName(toggle, label);
         toggle.Checked += (_, _) => { senseDetails[key] = true; body.Visibility = Visibility.Visible; };
         toggle.Unchecked += (_, _) => { senseDetails[key] = false; body.Visibility = Visibility.Collapsed; };

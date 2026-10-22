@@ -37,6 +37,7 @@ public partial class MainWindow
     internal void ExitApplication() { quit = true; Close(); }
     internal void OpenSettings()
     {
+        skipSummonedLookup = !IsActive; CancelSummonedLookup();
         Restore();
         if (OwnedWindows.OfType<SettingsWindow>().FirstOrDefault() is { } dialog) { dialog.Activate(); return; }
         Settings_Click(this, new RoutedEventArgs());

@@ -25,6 +25,7 @@ public sealed partial class SettingsWindow
         var data = new UserData(root); var history = session?.History ?? new QueryHistory(root);
         panel.Children.Add(Text("备份与迁移", 20));
         panel.Children.Add(Text("备份含设置、历史和已保存查询，可能包含私人文本。密钥、OAuth 登录、语音和词库文件不会导出；在新设备重新连接账号。", 14, Muted));
+        panel.Children.Add(Text("跨平台恢复设置时，不支持的模型服务会保留本机模型配置；历史与已保存查询照常合入。", 14, Muted));
         var status = Text("", 14, Muted);
         bool Ready()
         {

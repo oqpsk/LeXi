@@ -25,6 +25,7 @@ public partial class MainWindow
         if (Placeholder == null) return;
         Placeholder.Visibility = string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
         if (suppressSuggestions) return;
+        CancelSummonedLookup();
         // Real edits start a fresh candidate list; previews keep the original list intact.
         DismissSuggestions();
         if (string.IsNullOrWhiteSpace(SearchBox.Text) && current.Length > 0) ShowHistory(false);
@@ -83,6 +84,7 @@ public partial class MainWindow
 
     private async void SearchBox_KeyDown(object sender, KeyEventArgs e)
     {
+        CancelSummonedLookup();
         if (inputComposing) return;
         if (e.Key == Key.Enter && !Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
         {
@@ -92,12 +94,11 @@ public partial class MainWindow
             return;
         }
         if (Keyboard.Modifiers != ModifierKeys.None) return;
-        if (e.Key is Key.Down or Key.Up && MoveSuggestion(e.Key == Key.Down ? 1 : -1))
+        if (e.Key is Key.Down or Key.Up && (MoveSuggestion(e.Key == Key.Down ? 1 : -1) || e.Key == Key.Down && !SearchBox.Text.Contains('\n') && EnterResults()))
         {
-            SearchBox.Focus();
             e.Handled = true;
         }
-        else if (e.Key == Key.Tab && AcceptSuggestion()) e.Handled = true;
+        else if (e.Key == Key.Tab && (AcceptSuggestion() || EnterResults())) e.Handled = true;
     }
 
     private void Suggestions_Click(object sender, MouseButtonEventArgs e)

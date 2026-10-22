@@ -62,10 +62,24 @@ public static class ModelCatalog
             : new(settings.JudgeModel.StartsWith("claude", StringComparison.Ordinal) ? "anthropic" : "openai", settings.JudgeModel);
 
     public static string? Validate(AppSettings settings) => Validate(settings, ApiOnly);
-    public static string? Validate(AppSettings settings, bool api)
+    public static string? Validate(AppSettings settings, bool api) => Validate(settings, api, false);
+    // A backup may come from any supported platform. Validate its contents before deciding
+    // whether this device can restore its model configuration.
+    public static string? ValidatePortable(AppSettings settings) => Validate(settings, false, true);
+    private static string? Validate(AppSettings settings, bool api, bool portable)
     {
         var judge = Judge(settings, api);
-        if (api)
+        if (portable)
+        {
+            if (settings.Provider is not ("codex" or "claude" or CompatibleText.Provider or "openai" or "anthropic") ||
+                settings.SecondaryProvider is not ("" or "codex" or "claude" or CompatibleText.Provider or "openai" or "anthropic") ||
+                settings.JudgeProvider is not ("codex" or CompatibleText.Provider or "openai" or "anthropic"))
+                return "请选择受支持的模型服务。";
+            if (settings.Model == null || settings.SecondaryModel == null || settings.JudgeModel == null ||
+                LookupModel.Selected(settings).Append(judge).Any(m => IsApi(m.Provider) && !ValidModelId(m.Model)))
+                return "请填写有效的模型 ID。";
+        }
+        else if (api)
         {
             if (!Reachable(settings.Provider) || settings.SecondaryProvider.Length > 0 && !Reachable(settings.SecondaryProvider) || !Reachable(judge.Provider))
                 return "请选择受支持的模型服务。";

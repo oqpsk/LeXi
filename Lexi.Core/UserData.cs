@@ -93,7 +93,7 @@ public sealed class UserData(string root)
         {
             using var json = JsonDocument.Parse(item.Value);
             if (item.Key == "settings.json")
-            { var settings = JsonSerializer.Deserialize<AppSettings>(item.Value, Json.Options) ?? throw new UserDataException("设置为空。"); if (ModelCatalog.Validate(settings) is { } error) throw new UserDataException(error); }
+            { var settings = JsonSerializer.Deserialize<AppSettings>(item.Value, Json.Options) ?? throw new UserDataException("设置为空。"); if (ModelCatalog.ValidatePortable(settings) is { } error) throw new UserDataException(error); }
             else if (item.Key == "history.json")
             { if ((JsonSerializer.Deserialize<HistoryEntry[]>(item.Value, Json.Options) ?? []).Any(e => e == null || Queries.Validate(e.Query) != null || e.Visits < 0)) throw new UserDataException("历史记录无效。"); }
             else if (item.Key.StartsWith(SavedQueries.DictionaryKind + "/", StringComparison.Ordinal))
@@ -131,7 +131,10 @@ public sealed class UserData(string root)
         }
         AppSettings? restored = null;
         if (includeSettings && data.TryGetValue("settings.json", out var config))
-        { restored = JsonSerializer.Deserialize<AppSettings>(config, Json.Options)!; restored.CodexPath = settings.CodexPath; SpeechCatalog.AdoptLocal(restored); staged["settings.json"] = JsonSerializer.SerializeToUtf8Bytes(restored, Json.Options); }
+        {
+            restored = RestoreSettings(JsonSerializer.Deserialize<AppSettings>(config, Json.Options)!, settings, ModelCatalog.ApiOnly);
+            staged["settings.json"] = JsonSerializer.SerializeToUtf8Bytes(restored, Json.Options);
+        }
         foreach (var item in data.Where(p => p.Key.Contains('/')))
             if (!File.Exists(Path.Combine(root, item.Key.Replace('/', Path.DirectorySeparatorChar)))) staged[item.Key] = item.Value;
         foreach (var name in staged.Keys)
@@ -159,9 +162,30 @@ public sealed class UserData(string root)
             foreach (var item in rollback.Reverse()) { if (item.Value == null) { if (File.Exists(item.Key)) File.Delete(item.Key); } else Atomic(item.Key, item.Value); }
             throw;
         }
-        if (restored != null) foreach (var p in typeof(AppSettings).GetProperties().Where(p => p.CanRead && p.CanWrite)) p.SetValue(settings, p.GetValue(restored));
+        if (restored != null)
+            foreach (var p in Json.Options.GetTypeInfo(typeof(AppSettings)).Properties)
+                if (p is { Get: { } get, Set: { } set }) set(settings, get(restored));
         if (data.TryGetValue("history.json", out bytes)) history.Merge(JsonSerializer.Deserialize<HistoryEntry[]>(bytes, Json.Options) ?? []);
         return preview;
+    }
+    internal static AppSettings RestoreSettings(AppSettings imported, AppSettings current, bool api)
+    {
+        var restored = imported.ForModel(LookupModel.Primary(imported));
+        if (ModelCatalog.Validate(restored, api) != null)
+        {
+            // Model selections, endpoint and profiles form one configuration. Retaining them
+            // together avoids sending a retained model to another device's endpoint.
+            restored.Provider = current.Provider; restored.Model = current.Model;
+            restored.SecondaryProvider = current.SecondaryProvider; restored.SecondaryModel = current.SecondaryModel;
+            restored.JudgeProvider = current.JudgeProvider; restored.JudgeModel = current.JudgeModel;
+            restored.ParallelLookup = current.ParallelLookup; restored.MergeSenses = current.MergeSenses;
+            restored.CompatibleBaseUrl = current.CompatibleBaseUrl; restored.CompatibleStreaming = current.CompatibleStreaming;
+            restored.ReasoningEffort = current.ReasoningEffort; restored.ServiceTier = current.ServiceTier;
+            restored.InferenceProfiles = [.. current.InferenceProfiles ?? []];
+        }
+        restored.CodexPath = current.CodexPath;
+        SpeechCatalog.AdoptLocal(restored);
+        return restored;
     }
     private static void Atomic(string file, byte[] bytes)
     {

@@ -20,6 +20,8 @@ public partial class App : Application
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(int processId);
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Helper requests never activate the app, touch its mutex, settings, tray or providers.
+        if (SelectionReader.TryRun(e.Args)) { Shutdown(); return; }
         base.OnStartup(e);
         SetCurrentProcessExplicitAppUserModelID("Lexi.Dictionary");
         mutex = new Mutex(true, "Local\\Lexi.Dictionary.v1", out var first);

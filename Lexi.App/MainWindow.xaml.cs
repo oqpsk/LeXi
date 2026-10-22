@@ -24,6 +24,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         QueryProgress.RetryRequested += (_, _) => Retry_Click(this, new RoutedEventArgs());
         InitializeInputPreview();
+        SourceInitialized += (_, _) => InitializeInstantLookup();
         shown = session.View;
         viewDelivery = new(Dispatcher, Render);
         session.Changed += Render;
@@ -34,17 +35,17 @@ public partial class MainWindow : Window
         UpdateOnlineButton(); UpdateNavigation(session.View.Navigation); UpdateCloseAction();
         LocationChanged += (_, _) => EtymologyPopup.IsOpen = false;
         SizeChanged += (_, _) => EtymologyPopup.IsOpen = false;
-        Deactivated += (_, _) => { CancelSearchFocus(); CancelInputPreview(); EtymologyPopup.IsOpen = false; };
+        Deactivated += (_, _) => { CancelSummonedLookup(); CancelSearchFocus(); CancelInputPreview(); EtymologyPopup.IsOpen = false; };
         ContentRendered += (_, _) => QueueSearchFocus();
         StateChanged += (_, _) => { if (WindowState == WindowState.Minimized) CancelSearchFocus(); else QueueSearchFocus(); };
-        PreviewMouseDown += (_, _) => CancelSearchFocus();
+        PreviewMouseDown += (_, _) => { CancelSummonedLookup(); CancelSearchFocus(); };
         ResultsScroll.ScrollChanged += (_, e) => { if (e.VerticalChange != 0) EtymologyPopup.IsOpen = false; };
         Loaded += async (_, _) => { FocusSearch(); QueueSearchFocus(); await session.InitializeAsync(); };
         Closing += (_, e) =>
         {
             if (!quit && settings.MinimizeOnClose && !Dispatcher.HasShutdownStarted) { e.Cancel = true; WindowState = WindowState.Minimized; }
         };
-        Closed += (_, _) => { focusClosed = true; CancelInputPreview(); CancelSearchFocus(); session.Cancel(); StopSpeech(); speech.Dispose(); session.Dispose(); };
+        Closed += (_, _) => { focusClosed = true; CancelSummonedLookup(); instantLookup?.Dispose(); CancelInputPreview(); CancelSearchFocus(); session.Cancel(); StopSpeech(); speech.Dispose(); session.Dispose(); };
     }
     public void Restore()
     {
@@ -52,20 +53,25 @@ public partial class MainWindow : Window
         Show(); Activate(); FocusSearch(); QueueSearchFocus();
     }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
-    private void Window_Activated(object? sender, EventArgs e) { FocusSearch(); QueueSearchFocus(); }
+    private void Window_Activated(object? sender, EventArgs e) { FocusSearch(); QueueSearchFocus(); LookUpSummoned(); }
     private async void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (inputComposing && e.Key is Key.Enter or Key.Up or Key.Down or Key.Escape) return;
+        if (inputComposing) return;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (Keyboard.Modifiers == ModifierKeys.Alt && key is Key.Left or Key.Right)
         { e.Handled = true; await NavigateAsync(key == Key.Left ? -1 : 1); return; }
         if (e.Key == Key.Escape)
         {
             if (EtymologyPopup.IsOpen) DismissEtymology();
+            else if (keyboardSenses.Any(s => s.Row.IsKeyboardFocused)) FocusSearch();
             else if (Suggestions.Visibility == Visibility.Visible || InputPreviewCard.Visibility == Visibility.Visible) DismissSuggestions(restoreDraft: true);
             else WindowState = WindowState.Minimized;
             e.Handled = true;
         }
+        if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.D && shown.Kind != QueryViewKind.Home && speechText.Length > 0)
+        { e.Handled = true; if (!e.IsRepeat) Speech_Click(sender, e); return; }
+        if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.C)
+        { e.Handled = true; CopySummary(); return; }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.L) { FocusSearch(); e.Handled = true; }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Q) { ExitApplication(); e.Handled = true; }
         if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.OemComma) { e.Handled = true; Settings_Click(sender, e); }
@@ -92,6 +98,7 @@ public partial class MainWindow : Window
     }
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
+        CancelSummonedLookup(); instantLookup?.Discard();
         StopSpeech();
         var previous = session.QuerySettingsIdentity();
         var library = session.Library;
@@ -102,14 +109,17 @@ public partial class MainWindow : Window
             UpdateOnlineButton(); UpdateCloseAction();
             if (!settings.OfflineEnabled) Suggestions.Visibility = Visibility.Collapsed;
         }
+        CancelSummonedLookup(); instantLookup?.Discard();
         FocusSearch();
     }
     private async void Retry_Click(object sender, RoutedEventArgs e) { StopSpeech(); await session.RetryFailedAsync(); }
-    private async Task SearchAsync(string raw, bool force = false, bool navigating = false)
+    private async Task SearchAsync(string raw, bool force = false, bool navigating = false, string? context = null)
     {
         // Speech always belongs to the result being replaced; invalid input leaves it untouched.
         if (Queries.Validate(raw) == null) StopSpeech();
-        await session.SubmitAsync(raw, force, navigating, ResultsScroll.VerticalOffset);
+        CancelSummonedLookup();
+        if (force && raw == current && !navigating) await session.RegenerateAsync();
+        else await session.SubmitAsync(raw, force, navigating, ResultsScroll.VerticalOffset, context);
     }
 
     // ---- Rendering of Core query views ----

@@ -8,9 +8,11 @@ internal static class SessionChecks
     public static async Task Run(string fixture, string root)
     {
         await MajorWorkflowChecks.Run(fixture,root);
+        await BackupMigrationChecks.Run(root);
         await InputPreviewChecks.Run(fixture,root);
         CandidateChecks.Run();
         await ContextChecks.Run(fixture, root);
+        await ContextCompletionChecks.Run(fixture, root);
         await FirstResultChecks.Run(fixture, root);
         await DictionaryPackChecks.Run(fixture, root);
         int count = 0;
