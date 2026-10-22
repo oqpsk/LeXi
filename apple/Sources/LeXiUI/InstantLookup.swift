@@ -2,15 +2,16 @@ import AppKit
 import ApplicationServices
 import LeXiKit
 
-// What the reader meant to look up when they pressed ⌘2 in another app: the selection there (with
-// Accessibility permission) or text they copied a moment earlier. It is read once, while the other
-// app is still in front, and handed to the query window when it comes forward. Core decides whether
-// the text is looked up at once, only fills the query field or is ignored (query.candidate).
+// What the reader meant to look up when they pressed the global shortcut in another app: the
+// selection there (with Accessibility permission) or text they copied a moment earlier. It is read
+// once, while the other app is still in front, and handed to the query window when it comes forward.
+// Core decides whether the text is looked up at once, only fills the query field or is ignored
+// (query.candidate).
 @MainActor public final class InstantLookup {
     public static let shared = InstantLookup()
     public static let clipboardKey = "lookupCopiedText"
     public static let selectionKey = "lookupSelectedText"
-    // How long after a copy ⌘2 still means "look this up".
+    // How long after a copy the global shortcut still means "look this up".
     static let freshness: TimeInterval = 8
 
     private let pasteboard: NSPasteboard
@@ -78,7 +79,7 @@ public enum SelectedText {
     static func read() -> CapturedText? {
         guard AXIsProcessTrusted() else { return nil }
         let system = AXUIElementCreateSystemWide()
-        // An unresponsive app must not hold up ⌘2.
+        // An unresponsive app must not hold up the global shortcut.
         AXUIElementSetMessagingTimeout(system, 0.25)
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
