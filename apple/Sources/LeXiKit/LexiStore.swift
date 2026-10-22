@@ -111,11 +111,14 @@ public final class LexiStore {
     }
 
     // ---- Queries ----
-    public func submit(_ text: String, force: Bool = false, scroll: Double = 0, context: String? = nil) async {
+    // restore: reopen a page the reader had open (iOS after the system closed the app), without
+    // recording it in history again.
+    public func submit(_ text: String, force: Bool = false, scroll: Double = 0, context: String? = nil, restore: Bool = false) async {
         clearSuggestions()
         await provideTextCredentials()
-        _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll, context: context)) as SubmitResult?
-        await refreshHistoryIfHome()
+        _ = try? await client?.call("query.submit", Submit(text: text, force: force, scroll: scroll, context: context, restore: restore ? true : nil)) as SubmitResult?
+        // Core has recorded the query by now; the list is current before anyone goes back to it.
+        await refreshHistory()
     }
     public func retryFailed() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.retry") as SubmitResult? }
     public func regenerate() async { clearSuggestions(); await provideTextCredentials(); _ = try? await client?.call("query.regenerate") as SubmitResult? }
@@ -197,7 +200,6 @@ public final class LexiStore {
     public func refreshSpeechModels(key: String) async throws { let _: EmptyResponse = try await requireClient().call("speech.elevenModels", ["key": key]) }
     private struct EmptyResponse: Decodable, Sendable {}
     private func requireClient() throws -> HostClient { guard let client else { throw CocoaError(.fileNoSuchFile) }; return client }
-    private func refreshHistoryIfHome() async { if view.kind == .home { await refreshHistory() } }
     public func remove(_ entry: HistoryEntry) async {
         if let result = try? await client?.call("history.remove", RemoveHistory(query: entry.query, translation: entry.translation)) as HistoryRemoval? {
             history = result.history; historyShown = historyRequest
@@ -241,6 +243,13 @@ public final class LexiStore {
     }
     public func refreshDictionaries() async {
         if let list = try? await client?.call("dictionaries.list") as DictionaryList? { dictionaries = list }
+    }
+    // Core checks the downloaded archive against the pack it pins before installing it.
+    public func installDictionary(_ id: String, archive: String) async throws {
+        dictionaries = try await requireClient().call("dictionaries.install", ["id": id, "path": archive])
+    }
+    public func removeDictionary(_ id: String) async throws {
+        dictionaries = try await requireClient().call("dictionaries.remove", ["id": id])
     }
     public func connectionStatus(_ provider: String) async -> LoginStatus? {
         try? await client?.call("connection.status", ["provider": provider]) as LoginStatus?
@@ -319,7 +328,7 @@ public final class LexiStore {
         return try await client.call("speech.synthesize", SpeechRequest(text: text, selection, key: key), as: SpeechFile.self).path
     }
 
-    private struct Submit: Encodable, Sendable { let text: String; let force: Bool; let scroll: Double; let context: String? }
+    private struct Submit: Encodable, Sendable { let text: String; let force: Bool; let scroll: Double; let context: String?; let restore: Bool? }
     private struct Navigate: Encodable, Sendable { let direction: Int; let scroll: Double }
     private struct Scroll: Encodable, Sendable { let scroll: Double }
     private struct RemoveHistory: Encodable, Sendable { let query: String; let translation: Bool }

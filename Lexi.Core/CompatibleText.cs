@@ -29,7 +29,10 @@ public static class CompatibleText
 {
     public const string Provider = "compatible";
     public const string DefaultBaseUrl = "";
-    public const string MissingCredentials = "请在设置 → API 连接中填写 CF Access Client ID 和 Client Secret。";
+    // Named after where the credentials are entered on each platform.
+    public static string MissingCredentials => ModelCatalog.ApiOnly
+        ? "请在“设置 → 模型服务 → 自定义文本服务”中填写 CF Access Client ID 和 Client Secret。"
+        : "请在设置 → API 连接中填写 CF Access Client ID 和 Client Secret。";
     public const string AuthenticationFailed = "自定义文本服务鉴权失败，请检查 CF Access Client ID、Client Secret 及可选 API Key。";
     public const string StorageFailure = "自定义文本服务凭据无法读取或保存，请在设置中重新填写。";
     public static string UserAgent => "LeXi/" + (typeof(CompatibleText).Assembly.GetName().Version?.ToString(3) ?? "0.0.0");

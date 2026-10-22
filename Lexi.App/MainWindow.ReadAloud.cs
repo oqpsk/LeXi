@@ -97,15 +97,22 @@ public partial class MainWindow
         var previousSize = Size.Empty;
         var previousCaret = Rect.Empty;
         double previousScale = 0;
+        Typeface? previousFace = null;
+        string? previousLanguage = null;
+        TextFormattingMode? previousMode = null;
         text.LayoutUpdated += (_, _) =>
         {
             if (!text.IsArrangeValid || text.LineCount < 1) return;
             var firstCaret = text.GetRectFromCharacterIndex(0);
             if (firstCaret.IsEmpty) return;
             var scale = VisualTreeHelper.GetDpi(text).PixelsPerDip;
-            if (text.Text == previousText && text.RenderSize == previousSize && firstCaret == previousCaret && scale == previousScale) return;
-            previousText = text.Text; previousSize = text.RenderSize; previousCaret = firstCaret; previousScale = scale;
             var face = new Typeface(text.FontFamily, text.FontStyle, text.FontWeight, text.FontStretch);
+            var culture = text.Language.GetSpecificCulture();
+            var mode = TextOptions.GetTextFormattingMode(text);
+            if (text.Text == previousText && text.RenderSize == previousSize && firstCaret == previousCaret && scale == previousScale &&
+                face.Equals(previousFace) && culture.Name == previousLanguage && mode == previousMode) return;
+            previousText = text.Text; previousSize = text.RenderSize; previousCaret = firstCaret; previousScale = scale;
+            previousFace = face; previousLanguage = culture.Name; previousMode = mode;
             var visible = Rect.Empty;
             for (var line = 0; line < text.LineCount; line++)
             {
@@ -114,8 +121,9 @@ public partial class MainWindow
                 var caret = text.GetRectFromCharacterIndex(index);
                 if (caret.IsEmpty) continue;
                 var content = text.GetLineText(line).TrimEnd('\r', '\n');
-                var formatted = new FormattedText(content, text.Language.GetSpecificCulture(), text.FlowDirection,
-                    face, text.FontSize, Brushes.Black, scale);
+                // Match the TextBox's display formatter, including CJK fallback and hinted metrics.
+                var formatted = new FormattedText(content, culture, text.FlowDirection,
+                    face, text.FontSize, Brushes.Black, null, mode, scale);
                 var ink = formatted.BuildGeometry(new Point()).Bounds;
                 // The speaker follows the first line; the tint follows the entire visible block,
                 // including wrapped lines. Both use the same actual glyph metrics.

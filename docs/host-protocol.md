@@ -35,7 +35,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 {"event": "view", "data": { "request": 3, "revision": 41, "kind": "dictionary", "...": "..." }}
 ```
 
-`data` 是完整的 `QueryView`（字段见 `Lexi.Core/QueryViews.cs`），字段名为 camelCase，枚举为 camelCase 字符串。`revision` 在整个会话中递增；前端丢弃不大于已显示 `revision` 的视图。`request` 变化表示新的查询页面。`progress` 为 `null` 表示没有进行中的查询；`progressGeneration` 变化表示新的进度周期。视图中的文字、来源说明、阶段和状态都已由 Core 决定，前端不再推断。
+`data` 是完整的 `QueryView`（字段见 `Lexi.Core/QueryViews.cs`），字段名为 camelCase，枚举为 camelCase 字符串。`revision` 在整个会话中递增；前端丢弃不大于已显示 `revision` 的视图。`request` 变化表示新的查询页面。`progress` 为 `null` 表示没有进行中的查询；`progressGeneration` 变化表示新的进度周期。视图中的文字、来源说明、阶段和状态都已由 Core 决定，前端不再推断。`navigation.pageId` 标识当前页面，`backId`、`forwardId` 是后退、前进将到达的页面（没有时为 `-1`）；同一页面在滚动和前进后退中保持同一 id，前端可以按 id 记住各页最后的画面，在滑动返回时画出下层页面。
 
 `progress.activity` 是可选的增量字段，取 `idle`、`querying`、`generating`、`merging`。Core 区分等待模型与收到新释义/译文，缓存文本不冒充新输出；终态与取消均为 `idle`。旧视图缺少字段时原生前端保留静态标志。该字段只驱动动效，不改变 `stage`、状态文字或查询生命周期。
 
@@ -56,7 +56,7 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | 方法 | 参数 | 结果 |
 |---|---|---|
 | `initialize` | — | `protocol`、`version`、`platform`、`paths`、当前 `view`、`settings`（同 `settings.get`）。等待离线词库加载 |
-| `query.submit` | `text`，可选 `force`、`scroll`、`context`（查询词所在的句子，见 `query.candidate`） | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送 |
+| `query.submit` | `text`，可选 `force`、`scroll`、`context`（查询词所在的句子，见 `query.candidate`）、`restore` | 查询结束后返回 `{request, revision}`；过程通过 `view` 事件推送。`restore` 为 `true` 时重新打开读者原本停留的页面（如 iOS 被系统关闭后重新启动）：页面照常进入前进后退，但不再写入查询历史 |
 | `query.regenerate` | — | 跳过已保存结果重新查询当前页面 |
 | `query.navigate` | `direction`（-1 或 1），可选 `scroll` | `{page, view}`；`page` 为 `null` 表示已到边界 |
 | `query.home` | 可选 `scroll` | 返回查询历史页面 |
@@ -73,7 +73,9 @@ lexi-host [--data <词库目录>] [--user <用户数据目录>] [--assets <模�
 | `inference.catalog` | — | 等本次启动的后台 OAuth 模型读取结束（在线时 Host 启动后自动读取一次官方 Codex/Claude 客户端的模型列表；离线或已结束时立即返回），然后返回 `settings.get` 的内容 |
 | `inference.configure` | `provider`、`model`、`effort`、`speed` | 按当前模型能力校验并保存两个配置项，返回 `settings.get`；空字符串使用服务默认；不自动降低档位 |
 | `settings.setOnline` | `online` | 切换在线补充并返回设置 |
-| `dictionaries.list` | — | `{dictionaries, folder}` |
+| `dictionaries.list` | — | `{dictionaries, folder, packs}`；`packs` 是可在应用内下载的词典包（`id`、`name`、`languages`、`url`、`bytes`、`installedBytes`、`license`、`installed`），目前只有 ECDICT |
+| `dictionaries.install` | `id`、`path`（前端下载好的词典包） | 核对大小和 SHA-256 与 `DictionaryPacks` 固定的一致，解压到数据目录下的临时文件夹并确认能打开，再替换到位、重新加载词库；返回 `dictionaries.list` 的内容。查询进行中返回 `busy`，文件不符返回 `invalid_dictionary` |
+| `dictionaries.remove` | `id` | 删除这部词典的文件并重新加载词库，返回 `dictionaries.list` 的内容 |
 | `connection.status` | `provider`（`codex` 或 `claude`），可选 `codexPath` | `{installed, signedIn, message}`，只含经过清理的摘要 |
 | `connection.loginCommand` | `provider`，可选 `codexPath` | `{fileName, arguments, path, clearEnvironment}` 或 `null`。前端仅在用户点击后在终端中运行，并清除 `clearEnvironment` 中的变量 |
 | `text.models` | `baseUrl`、`clientId`、`clientSecret`，可选 `apiKey` | `{models: [{provider, id, label, options}]}`；鉴权后读取列表，API Key 可留空；不保存凭据、不自动选择模型；离线时不发请求 |

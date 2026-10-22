@@ -34,7 +34,7 @@ struct SettingsView: View {
                     .labelsHidden()
                 }
                 Section {
-                    LabeledContent("版本", value: store.version.isEmpty ? "—" : store.version)
+                    LabeledContent("版本", value: version)
                     SourceLink("词库与许可", url: "https://github.com/oqpsk/LeXi/blob/main/THIRD_PARTY_NOTICES.md")
                 } footer: {
                     Text("LeXi 不需要注册，不收集使用数据。只有查 Wiktionary、调用你选的模型和合成在线语音时才会联网。")
@@ -45,7 +45,7 @@ struct SettingsView: View {
             .navigationDestination(for: SettingsPage.self) { page in
                 Group {
                     switch page {
-                    case .services: Form { KeysSection(store: store); CustomServiceSection(store: store) }
+                    case .services: ServicesForm(store: store)
                     case .query: Form { if let payload = store.settings { ModelSection(store: store, payload: payload) } }
                     case .speech: Form { SpeechSection(store: store, speech: speech) }
                     case .dictionary: Form { DictionarySection(store: store) }
@@ -56,7 +56,8 @@ struct SettingsView: View {
                 .navigationBarTitleDisplayMode(.inline)
             }
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
-            .task { await store.refreshSettings(); await store.refreshDictionaries() }
+            // Again once the lookup service has started, when settings open with LeXi.
+            .task(id: store.phase == .ready) { await store.refreshSettings(); await store.refreshDictionaries() }
         }
     }
 
@@ -70,9 +71,7 @@ struct SettingsView: View {
     }
 
     private var servicesSummary: String {
-        let keys = KeychainSpeechKeys()
-        var names = ModelKeys.providers.filter { keys.hasSaved($0) }.map { $0 == "openai" ? "OpenAI" : "Anthropic" }
-        if !(store.settings?.settings.compatibleBaseUrl ?? "").isEmpty { names.append("自定义服务") }
+        let names = ModelKeys.services(store.settings?.settings)
         return names.isEmpty ? "未设置" : names.joined(separator: " · ")
     }
     private var querySummary: String {
@@ -92,9 +91,35 @@ struct SettingsView: View {
         let count = store.dictionaries?.dictionaries.count ?? 0
         return count == 0 ? "未安装" : "\(count) 部"
     }
+    // Core's version, with this build's number, so two builds of one version can be told apart.
+    private var version: String {
+        guard !store.version.isEmpty else { return "—" }
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        return build.isEmpty || build == store.version ? store.version : "\(store.version) (\(build))"
+    }
 }
 
 // One secure field per service. The OpenAI key also serves OpenAI speech.
+// API keys and the custom text service, in settings and in the welcome sheet. With a service set up
+// but 自动补充双语释义 off (the welcome turns it off when none is), lookups call no model, so this
+// offers to turn it back on.
+struct ServicesForm: View {
+    @Bindable var store: LexiStore
+    var body: some View {
+        Form {
+            if store.settings?.settings.autoAi == false && !ModelKeys.services(store.settings?.settings).isEmpty {
+                Section {
+                    Button("查词时自动调用模型") { Task { await store.update(["autoAi": .bool(true)]) } }
+                } footer: {
+                    Text("“自动补充双语释义”已关闭，查词时只显示词典和 Wiktionary 的释义。")
+                }
+            }
+            KeysSection(store: store)
+            CustomServiceSection(store: store)
+        }
+    }
+}
+
 struct KeysSection: View {
     @Bindable var store: LexiStore
     @State private var inputs: [String: String] = [:]
@@ -591,24 +616,50 @@ struct SpeechSection: View {
     }
 }
 
+// Installed dictionaries, each removable, then the ones the app can download.
 struct DictionarySection: View {
     @Bindable var store: LexiStore
+    @State private var removing: InstalledDictionary?
+    @State private var message = ""
+
     var body: some View {
         Section {
-            if let list = store.dictionaries, !list.dictionaries.isEmpty {
-                ForEach(list.dictionaries) { dictionary in
+            ForEach(store.dictionaries?.dictionaries ?? []) { dictionary in
+                HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(dictionary.name)
-                        Text("\(dictionary.languages) · \(dictionary.entryCount) 条").font(.caption).foregroundStyle(.secondary)
+                        Text(dictionary.available ? "\(dictionary.languages) · \(dictionary.entryCount.formatted()) 条 · " + DataSection.size(dictionary.bytes) : dictionary.status)
+                            .font(.caption).foregroundStyle(.secondary)
                     }
+                    Spacer()
+                    Button("删除…", role: .destructive) { removing = dictionary }.buttonStyle(.borderless)
                 }
-            } else {
+            }
+            ForEach(store.dictionaries?.packs?.filter { !$0.installed } ?? []) { pack in DictionaryPackRow(pack: pack, store: store) }
+            if let list = store.dictionaries, list.dictionaries.isEmpty, list.packs?.isEmpty != false {
                 Text("尚未安装离线词库").foregroundStyle(.secondary)
             }
+            if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.red) }
         } header: {
             Text("离线词库")
         } footer: {
-            Text("离线词库提供输入建议、本地释义和输入时的 TL;DR。用 Mac 装机（build-ios.sh --device）时会复制 Mac 已安装的词库；应用内暂不能下载。没有词库时仍可查 Wiktionary 与模型释义。")
+            Text("离线词库提供输入建议、本地释义和输入时的 TL;DR，没有网络也能查。没有词库时仍可查 Wiktionary 与模型释义。")
         }
+        .confirmationDialog("删除“" + (removing?.name ?? "") + "”？", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            titleVisibility: .visible) {
+            if let dictionary = removing {
+                Button("删除词库", role: .destructive) { Task { await remove(dictionary) } }
+            }
+        } message: {
+            Text("输入建议和本地释义会消失，需要时可以再下载。")
+        }
+        .task(id: store.phase == .ready) { await store.refreshDictionaries() }
+    }
+
+    private func remove(_ dictionary: InstalledDictionary) async {
+        removing = nil
+        do { try await store.removeDictionary(dictionary.id); message = "" }
+        catch let error as HostError { message = error.message }
+        catch { message = "删除没有完成，请重试。" }
     }
 }

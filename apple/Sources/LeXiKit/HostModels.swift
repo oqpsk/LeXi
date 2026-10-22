@@ -44,6 +44,10 @@ public struct NavigationState: Decodable, Equatable, Sendable {
     public let canForward: Bool
     public let backLabel: String
     public let forwardLabel: String
+    // The session's page ids (Core's QueryPage.Id); -1 when there is no page that way. Older hosts omit them.
+    public var pageId: Int64? = nil
+    public var backId: Int64? = nil
+    public var forwardId: Int64? = nil
 }
 
 public struct LocalSource: Decodable, Equatable, Sendable, Identifiable {
@@ -324,7 +328,17 @@ public struct InstalledDictionary: Decodable, Equatable, Sendable, Identifiable 
     public let version: String
     public let attribution: String
 }
-public struct DictionaryList: Decodable, Sendable { public let dictionaries: [InstalledDictionary]; public let folder: String }
+public struct DictionaryList: Decodable, Sendable {
+    public let dictionaries: [InstalledDictionary]
+    public let folder: String
+    // Dictionaries the app can download in one piece (iOS); older hosts send none.
+    public let packs: [DictionaryPack]?
+}
+public struct DictionaryPack: Decodable, Equatable, Sendable, Identifiable {
+    public let id, name, languages, url, license: String
+    public let bytes, installedBytes: Int64
+    public let installed: Bool
+}
 
 public struct LoginStatus: Decodable, Equatable, Sendable { public let installed: Bool; public let signedIn: Bool; public let message: String }
 public struct LoginCommand: Decodable, Equatable, Sendable {

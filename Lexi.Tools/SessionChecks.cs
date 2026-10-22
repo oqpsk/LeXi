@@ -14,6 +14,7 @@ internal static class SessionChecks
         await ContextChecks.Run(fixture, root);
         await ContextCompletionChecks.Run(fixture, root);
         await FirstResultChecks.Run(fixture, root);
+        await DictionaryPackChecks.Run(fixture, root);
         int count = 0;
         void Check(bool ok, string name) { if (!ok) throw new Exception("FAIL: " + name); Console.WriteLine("PASS: " + name); count++; }
         var work = Path.Combine(Path.GetFullPath(root), Guid.NewGuid().ToString("N"));
@@ -75,6 +76,10 @@ internal static class SessionChecks
             offline.ShowHome();
             Check(offline.View is { Kind: QueryViewKind.Home, Progress: null, Status: "准备就绪", QuickRead.Visible: false } && offline.Current == "",
                 "returning home clears the query lifecycle and lexical overview");
+            await offline.SubmitAsync("walked", recordHistory: false);
+            Check(offline.View is { Query: "walked", Navigation: { CanBack: true, BackLabel: "查询历史" } } &&
+                offline.History.Entries.Select(e => e.Query).SequenceEqual(["Hello", "walked"]),
+                "a reopened page becomes the current page without moving up the history");
         }
 
         using (var online = new QuerySession(Paths("online"), providers: providers, network: network))

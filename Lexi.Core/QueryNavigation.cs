@@ -1,6 +1,8 @@
 namespace Lexi.Core;
 
-public sealed record QueryPage(string Query, bool Translation = false, double ScrollOffset = 0);
+// Id stays with a page while it is in the session, so a front end can keep what it drew for the
+// pages behind and ahead (iOS slides the current page off the one beneath). The start page is 0.
+public sealed record QueryPage(string Query, bool Translation = false, double ScrollOffset = 0, long Id = 0);
 
 /// <summary>Session navigation, independent of persisted recent-query history.</summary>
 public sealed class QueryNavigation
@@ -8,6 +10,7 @@ public sealed class QueryNavigation
     public const int Capacity = 100;
     private readonly List<QueryPage> pages = [new("")];
     private int index;
+    private long lastId;
     public QueryPage Current => pages[index];
     public QueryPage? Back => CanBack ? pages[index - 1] : null;
     public QueryPage? Forward => CanForward ? pages[index + 1] : null;
@@ -23,7 +26,7 @@ public sealed class QueryNavigation
         Revision++;
         if (Current.Query == query && Current.Translation == translation) return;
         pages.RemoveRange(index + 1, pages.Count - index - 1);
-        pages.Add(new(query, translation));
+        pages.Add(new(query, translation, Id: ++lastId));
         if (pages.Count > Capacity) pages.RemoveAt(0);
         index = pages.Count - 1;
     }
