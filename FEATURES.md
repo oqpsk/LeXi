@@ -34,7 +34,7 @@ LeXi 的 Windows 版（`Lexi.App`，WPF）与 macOS 版（`apple/`，SwiftUI）�
 | 保存的结果与重新生成 | `SavedQueries`、`QuerySession.RegenerateAsync` | 已实现：底栏“重新生成” | 已实现：底栏“重新生成”，⌘R |
 | 在线补充开关 | `QuerySession.SetOnline`、`ControlText` | 已实现：底栏两态开关 | 已实现：底部玻璃按钮，以图标和文字区分在线与离线 |
 | 文本翻译与复制译文 | `Translation`、`TranslationView` | 已实现 | 已实现 |
-| 查询历史 | `QueryHistory`：最多 10,000 条，频次与原始大小写持久化 | 已实现：搜索与逐页加载、单条删除 | 已实现：搜索与逐页加载、单条删除；⌘Y |
+| 查询历史 | `QueryHistory`：最多 10,000 条，频次与原始大小写持久化 | 已实现：最近查询直接列出、逐页加载、单条删除；与 iOS 一样不设独立历史搜索框 | 已实现：搜索与逐页加载、单条删除；⌘Y |
 | 后退 / 前进 | `QueryNavigation`、`NavigationView` | 已实现：Alt+← / Alt+→ | 已实现：工具栏按钮，⌘[ / ⌘] |
 
 ## 设置与连接

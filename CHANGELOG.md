@@ -2,6 +2,8 @@
 
 ## Unreleased — major-version preparation
 
+- Remove the Windows home page's history search field, matching iOS, so the main query box is the only input. Recent queries, loading more history and individual deletion remain available.
+
 - Bring the shared offline index mapping and compact API model names to Windows. Keep context-work progress together with the new navigation page IDs when integrating the iOS restore and dictionary-management changes.
 - Match read-aloud glyph measurement to the TextBox's display formatting mode and invalidate it after font or language changes. Keep the existing one-DIP rendered alignment checks, text layout and hover targets. The pixel check samples only the target tint's empty padding, excluding unrelated text/DPI repaints elsewhere in the column.
 
