@@ -2,6 +2,7 @@
 
 ## Unreleased — major-version preparation
 
+- iOS is ready for a new word whenever you come back. Returning to LeXi from another app focuses the query box with its text selected, so typing replaces it, while the page you were reading stays put; Control Center or a banner over LeXi does not count, and an open settings or welcome sheet keeps the focus. A page reopened after iOS closed LeXi opens the same way, with the keyboard up.
 - macOS settings open in a window that can be resized, 900 × 760 at first, and remember their size. The traffic lights sit inside the sidebar on one row with the sidebar button, as in System Settings, and the toolbar names the page shown. ⌘, and 设置… in the app menu open it as before.
 - macOS summons LeXi with ⌥2 instead of ⌘2. Option sits where the Win key of Win+2 does, and ⌘2 goes back to the app in front. 设置 → 通用 → 快捷键 records another combination (with ⌘, ⌥ or ⌃, or a function key alone; Esc cancels, 恢复默认 returns to ⌥2), and every hint names the shortcut in use. On US layouts ⌥2 no longer types ™ while LeXi holds it.
 - Upload the iOS app to TestFlight.

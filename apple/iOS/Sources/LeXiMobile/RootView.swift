@@ -49,6 +49,10 @@ struct RootView: View {
     @AppStorage("welcome.done") private var welcomeDone = false
     @State private var welcoming = false
     @Environment(\.scenePhase) private var scenePhase
+    // The query field's selection, and whether LeXi has been in the background since it was last
+    // in front: coming back from another app selects the query, ready for a new word.
+    @State private var selection: TextSelection?
+    @State private var away = false
     private static let edge: CGFloat = 20
 
     var body: some View {
@@ -92,7 +96,11 @@ struct RootView: View {
         .onChange(of: store.view.status) { _, _ in speech.clearStatus() }
         .onChange(of: searching) { _, active in if !active { store.clearInputPreview() } }
         .onChange(of: store.view.progress?.busy == true, initial: true) { _, busy in lookupTime.lookup(busy: busy) }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { savePage() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { savePage() }
+            // Only a return from another app, not from Control Center or a banner over LeXi.
+            if phase == .background { away = true } else if phase == .active && away { away = false; focusQuery() }
+        }
         .onChange(of: store.phase, initial: true) { _, phase in if phase == .ready { launch() } }
         // lexi://lookup?q=word looks a word up, from Shortcuts, other apps or a link.
         .onOpenURL { url in
@@ -100,14 +108,13 @@ struct RootView: View {
                 .queryItems?.first(where: { $0.name == "q" })?.value, !query.isEmpty else { return }
             if store.phase == .ready { setText(query); submit(query) } else { linked = query }
         }
-        // The lookup is ready the moment LeXi opens, as on the desktop, unless a page is reopened. The
-        // field may join the hierarchy a moment after the first appearance, so focus is asked for again
-        // on the next turn.
-        .defaultFocus($searching, !reopens)
+        // The lookup is ready the moment LeXi opens, as on the desktop. The field may join the hierarchy
+        // a moment after the first appearance, so focus is asked for again on the next turn.
+        .defaultFocus($searching, true)
         .task {
             await Task.yield()
             // For UI checks and screenshots: `-LexiSettings YES` opens settings at launch.
-            if UserDefaults.standard.bool(forKey: "LexiSettings") { showSettings = true } else if !reopens { searching = true }
+            if UserDefaults.standard.bool(forKey: "LexiSettings") { showSettings = true } else { searching = true }
         }
     }
 
@@ -121,9 +128,17 @@ struct RootView: View {
         // For UI checks and screenshots: `-LexiLookup <text>` looks something up instead (LeXiMobileApp).
         guard UserDefaults.standard.string(forKey: "LexiLookup")?.isEmpty != false, reopens, store.view.kind == .home else { return }
         reopening = savedScroll
-        searching = false
         let query = savedQuery
-        Task { await store.submit(query, restore: true) }
+        Task { await store.submit(query, restore: true); focusQuery() }
+    }
+
+    // Ready for a new word without leaving the page: the query field takes focus with its text
+    // selected, so typing replaces it. Not while a sheet covers the page.
+    private func focusQuery() {
+        guard !showSettings && !welcoming else { return }
+        searching = true
+        // Once the field is first responder, or the selection does not take.
+        Task { await Task.yield(); selection = TextSelection(range: text.startIndex..<text.endIndex) }
     }
 
     // For UI checks and screenshots: `-LexiWelcome YES` shows the welcome sheet again.
@@ -244,7 +259,7 @@ struct RootView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-                TextField("查词或翻译", text: $text, axis: .vertical)
+                TextField("查词或翻译", text: $text, selection: $selection, axis: .vertical)
                     .lineLimit(1...4)
                     .font(.system(size: 18))
                     .focused($searching)
@@ -374,7 +389,8 @@ struct RootView: View {
         }
     }
 
-    private func setText(_ value: String) { if text != value { programmatic = true; text = value } }
+    // A selection of the text being replaced would point into the old string.
+    private func setText(_ value: String) { if text != value { programmatic = true; selection = nil; text = value } }
 
     // Return on the keyboard ends the query; pasted line breaks stay, for translation.
     private func edited(_ old: String, _ value: String) {
