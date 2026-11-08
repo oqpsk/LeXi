@@ -392,10 +392,11 @@ struct RootView: View {
     // A selection of the text being replaced would point into the old string.
     private func setText(_ value: String) { if text != value { programmatic = true; selection = nil; text = value } }
 
-    // Return on the keyboard ends the query; pasted line breaks stay, for translation.
+    // Return on the keyboard ends the query wherever the cursor is; pasted line breaks stay, for
+    // translation.
     private func edited(_ old: String, _ value: String) {
         if programmatic { programmatic = false; return }
-        if value.hasSuffix("\n") && String(value.dropLast()) == old {
+        if QueryInput.typedReturn(old, value) {
             setText(old); submit(old); return
         }
         if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
